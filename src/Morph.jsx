@@ -16,8 +16,8 @@ export default function Morph({ leftVal, rightVal }) {
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const hScale = THREE.MathUtils.lerp(0.3, 2.5, lv)
-    const vScale = THREE.MathUtils.lerp(0.3, 2.5, rv)
+    const hScale = THREE.MathUtils.lerp(0.6, 2.5, lv)
+    const vScale = THREE.MathUtils.lerp(0.6, 2.0, rv)
     meshRef.current.scale.set(hScale, vScale, hScale)
 
     tempColor.copy(GREEN).lerp(BLUE, lv)
