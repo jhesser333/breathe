@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
 const GREEN = new THREE.Color('#22dd55')
@@ -27,8 +28,7 @@ export default function Morph({ leftVal, rightVal }) {
   })
 
   return (
-    <mesh ref={meshRef}>
-      <sphereGeometry args={[1, 64, 64]} />
+    <RoundedBox ref={meshRef} args={[2, 2, 2]} radius={0.3} smoothness={4}>
       <meshStandardMaterial
         ref={matRef}
         color="#22dd55"
@@ -37,6 +37,6 @@ export default function Morph({ leftVal, rightVal }) {
         roughness={0.3}
         metalness={0.1}
       />
-    </mesh>
+    </RoundedBox>
   )
 }

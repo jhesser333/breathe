@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import Morph from './Morph'
+import Gates from './Gates'
 import Sliders from './Sliders'
 
 export default function App() {
@@ -13,13 +14,14 @@ export default function App() {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [0, 4, 4], fov: 50 }}
+        camera={{ position: [0, 2.9, 5], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
       >
         <color attach="background" args={['#111111']} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <Morph leftVal={leftVal} rightVal={rightVal} />
+        <Gates />
       </Canvas>
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
