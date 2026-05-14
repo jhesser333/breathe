@@ -5,7 +5,7 @@ const POOL_SIZE = 3
 const GATE_SPEED = 5
 const SPAWN_Z = -20
 const DESPAWN_Z = 8
-const SPAWN_INTERVAL = 4
+const SPAWN_INTERVAL = 8
 
 const BOX_SIZE = 0.6
 const BOX_X = 1.2
