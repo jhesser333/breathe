@@ -6,7 +6,7 @@ const OPTIONS = [
   },
   {
     id: 'timed',
-    label: 'Timed Breathing',
+    label: 'Paced Breathing',
     desc: 'Time your breath to fit through the gates',
   },
   {

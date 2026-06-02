@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 const LOW_THRESHOLD = 0.15   // "at the bottom"
 const HIGH_THRESHOLD = 0.5   // must reach this height to count as a real breath
 const MIN_BREATH_SECONDS = 1.5
-const MIN_BREATHS = 5
+const MIN_BREATHS = 3
 const RAMP_SECONDS = 60
 
 export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnIntervalRef, onGatesReady }) {
