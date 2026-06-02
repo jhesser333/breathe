@@ -5,12 +5,11 @@ const POOL_SIZE = 3
 const GATE_SPEED = 5
 const SPAWN_Z = -20
 const DESPAWN_Z = 8
-const SPAWN_INTERVAL = 8
 
 const BOX_SIZE = 0.6
 const BOX_X = 1.2
 
-export default function Gates() {
+export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
   const slots = useRef(
     Array.from({ length: POOL_SIZE }, () => ({ z: 0, active: false }))
   )
@@ -21,12 +20,12 @@ export default function Gates() {
   useFrame((_, delta) => {
     elapsed.current += delta
 
-    if (elapsed.current >= nextSpawn.current) {
+    if (gatesEnabledRef.current && elapsed.current >= nextSpawn.current) {
       const slot = slots.current.find(s => !s.active)
       if (slot) {
         slot.z = SPAWN_Z
         slot.active = true
-        nextSpawn.current = elapsed.current + SPAWN_INTERVAL
+        nextSpawn.current = elapsed.current + spawnIntervalRef.current
       }
     }
 
