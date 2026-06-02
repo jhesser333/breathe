@@ -19,7 +19,7 @@ const STILLNESS_MS = 10000
 
 export default function App() {
   const leftVal = useRef(0)
-  const rightVal = useRef(0)
+  const rightVal = useRef(1)
 
   const [mode, setMode] = useState(null)
   const [tutorialText, setTutorialText] = useState('')
@@ -27,18 +27,22 @@ export default function App() {
 
   const lastMoveTime = useRef(0)
   const tutorialVisibleRef = useRef(false)
+  const tutorialForcedRef = useRef(false)
   const displayTimerRef = useRef(null)
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
 
-  // Show current tutorialText for DISPLAY_MS then hide
-  const showTutorial = useCallback(() => {
+  // Show current tutorialText for DISPLAY_MS then hide.
+  // Pass { force: true } to keep text visible even while sliders are moving.
+  const showTutorial = useCallback((opts = {}) => {
+    tutorialForcedRef.current = opts.force ?? false
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     clearTimeout(displayTimerRef.current)
     displayTimerRef.current = setTimeout(() => {
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
+      tutorialForcedRef.current = false
     }, DISPLAY_MS)
   }, [])
 
@@ -59,7 +63,7 @@ export default function App() {
   const setLeft = useCallback((v) => {
     leftVal.current = v
     lastMoveTime.current = Date.now()
-    if (tutorialVisibleRef.current) {
+    if (tutorialVisibleRef.current && !tutorialForcedRef.current) {
       clearTimeout(displayTimerRef.current)
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
@@ -69,7 +73,7 @@ export default function App() {
   const setRight = useCallback((v) => {
     rightVal.current = v
     lastMoveTime.current = Date.now()
-    if (tutorialVisibleRef.current) {
+    if (tutorialVisibleRef.current && !tutorialForcedRef.current) {
       clearTimeout(displayTimerRef.current)
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
@@ -91,7 +95,7 @@ export default function App() {
   // Called by SlowingDownController when 5 breath cycles are recorded
   const handleGatesReady = useCallback(() => {
     setTutorialText(TEXTS.slowing_gates)
-    setTimeout(() => showTutorial(), 0)
+    setTimeout(() => showTutorial({ force: true }), 0)
   }, [showTutorial])
 
   const handleBack = useCallback(() => {
@@ -99,6 +103,7 @@ export default function App() {
     clearTimeout(displayTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
+    tutorialForcedRef.current = false
     setMode(null)
   }, [])
 
@@ -114,7 +119,7 @@ export default function App() {
         camera={{ position: [0, 2.9, 5], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
       >
-        <color attach="background" args={['#111111']} />
+        <color attach="background" args={['#1a1028']} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <Morph leftVal={leftVal} rightVal={rightVal} />

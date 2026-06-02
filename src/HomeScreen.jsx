@@ -20,7 +20,7 @@ export default function HomeScreen({ onSelect }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: '#111111',
+      background: '#1a1028',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       gap: 16, padding: 32,
