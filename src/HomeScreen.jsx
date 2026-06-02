@@ -2,7 +2,7 @@ const OPTIONS = [
   {
     id: 'basic',
     label: 'Basic',
-    desc: 'Move freely with your breath, no pressure',
+    desc: 'Move with your breath',
   },
   {
     id: 'timed',
@@ -12,7 +12,7 @@ const OPTIONS = [
   {
     id: 'slowing',
     label: 'Slowing Down',
-    desc: 'The app learns your breath and gently guides you deeper',
+    desc: 'The app times your breathing then gently helps you slow down',
   },
 ]
 

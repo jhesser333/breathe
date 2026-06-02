@@ -57,15 +57,13 @@ export default function App() {
     return () => clearInterval(id)
   }, [mode])
 
-  // Force-visible timer: after 10s, revert to normal stillness rules
+  // Force-visible timer: after 10s, always hide then let stillness rules take over
   useEffect(() => {
     if (!tutorialForce) return
     const id = setTimeout(() => {
       setTutorialForce(false)
       isForcedRef.current = false
-      if (Date.now() - lastMoveTime.current < STILLNESS_MS) {
-        setTutorialShow(false)
-      }
+      setTutorialShow(false)
     }, FORCE_VISIBLE_MS)
     return () => clearTimeout(id)
   }, [tutorialForce])
@@ -74,8 +72,8 @@ export default function App() {
     gatesEnabledRef.current = m === 'timed'
     spawnIntervalRef.current = 8
     lastMoveTime.current = 0
-    setTutorialForce(false)
-    isForcedRef.current = false
+    isForcedRef.current = true
+    setTutorialForce(true)
     setTutorialShow(true)
     setTutorialText(m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic'])
     setMode(m)

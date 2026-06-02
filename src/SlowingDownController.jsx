@@ -1,7 +1,8 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-const BREATH_THRESHOLD = 0.5
+const LOW_THRESHOLD = 0.15   // "at the bottom"
+const HIGH_THRESHOLD = 0.5   // must reach this height to count as a real breath
 const MIN_BREATH_SECONDS = 1.5
 const MIN_LEARNING_SECONDS = 60
 const MIN_BREATHS = 5
@@ -10,7 +11,8 @@ const RAMP_SECONDS = 60
 export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnIntervalRef, onGatesReady }) {
   const startTime = useRef(null)
   const prevLeft = useRef(null)
-  const breathStart = useRef(null)
+  const cycleStart = useRef(null)
+  const hadPeak = useRef(false)
   const breaths = useRef([])
   const phase = useRef('learning')
   const avgBreath = useRef(0)
@@ -30,17 +32,22 @@ export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnI
     const lv = leftVal.current
     const prev = prevLeft.current
 
-    // Detect upward threshold crossing (inhale start)
-    if (prev <= BREATH_THRESHOLD && lv > BREATH_THRESHOLD) {
-      breathStart.current = now
+    // Slider reached top (inhale peak)
+    if (prev < HIGH_THRESHOLD && lv >= HIGH_THRESHOLD && cycleStart.current !== null) {
+      hadPeak.current = true
     }
-    // Detect downward threshold crossing (exhale complete = full breath)
-    if (prev > BREATH_THRESHOLD && lv <= BREATH_THRESHOLD && breathStart.current !== null) {
-      const duration = now - breathStart.current
-      if (duration >= MIN_BREATH_SECONDS) {
-        breaths.current.push(duration)
+
+    // Slider returned to bottom (cycle end / next cycle start)
+    if (prev > LOW_THRESHOLD && lv <= LOW_THRESHOLD) {
+      if (cycleStart.current !== null && hadPeak.current) {
+        const duration = now - cycleStart.current
+        if (duration >= MIN_BREATH_SECONDS) {
+          breaths.current.push(duration)
+        }
       }
-      breathStart.current = null
+      // Start tracking the next cycle from this bottom point
+      cycleStart.current = now
+      hadPeak.current = false
     }
 
     prevLeft.current = lv
