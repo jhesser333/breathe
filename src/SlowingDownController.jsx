@@ -4,12 +4,10 @@ import { useFrame } from '@react-three/fiber'
 const LOW_THRESHOLD = 0.15   // "at the bottom"
 const HIGH_THRESHOLD = 0.5   // must reach this height to count as a real breath
 const MIN_BREATH_SECONDS = 1.5
-const MIN_LEARNING_SECONDS = 60
 const MIN_BREATHS = 5
 const RAMP_SECONDS = 60
 
 export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnIntervalRef, onGatesReady }) {
-  const startTime = useRef(null)
   const prevLeft = useRef(null)
   const cycleStart = useRef(null)
   const hadPeak = useRef(false)
@@ -23,8 +21,7 @@ export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnI
   useFrame((state) => {
     const now = state.clock.elapsedTime
 
-    if (startTime.current === null) {
-      startTime.current = now
+    if (prevLeft.current === null) {
       prevLeft.current = leftVal.current
       return
     }
@@ -53,9 +50,8 @@ export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnI
     prevLeft.current = lv
 
     if (phase.current === 'learning') {
-      const elapsed = now - startTime.current
       const count = breaths.current.length
-      if (elapsed >= MIN_LEARNING_SECONDS && count >= MIN_BREATHS) {
+      if (count >= MIN_BREATHS) {
         const avg = breaths.current.reduce((a, b) => a + b, 0) / count
         avgBreath.current = avg
         spawnIntervalRef.current = avg

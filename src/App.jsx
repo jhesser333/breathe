@@ -14,8 +14,8 @@ const TEXTS = {
   slowing_gates: 'Now begin to time your breath so the object fits through the gates',
 }
 
+const DISPLAY_MS = 5000
 const STILLNESS_MS = 10000
-const FORCE_VISIBLE_MS = 10000
 
 export default function App() {
   const leftVal = useRef(0)
@@ -23,72 +23,82 @@ export default function App() {
 
   const [mode, setMode] = useState(null)
   const [tutorialText, setTutorialText] = useState('')
-  const [tutorialShow, setTutorialShow] = useState(true)
-  const [tutorialForce, setTutorialForce] = useState(false)
+  const [tutorialVisible, setTutorialVisible] = useState(false)
 
   const lastMoveTime = useRef(0)
-  const isForcedRef = useRef(false)
+  const tutorialVisibleRef = useRef(false)
+  const displayTimerRef = useRef(null)
   const gatesEnabledRef = useRef(false)
-  const spawnIntervalRef = useRef(8)
+  const spawnIntervalRef = useRef(12)
 
-  // Keep isForcedRef in sync so setLeft/setRight callbacks don't go stale
-  useEffect(() => { isForcedRef.current = tutorialForce }, [tutorialForce])
+  // Show current tutorialText for DISPLAY_MS then hide
+  const showTutorial = useCallback(() => {
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    clearTimeout(displayTimerRef.current)
+    displayTimerRef.current = setTimeout(() => {
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+    }, DISPLAY_MS)
+  }, [])
+
+  // Stillness check: if text is hidden and sliders haven't moved for STILLNESS_MS, show again
+  useEffect(() => {
+    if (!mode) return
+    const id = setInterval(() => {
+      if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
+        showTutorial()
+      }
+    }, 500)
+    return () => clearInterval(id)
+  }, [mode, showTutorial])
+
+  // Cleanup display timer on unmount
+  useEffect(() => () => clearTimeout(displayTimerRef.current), [])
 
   const setLeft = useCallback((v) => {
     leftVal.current = v
     lastMoveTime.current = Date.now()
-    if (!isForcedRef.current) setTutorialShow(false)
+    if (tutorialVisibleRef.current) {
+      clearTimeout(displayTimerRef.current)
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+    }
   }, [])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
     lastMoveTime.current = Date.now()
-    if (!isForcedRef.current) setTutorialShow(false)
+    if (tutorialVisibleRef.current) {
+      clearTimeout(displayTimerRef.current)
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+    }
   }, [])
-
-  // Check for 10s of slider stillness → fade text back in
-  useEffect(() => {
-    if (!mode) return
-    const id = setInterval(() => {
-      if (Date.now() - lastMoveTime.current >= STILLNESS_MS) {
-        setTutorialShow(true)
-      }
-    }, 500)
-    return () => clearInterval(id)
-  }, [mode])
-
-  // Force-visible timer: after 10s, always hide then let stillness rules take over
-  useEffect(() => {
-    if (!tutorialForce) return
-    const id = setTimeout(() => {
-      setTutorialForce(false)
-      isForcedRef.current = false
-      setTutorialShow(false)
-    }, FORCE_VISIBLE_MS)
-    return () => clearTimeout(id)
-  }, [tutorialForce])
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = m === 'timed'
-    spawnIntervalRef.current = 8
-    lastMoveTime.current = 0
-    isForcedRef.current = true
-    setTutorialForce(true)
-    setTutorialShow(true)
-    setTutorialText(m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic'])
+    spawnIntervalRef.current = m === 'timed' ? 12 : 8
+    lastMoveTime.current = Date.now() - STILLNESS_MS - 1 // treat as already-still
+    clearTimeout(displayTimerRef.current)
+    const text = m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic']
+    setTutorialText(text)
     setMode(m)
-  }, [])
+    // show immediately on entry — use timeout to let text state settle first
+    setTimeout(() => showTutorial(), 0)
+  }, [showTutorial])
 
-  // Called by SlowingDownController when conditions are met
+  // Called by SlowingDownController when 5 breath cycles are recorded
   const handleGatesReady = useCallback(() => {
     setTutorialText(TEXTS.slowing_gates)
-    setTutorialForce(true)
-    isForcedRef.current = true
-    setTutorialShow(true)
-  }, [])
+    setTimeout(() => showTutorial(), 0)
+  }, [showTutorial])
 
   const handleBack = useCallback(() => {
     gatesEnabledRef.current = false
+    clearTimeout(displayTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
     setMode(null)
   }, [])
 
@@ -124,10 +134,7 @@ export default function App() {
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
           <Sliders onLeft={setLeft} onRight={setRight} />
         </div>
-        <TutorialText
-          text={tutorialText}
-          visible={tutorialShow || tutorialForce}
-        />
+        <TutorialText text={tutorialText} visible={tutorialVisible} />
         <button
           onClick={handleBack}
           style={{
