@@ -6,13 +6,7 @@ import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
-
-const TEXTS = {
-  basic: 'Move the sliders up and down along with your breath',
-  timed: 'Move the sliders up and down with your breath. Time your breathing so the object fits through the gates',
-  slowing_learn: 'Move the sliders up and down along with your breath',
-  slowing_gates: 'Now begin to time your breath so the object fits through the gates',
-}
+import { TEXTS } from './copy'
 
 const DISPLAY_MS = 5000
 const STILLNESS_MS = 10000

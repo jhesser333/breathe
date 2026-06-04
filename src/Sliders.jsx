@@ -19,15 +19,17 @@ const labelStyle = {
   pointerEvents: 'none',
 }
 
+const THUMB_SIZE = 52
+
 function ThumbDot({ value }) {
   return (
     <div style={{
       position: 'absolute',
       left: '50%',
-      bottom: `calc(${value * 100}% - 14px)`,
+      bottom: `calc(${value} * (100% - ${THUMB_SIZE}px))`,
       transform: 'translateX(-50%)',
-      width: '28px',
-      height: '28px',
+      width: `${THUMB_SIZE}px`,
+      height: `${THUMB_SIZE}px`,
       borderRadius: '50%',
       background: 'rgba(255,255,255,0.7)',
       boxShadow: '0 0 8px rgba(255,255,255,0.4)',
@@ -41,7 +43,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
     <div style={{
       position: 'absolute',
       [side]: 12,
-      top: '8%', bottom: '8%',
+      top: '45%', bottom: '8%',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 6,
     }}>
@@ -49,7 +51,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
       <div
         ref={sliderRef}
         style={{
-          flex: 1, width: 56,
+          flex: 1, width: 62,
           display: 'flex', alignItems: 'stretch',
           cursor: 'pointer', userSelect: 'none', touchAction: 'none',
         }}
