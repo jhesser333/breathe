@@ -16,7 +16,7 @@ export default function Morph({ leftVal, rightVal }) {
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const hScale = THREE.MathUtils.lerp(1.0, 2.0, lv)
+    const hScale = THREE.MathUtils.lerp(0.75, 2.0, lv)
     const vScale = THREE.MathUtils.lerp(1.2, 2.5, rv)
     meshRef.current.scale.set(hScale, vScale, 1)
 
