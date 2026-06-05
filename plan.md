@@ -53,6 +53,12 @@
 - Background `#1a1028` (dark desaturated purple)
 - Ambient + directional lighting
 
+**Axis orientation**
+- **X** — width (left/right)
+- **Y** — height (up/down)
+- **Z** — depth along the road (negative Z = ahead/into screen; positive Z = behind/toward camera)
+- Morph sits at origin `[0, 0, 0]`; gates spawn at z=−20 and travel toward z=0
+
 ---
 
 ## Ideas / next iterations
