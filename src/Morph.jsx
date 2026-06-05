@@ -1,6 +1,5 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Capsule } from '@react-three/drei'
 import * as THREE from 'three'
 
 const GREEN = new THREE.Color('#22dd55')
@@ -17,7 +16,7 @@ export default function Morph({ leftVal, rightVal }) {
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const hScale = THREE.MathUtils.lerp(0.5, 2.5, lv)
+    const hScale = THREE.MathUtils.lerp(1.0, 2.5, lv)
     const vScale = THREE.MathUtils.lerp(1.2, 2.5, rv)
     meshRef.current.scale.set(hScale, vScale, 1)
 
@@ -28,7 +27,8 @@ export default function Morph({ leftVal, rightVal }) {
   })
 
   return (
-    <Capsule ref={meshRef} args={[0.4, 0.3, 4, 16]}>
+    <mesh ref={meshRef}>
+      <sphereGeometry args={[0.5, 32, 16]} />
       <meshStandardMaterial
         ref={matRef}
         color="#22dd55"
@@ -37,6 +37,6 @@ export default function Morph({ leftVal, rightVal }) {
         roughness={0.3}
         metalness={0.1}
       />
-    </Capsule>
+    </mesh>
   )
 }

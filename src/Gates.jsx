@@ -18,7 +18,7 @@ function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
 function makeSlotB() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0 }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, fadeDelay: 0 }
 }
 
 export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
@@ -41,6 +41,7 @@ export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
       Object.assign(slot, makeSlotB())
       slot.z = GATE_B_Z
       slot.speed = speed
+      slot.fadeDelay = FADE_DURATION
       slot.active = true
     }
 
@@ -94,15 +95,21 @@ export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
       if (!group) return
       if (!slot.active) { group.visible = false; return }
 
-      slot.fadeElapsed += delta
-      const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      if (matRefsB.current[i]) matRefsB.current[i].opacity = opacity
-
       slot.z += slot.speed * delta
 
       if (slot.z > DESPAWN_Z) { slot.active = false; group.visible = false; return }
 
       group.position.z = slot.z
+
+      if (slot.fadeDelay > 0) {
+        slot.fadeDelay -= delta
+        group.visible = false
+        return
+      }
+
+      slot.fadeElapsed += delta
+      const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
+      if (matRefsB.current[i]) matRefsB.current[i].opacity = opacity
       group.visible = true
     })
   })

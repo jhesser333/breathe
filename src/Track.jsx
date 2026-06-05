@@ -4,7 +4,7 @@ import { Line } from '@react-three/drei'
 
 const PERIOD = 20      // matches gate spacing: Gate A every 20 units
 const MIN_HALF = 0.08  // half-width at Gate A positions (nearly touching)
-const MAX_HALF = 0.6   // half-width at Gate B positions (wider than Gate B mesh)
+const MAX_HALF = 1.2   // half-width at Gate B positions (wider than Gate B mesh)
 const Y = 0            // road surface
 const Z_START = -70
 const Z_END = 10
@@ -48,8 +48,8 @@ export default function Track({ gatesEnabledRef, spawnIntervalRef }) {
 
   return (
     <group ref={groupRef} visible={false}>
-      <Line points={leftPoints} color="white" lineWidth={3} />
-      <Line points={rightPoints} color="white" lineWidth={3} />
+      <Line points={leftPoints} color="white" lineWidth={3} transparent opacity={0.05} />
+      <Line points={rightPoints} color="white" lineWidth={3} transparent opacity={0.05} />
     </group>
   )
 }
