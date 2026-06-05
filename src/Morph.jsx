@@ -19,16 +19,16 @@ export default function Morph({ leftVal, rightVal }) {
 
     const hScale = THREE.MathUtils.lerp(0.6, 2.5, lv)
     const vScale = THREE.MathUtils.lerp(0.6, 2.0, rv)
-    meshRef.current.scale.set(hScale, vScale, hScale)
+    meshRef.current.scale.set(hScale, vScale, 1)
 
     tempColor.copy(GREEN).lerp(BLUE, lv)
     matRef.current.color.copy(tempColor)
     matRef.current.emissive.copy(tempColor)
-    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(0, 4, rv)
+    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(0.2, 0.8, rv)
   })
 
   return (
-    <RoundedBox ref={meshRef} args={[2, 2, 2]} radius={0.3} smoothness={4}>
+    <RoundedBox ref={meshRef} args={[1, 1, 1]} radius={0.15} smoothness={4}>
       <meshStandardMaterial
         ref={matRef}
         color="#22dd55"
