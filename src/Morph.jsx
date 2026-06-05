@@ -17,14 +17,14 @@ export default function Morph({ leftVal, rightVal }) {
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const hScale = THREE.MathUtils.lerp(0.6, 2.5, lv)
-    const vScale = THREE.MathUtils.lerp(0.6, 2.0, rv)
+    const hScale = THREE.MathUtils.lerp(0.5, 2.5, lv)
+    const vScale = THREE.MathUtils.lerp(0.6, 2.5, rv)
     meshRef.current.scale.set(hScale, vScale, 1)
 
     tempColor.copy(GREEN).lerp(BLUE, lv)
     matRef.current.color.copy(tempColor)
     matRef.current.emissive.copy(tempColor)
-    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(0.2, 0.8, rv)
+    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(0.5, 0.85, rv)
   })
 
   return (

@@ -39,6 +39,8 @@ function ThumbDot({ value }) {
 }
 
 function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
+  const fillFromTop = side === 'right'
+  const fillHeight = fillFromTop ? (1 - value) * 100 : value * 100
   return (
     <div style={{
       position: 'absolute',
@@ -57,6 +59,15 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
         }}
       >
         <div style={trackInner}>
+          <div style={{
+            position: 'absolute',
+            [fillFromTop ? 'top' : 'bottom']: 0,
+            left: 0, right: 0,
+            height: `${fillHeight}%`,
+            background: 'rgba(255,255,255,0.35)',
+            borderRadius: 28,
+            pointerEvents: 'none',
+          }} />
           <ThumbDot value={value} />
         </div>
       </div>

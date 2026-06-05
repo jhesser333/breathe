@@ -6,7 +6,7 @@ const SPAWN_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
 
-const EGG_X = 1.2
+const EGG_X = 0.65
 const EGG_COLOR = '#c89070'
 
 export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
