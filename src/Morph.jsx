@@ -21,7 +21,7 @@ export default function Morph({ leftVal, rightVal }) {
 
     const hScale = THREE.MathUtils.lerp(0.75, 2.0, lv)
     const vScale = THREE.MathUtils.lerp(1.2, 2.5, rv)
-    const spreadX = THREE.MathUtils.lerp(0, 0.85, lv)
+    const spreadX = THREE.MathUtils.lerp(0, 1.4, lv)
 
     meshLeftRef.current.scale.set(hScale, vScale, 1)
     meshRightRef.current.scale.set(hScale, vScale, 1)
