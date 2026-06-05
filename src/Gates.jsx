@@ -5,7 +5,8 @@ import { RoundedBox } from '@react-three/drei'
 const POOL_A = 3
 const POOL_B = 3
 const SPAWN_Z = -20
-const GATE_B_Z = -10
+const GATE_B_Z = -30
+const GATE_B_FADE_Z = -20  // Gate B starts fading in at same Z as Gate A spawns
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
 
@@ -18,7 +19,7 @@ function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
 function makeSlotB() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0, fadeDelay: 0 }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0 }
 }
 
 export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
@@ -32,7 +33,6 @@ export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
   const matRefsB = useRef(Array.from({ length: POOL_B }, () => null))
 
   const wasEnabled = useRef(false)
-  const firstSpawn = useRef(true)
 
   useFrame((_, delta) => {
     const spawnB = (speed) => {
@@ -41,7 +41,6 @@ export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
       Object.assign(slot, makeSlotB())
       slot.z = GATE_B_Z
       slot.speed = speed
-      slot.fadeDelay = FADE_DURATION
       slot.active = true
     }
 
@@ -52,19 +51,15 @@ export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
       slot.z = SPAWN_Z
       slot.speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
       slot.active = true
-      // Skip Gate B on the very first spawn so sequence starts A, B, A, B...
-      if (!firstSpawn.current) spawnB(slot.speed)
-      firstSpawn.current = false
+      spawnB(slot.speed)
     }
 
     if (gatesEnabledRef.current && !wasEnabled.current) {
       wasEnabled.current = true
-      firstSpawn.current = true
       spawnA()
     }
     if (!gatesEnabledRef.current) {
       wasEnabled.current = false
-      firstSpawn.current = true
     }
 
     slotsA.current.forEach((slot, i) => {
@@ -101,8 +96,7 @@ export default function Gates({ gatesEnabledRef, spawnIntervalRef }) {
 
       group.position.z = slot.z
 
-      if (slot.fadeDelay > 0) {
-        slot.fadeDelay -= delta
+      if (slot.z < GATE_B_FADE_Z) {
         group.visible = false
         return
       }
