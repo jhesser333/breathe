@@ -16,7 +16,7 @@ const OPTIONS = [
   },
 ]
 
-export default function HomeScreen({ onSelect }) {
+export default function HomeScreen({ onSelect, onPersonalize }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -26,6 +26,19 @@ export default function HomeScreen({ onSelect }) {
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
+      <button
+        onClick={onPersonalize}
+        style={{
+          position: 'absolute', top: 16, left: 16,
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+          padding: '8px 14px', fontSize: 13,
+          cursor: 'pointer', fontFamily: 'sans-serif',
+        }}
+      >
+        Personalize
+      </button>
       <h1 style={{
         color: '#ffffff', fontSize: 28, fontWeight: 300,
         marginBottom: 16, letterSpacing: '0.12em', margin: '0 0 24px',

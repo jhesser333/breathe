@@ -1,12 +1,18 @@
 import { useRef, useCallback, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
-import Morph from './Morph'
-import Gates from './Gates'
+import MorphA from './MorphA'
+import MorphB from './MorphB'
+import GatesA from './GatesA'
+import GatesB from './GatesB'
 import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
+import PersonalizeScreen from './PersonalizeScreen'
+import ShapeOptionsScreen from './ShapeOptionsScreen'
+import ColorOptionsScreen from './ColorOptionsScreen'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { PALETTES } from './palettes'
 import { TEXTS } from './copy'
 
 const DISPLAY_MS = 5000
@@ -16,9 +22,24 @@ export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
 
+  const [screen, setScreen] = useState('home')
   const [mode, setMode] = useState(null)
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
+  const [shapeOption, setShapeOptionState] = useState(() => localStorage.getItem('shapeOption') || 'a')
+  const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
+
+  const setShapeOption = useCallback((v) => {
+    localStorage.setItem('shapeOption', v)
+    setShapeOptionState(v)
+  }, [])
+
+  const setColorPalette = useCallback((v) => {
+    localStorage.setItem('colorPalette', v)
+    setColorPaletteState(v)
+  }, [])
+
+  const palette = PALETTES[colorPalette]
 
   const lastMoveTime = useRef(0)
   const tutorialVisibleRef = useRef(false)
@@ -27,8 +48,6 @@ export default function App() {
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
 
-  // Show current tutorialText for DISPLAY_MS then hide.
-  // Pass { force: true } to keep text visible even while sliders are moving.
   const showTutorial = useCallback((opts = {}) => {
     tutorialForcedRef.current = opts.force ?? false
     setTutorialVisible(true)
@@ -41,18 +60,16 @@ export default function App() {
     }, DISPLAY_MS)
   }, [])
 
-  // Stillness check: if text is hidden and sliders haven't moved for STILLNESS_MS, show again
   useEffect(() => {
-    if (!mode) return
+    if (screen !== 'experience') return
     const id = setInterval(() => {
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
         showTutorial()
       }
     }, 500)
     return () => clearInterval(id)
-  }, [mode, showTutorial])
+  }, [screen, showTutorial])
 
-  // Cleanup display timer on unmount
   useEffect(() => () => clearTimeout(displayTimerRef.current), [])
 
   const setLeft = useCallback((v) => {
@@ -78,35 +95,64 @@ export default function App() {
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = m === 'timed'
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
-    lastMoveTime.current = Date.now() - STILLNESS_MS - 1 // treat as already-still
+    lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     clearTimeout(displayTimerRef.current)
     const text = m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic']
     setTutorialText(text)
     setMode(m)
-    // show immediately on entry — use timeout to let text state settle first
+    setScreen('experience')
     setTimeout(() => showTutorial(), 0)
   }, [showTutorial])
 
-  // Called by SlowingDownController when 5 breath cycles are recorded
   const handleGatesReady = useCallback(() => {
     setTutorialText(TEXTS.slowing_gates)
     setTimeout(() => showTutorial({ force: true }), 0)
   }, [showTutorial])
 
-  const handleBack = useCallback(() => {
+  const handleBackFromExperience = useCallback(() => {
     gatesEnabledRef.current = false
     clearTimeout(displayTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
     tutorialForcedRef.current = false
     setMode(null)
+    setScreen('home')
   }, [])
 
-  if (!mode) {
-    return <HomeScreen onSelect={handleSelectMode} />
+  if (screen === 'home') {
+    return <HomeScreen onSelect={handleSelectMode} onPersonalize={() => setScreen('personalize')} />
+  }
+  if (screen === 'personalize') {
+    return (
+      <PersonalizeScreen
+        onShape={() => setScreen('shape')}
+        onColor={() => setScreen('color')}
+        onBack={() => setScreen('home')}
+      />
+    )
+  }
+  if (screen === 'shape') {
+    return (
+      <ShapeOptionsScreen
+        selected={shapeOption}
+        onSelect={setShapeOption}
+        onBack={() => setScreen('personalize')}
+      />
+    )
+  }
+  if (screen === 'color') {
+    return (
+      <ColorOptionsScreen
+        selected={colorPalette}
+        onSelect={setColorPalette}
+        onBack={() => setScreen('personalize')}
+      />
+    )
   }
 
   const hasGates = mode === 'timed' || mode === 'slowing'
+  const MorphComponent = shapeOption === 'b' ? MorphB : MorphA
+  const GatesComponent = shapeOption === 'b' ? GatesB : GatesA
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -114,15 +160,19 @@ export default function App() {
         camera={{ position: [0, 2, 5], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
       >
-        <color attach="background" args={['#1a1028']} />
+        <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
-        <Morph leftVal={leftVal} rightVal={rightVal} />
+        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
         {hasGates && (
-          <Gates gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />
+          <GatesComponent
+            gatesEnabledRef={gatesEnabledRef}
+            spawnIntervalRef={spawnIntervalRef}
+            gateColor={palette.gateColor}
+          />
         )}
         {mode === 'slowing' && (
           <SlowingDownController
@@ -139,7 +189,7 @@ export default function App() {
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
         <button
-          onClick={handleBack}
+          onClick={handleBackFromExperience}
           style={{
             position: 'absolute', top: 16, left: 16,
             background: 'rgba(255,255,255,0.08)',

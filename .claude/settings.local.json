@@ -13,7 +13,8 @@
       "Bash(git remote *)",
       "Bash(git branch *)",
       "Bash(git push *)",
-      "WebFetch(domain:breathe-omega-ivory.vercel.app)"
+      "WebFetch(domain:breathe-omega-ivory.vercel.app)",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Claude Code Projects\\\\Breathe\\\\src\\\\GatesB.jsx'\\) -replace 'export default function GatesA', 'export default function GatesB' | Set-Content 'C:\\\\Claude Code Projects\\\\Breathe\\\\src\\\\GatesB.jsx'\")"
     ]
   }
 }
