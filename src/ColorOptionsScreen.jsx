@@ -19,7 +19,7 @@ function optionBtn(selected) {
   }
 }
 
-export default function ColorOptionsScreen({ selected, onSelect, onBack }) {
+export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -30,6 +30,7 @@ export default function ColorOptionsScreen({ selected, onSelect, onBack }) {
       fontFamily: 'sans-serif',
     }}>
       <button style={backBtnStyle} onClick={onBack}>← Personalize</button>
+      <button style={{ ...backBtnStyle, left: 'auto', right: 16 }} onClick={onHome}>Home</button>
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Color Options
       </h1>

@@ -137,6 +137,7 @@ export default function App() {
         selected={shapeOption}
         onSelect={setShapeOption}
         onBack={() => setScreen('personalize')}
+        onHome={() => setScreen('home')}
       />
     )
   }
@@ -146,6 +147,7 @@ export default function App() {
         selected={colorPalette}
         onSelect={setColorPalette}
         onBack={() => setScreen('personalize')}
+        onHome={() => setScreen('home')}
       />
     )
   }
