@@ -2,16 +2,23 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const MID_COLOR = '#2299aa'
+const BASE_COLOR = '#2299aa'
+const EMISSIVE_COLOR = '#ff69b4'
 
 export default function Morph({ leftVal, rightVal }) {
   const meshRef = useRef()
   const matRef = useRef()
 
   useFrame(() => {
-    if (!matRef.current) return
+    if (!meshRef.current || !matRef.current) return
+    const lv = leftVal.current
     const rv = rightVal.current
-    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(0.85, 0.5, rv)
+
+    const xzScale = THREE.MathUtils.lerp(2.0, 1.0, lv)
+    const yScale = THREE.MathUtils.lerp(2.0, 0.1, rv)
+    meshRef.current.scale.set(xzScale, yScale, xzScale)
+
+    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(10, 0.2, rv)
   })
 
   return (
@@ -19,9 +26,9 @@ export default function Morph({ leftVal, rightVal }) {
       <sphereGeometry args={[0.5, 32, 16]} />
       <meshStandardMaterial
         ref={matRef}
-        color={MID_COLOR}
-        emissive={MID_COLOR}
-        emissiveIntensity={0.85}
+        color={BASE_COLOR}
+        emissive={EMISSIVE_COLOR}
+        emissiveIntensity={0.2}
         roughness={0.3}
         metalness={0.1}
       />
