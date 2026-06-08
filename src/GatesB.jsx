@@ -12,7 +12,7 @@ const FADE_DURATION = 1.0
 const EMISSIVE_RAMP_IN = 1
 const MAX_EMISSIVE = 3
 const FADE_OUT_START = 0
-const FADE_OUT_DURATION = 1
+const FADE_OUT_DURATION = 2
 
 const GATE_X = 0.65
 const GATE_ARGS = [0.5, 0.75, 0.5]

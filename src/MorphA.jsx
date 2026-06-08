@@ -8,8 +8,8 @@ export default function MorphA({ leftVal, rightVal, palette }) {
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
       fresnelColor:     { value: new THREE.Color(palette.morphEmissive) },
-      fresnelPower:     { value: 3.0 },
-      fresnelIntensity: { value: 0.3 },
+      fresnelPower:     { value: 5.0 },
+      fresnelIntensity: { value: 1.5 },
     }
 
     const mat = new THREE.MeshStandardMaterial({
@@ -46,7 +46,7 @@ uniform float fresnelIntensity;\n` + shader.fragmentShader
     const yScale = THREE.MathUtils.lerp(3.5, 0.25, rv)
     meshRef.current.scale.set(xScale, yScale, zScale)
     material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.2, rv)
-    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(0.3, 3.0, lv)
+    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(1.5, 4.0, lv)
   })
 
   return (

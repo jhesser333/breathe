@@ -30,7 +30,7 @@ const INHALE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER
 const EMISSIVE_RAMP_IN = 1   // units before Morph where glow ramps to max
 const MAX_EMISSIVE = 3       // holds at max after passing Morph
 const FADE_OUT_START = 0     // start fading as gate passes Morph
-const FADE_OUT_DURATION = 1  // fully invisible 1 unit past Morph
+const FADE_OUT_DURATION = 2  // fully invisible 2 units past Morph
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
