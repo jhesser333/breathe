@@ -23,7 +23,7 @@ export default function Morph({ leftVal, rightVal }) {
   })
 
   return (
-    <mesh ref={meshRef} position={[0, 1, 0]}>
+    <mesh ref={meshRef} position={[0, 0.5, 0]}>
       <sphereGeometry args={[0.5, 32, 16]} />
       <meshStandardMaterial
         ref={matRef}
