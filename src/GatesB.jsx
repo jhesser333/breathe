@@ -9,7 +9,8 @@ const GATE_B_Z = -30
 const GATE_B_FADE_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
-const EMISSIVE_RANGE = 5
+const EMISSIVE_RAMP_IN = 2
+const EMISSIVE_RAMP_OUT = 1
 const MAX_EMISSIVE = 2
 
 const GATE_X = 0.65
@@ -68,7 +69,9 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      const emissive = MAX_EMISSIVE * Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      const emissive = slot.z < 0
+        ? MAX_EMISSIVE * Math.max(0, 1 + slot.z / EMISSIVE_RAMP_IN)
+        : MAX_EMISSIVE * Math.max(0, 1 - slot.z / EMISSIVE_RAMP_OUT)
       if (matLeftRefsA.current[i]) {
         matLeftRefsA.current[i].opacity = opacity
         matLeftRefsA.current[i].emissiveIntensity = emissive
@@ -106,7 +109,9 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      const emissive = MAX_EMISSIVE * Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      const emissive = slot.z < 0
+        ? MAX_EMISSIVE * Math.max(0, 1 + slot.z / EMISSIVE_RAMP_IN)
+        : MAX_EMISSIVE * Math.max(0, 1 - slot.z / EMISSIVE_RAMP_OUT)
       if (matRefsB.current[i]) {
         matRefsB.current[i].opacity = opacity
         matRefsB.current[i].emissiveIntensity = emissive

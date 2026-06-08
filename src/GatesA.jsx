@@ -27,7 +27,8 @@ const INHALE_Y = 0.5 * 3.5   // 1.75
 const EXHALE_SCALE = [EXHALE_X * 1.05 / BASE_INNER, EXHALE_Y * 1.15 / BASE_INNER, 1]
 const INHALE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER, 1]
 
-const EMISSIVE_RANGE = 5   // units from Morph where emissive ramp starts/ends
+const EMISSIVE_RAMP_IN = 2   // units before Morph where glow starts
+const EMISSIVE_RAMP_OUT = 1  // units after Morph where glow fades
 const MAX_EMISSIVE = 2
 
 function makeSlotA() {
@@ -81,7 +82,9 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      const emissive = MAX_EMISSIVE * Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      const emissive = slot.z < 0
+        ? MAX_EMISSIVE * Math.max(0, 1 + slot.z / EMISSIVE_RAMP_IN)
+        : MAX_EMISSIVE * Math.max(0, 1 - slot.z / EMISSIVE_RAMP_OUT)
       if (matRefsA.current[i]) {
         matRefsA.current[i].opacity = opacity
         matRefsA.current[i].emissiveIntensity = emissive
@@ -115,7 +118,9 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      const emissive = MAX_EMISSIVE * Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      const emissive = slot.z < 0
+        ? MAX_EMISSIVE * Math.max(0, 1 + slot.z / EMISSIVE_RAMP_IN)
+        : MAX_EMISSIVE * Math.max(0, 1 - slot.z / EMISSIVE_RAMP_OUT)
       if (matRefsB.current[i]) {
         matRefsB.current[i].opacity = opacity
         matRefsB.current[i].emissiveIntensity = emissive
