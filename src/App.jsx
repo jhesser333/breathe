@@ -6,7 +6,6 @@ import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
-import Track from './Track'
 import { TEXTS } from './copy'
 
 const DISPLAY_MS = 5000
@@ -120,9 +119,6 @@ export default function App() {
         <Morph leftVal={leftVal} rightVal={rightVal} />
         {hasGates && (
           <Gates gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />
-        )}
-        {hasGates && (
-          <Track gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />
         )}
         {mode === 'slowing' && (
           <SlowingDownController
