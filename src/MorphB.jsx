@@ -6,7 +6,13 @@ import * as THREE from 'three'
 export default function MorphB({ leftVal, rightVal, palette }) {
   const meshRef = useRef()
 
-  const material = useMemo(() => {
+  const { material, fresnelUniforms } = useMemo(() => {
+    const fresnelUniforms = {
+      fresnelColor:     { value: new THREE.Color(palette.morphEmissive) },
+      fresnelPower:     { value: 3.0 },
+      fresnelIntensity: { value: 0.3 },
+    }
+
     const mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.morphBase),
       emissive: new THREE.Color(palette.morphEmissive),
@@ -16,15 +22,11 @@ export default function MorphB({ leftVal, rightVal, palette }) {
     })
 
     mat.onBeforeCompile = (shader) => {
-      shader.uniforms.fresnelColor = { value: new THREE.Color(palette.morphEmissive) }
-      shader.uniforms.fresnelPower = { value: 3.0 }
-      shader.uniforms.fresnelIntensity = { value: 1.5 }
-
+      Object.assign(shader.uniforms, fresnelUniforms)
       shader.fragmentShader =
         `uniform vec3 fresnelColor;
 uniform float fresnelPower;
 uniform float fresnelIntensity;\n` + shader.fragmentShader
-
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <output_fragment>',
         `#include <output_fragment>
@@ -33,7 +35,7 @@ uniform float fresnelIntensity;\n` + shader.fragmentShader
       )
     }
 
-    return mat
+    return { material: mat, fresnelUniforms }
   }, [palette.morphBase, palette.morphEmissive])
 
   useFrame(() => {
@@ -44,7 +46,8 @@ uniform float fresnelIntensity;\n` + shader.fragmentShader
     const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.25, rv)
     meshRef.current.scale.set(xScale, yScale, zScale)
-    material.emissiveIntensity = THREE.MathUtils.lerp(2, 0.2, rv)
+    material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.2, rv)
+    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(0.3, 3.0, lv)
   })
 
   return (
