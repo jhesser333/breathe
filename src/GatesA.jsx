@@ -9,15 +9,24 @@ const GATE_B_FADE_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
 
-const GATE_Y = 0.25         // matches Morph Y position
+const GATE_Y = 0.25   // matches Morph Y position
 
-// Gate A: exhale morph half-width 1.1 → inner hole 1.25 (14% clearance)
-const GATE_A_RADIUS = 1.35
-const GATE_A_TUBE = 0.1
+// Base torus geometry (unit circle, inner hole = radius - tube)
+const BASE_RADIUS = 1.0
+const BASE_TUBE = 0.06
+const BASE_INNER = BASE_RADIUS - BASE_TUBE  // 0.94
 
-// Gate B: inhale morph half-height 1.75 → inner hole 2.0 (14% clearance)
-const GATE_B_RADIUS = 2.1
-const GATE_B_TUBE = 0.1
+// Morph actual half-extents (sphere r=0.5 × scale)
+const EXHALE_X = 0.5 * 2.2   // 1.1
+const EXHALE_Y = 0.5 * 0.25  // 0.125
+const INHALE_X = 0.5 * 1.2   // 0.6
+const INHALE_Y = 0.5 * 3.5   // 1.75
+
+const CLEARANCE = 1.15  // 15% extra room around the morph
+
+// Non-uniform scale to stretch the circular torus into the right ellipse shape
+const EXHALE_SCALE = [EXHALE_X * CLEARANCE / BASE_INNER, EXHALE_Y * CLEARANCE / BASE_INNER, 1]
+const INHALE_SCALE = [INHALE_X * CLEARANCE / BASE_INNER, INHALE_Y * CLEARANCE / BASE_INNER, 1]
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
@@ -109,8 +118,8 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
     <>
       {Array.from({ length: POOL_A }, (_, i) => (
         <group key={`a${i}`} ref={el => { groupRefsA.current[i] = el }} visible={false}>
-          <mesh position={[0, GATE_Y, 0]}>
-            <torusGeometry args={[GATE_A_RADIUS, GATE_A_TUBE, 16, 64]} />
+          <mesh position={[0, GATE_Y, 0]} scale={EXHALE_SCALE}>
+            <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
             <meshStandardMaterial ref={el => { matRefsA.current[i] = el }}
               color={gateColor} roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
@@ -118,8 +127,8 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
       ))}
       {Array.from({ length: POOL_B }, (_, i) => (
         <group key={`b${i}`} ref={el => { groupRefsB.current[i] = el }} visible={false}>
-          <mesh position={[0, GATE_Y, 0]}>
-            <torusGeometry args={[GATE_B_RADIUS, GATE_B_TUBE, 16, 64]} />
+          <mesh position={[0, GATE_Y, 0]} scale={INHALE_SCALE}>
+            <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
             <meshStandardMaterial ref={el => { matRefsB.current[i] = el }}
               color={gateColor} roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
