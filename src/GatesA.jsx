@@ -27,7 +27,8 @@ const INHALE_Y = 0.5 * 3.5   // 1.75
 const EXHALE_SCALE = [EXHALE_X * 1.05 / BASE_INNER, EXHALE_Y * 1.15 / BASE_INNER, 1]
 const INHALE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER, 1]
 
-const EMISSIVE_RANGE = 3  // units from Morph where emissive ramp starts/ends
+const EMISSIVE_RANGE = 5   // units from Morph where emissive ramp starts/ends
+const MAX_EMISSIVE = 2
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
@@ -36,7 +37,7 @@ function makeSlotB() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0 }
 }
 
-export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor }) {
+export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matRefsA = useRef(Array.from({ length: POOL_A }, () => null))
@@ -80,7 +81,7 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      const emissive = Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      const emissive = MAX_EMISSIVE * Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
       if (matRefsA.current[i]) {
         matRefsA.current[i].opacity = opacity
         matRefsA.current[i].emissiveIntensity = emissive
@@ -114,7 +115,7 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      const emissive = Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      const emissive = MAX_EMISSIVE * Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
       if (matRefsB.current[i]) {
         matRefsB.current[i].opacity = opacity
         matRefsB.current[i].emissiveIntensity = emissive
@@ -130,7 +131,7 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
           <mesh position={[0, GATE_Y, 0]} scale={EXHALE_SCALE}>
             <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
             <meshStandardMaterial ref={el => { matRefsA.current[i] = el }}
-              color={gateColor} emissive={gateColor} emissiveIntensity={0}
+              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
         </group>
@@ -140,7 +141,7 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
           <mesh position={[0, GATE_Y, 0]} scale={INHALE_SCALE}>
             <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
             <meshStandardMaterial ref={el => { matRefsB.current[i] = el }}
-              color={gateColor} emissive={gateColor} emissiveIntensity={0}
+              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
         </group>

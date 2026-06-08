@@ -174,6 +174,7 @@ export default function App() {
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.gateColor}
+            emissiveColor={palette.morphEmissive}
           />
         )}
         {mode === 'slowing' && (
