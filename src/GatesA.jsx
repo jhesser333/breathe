@@ -22,11 +22,12 @@ const EXHALE_Y = 0.5 * 0.25  // 0.125
 const INHALE_X = 0.5 * 1.2   // 0.6
 const INHALE_Y = 0.5 * 3.5   // 1.75
 
-const CLEARANCE = 1.15  // 15% extra room around the morph
-
 // Non-uniform scale to stretch the circular torus into the right ellipse shape
-const EXHALE_SCALE = [EXHALE_X * CLEARANCE / BASE_INNER, EXHALE_Y * CLEARANCE / BASE_INNER, 1]
-const INHALE_SCALE = [INHALE_X * CLEARANCE / BASE_INNER, INHALE_Y * CLEARANCE / BASE_INNER, 1]
+// Exhale gate: X reduced to 1.05x clearance; Inhale gate: Y reduced to 1.05x clearance
+const EXHALE_SCALE = [EXHALE_X * 1.05 / BASE_INNER, EXHALE_Y * 1.15 / BASE_INNER, 1]
+const INHALE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER, 1]
+
+const EMISSIVE_RANGE = 3  // units from Morph where emissive ramp starts/ends
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
@@ -79,7 +80,11 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      if (matRefsA.current[i]) matRefsA.current[i].opacity = opacity
+      const emissive = Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      if (matRefsA.current[i]) {
+        matRefsA.current[i].opacity = opacity
+        matRefsA.current[i].emissiveIntensity = emissive
+      }
 
       slot.z += slot.speed * delta
 
@@ -109,7 +114,11 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
 
       slot.fadeElapsed += delta
       const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
-      if (matRefsB.current[i]) matRefsB.current[i].opacity = opacity
+      const emissive = Math.max(0, 1 - Math.abs(slot.z) / EMISSIVE_RANGE)
+      if (matRefsB.current[i]) {
+        matRefsB.current[i].opacity = opacity
+        matRefsB.current[i].emissiveIntensity = emissive
+      }
       group.visible = true
     })
   })
@@ -121,7 +130,8 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
           <mesh position={[0, GATE_Y, 0]} scale={EXHALE_SCALE}>
             <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
             <meshStandardMaterial ref={el => { matRefsA.current[i] = el }}
-              color={gateColor} roughness={0.5} metalness={0.1} transparent opacity={0} />
+              color={gateColor} emissive={gateColor} emissiveIntensity={0}
+              roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
         </group>
       ))}
@@ -130,7 +140,8 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor })
           <mesh position={[0, GATE_Y, 0]} scale={INHALE_SCALE}>
             <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
             <meshStandardMaterial ref={el => { matRefsB.current[i] = el }}
-              color={gateColor} roughness={0.5} metalness={0.1} transparent opacity={0} />
+              color={gateColor} emissive={gateColor} emissiveIntensity={0}
+              roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
         </group>
       ))}

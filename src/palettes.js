@@ -2,7 +2,7 @@ export const PALETTES = {
   a: {
     morphBase: '#2299aa',
     morphEmissive: '#ff69b4',
-    gateColor: '#c89070',
+    gateColor: '#9955dd',
     background: '#1a1028',
   },
   b: {
