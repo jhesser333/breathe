@@ -45,7 +45,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
     <div style={{
       position: 'absolute',
       [side]: 12,
-      top: '45%', bottom: '8%',
+      top: '63%', bottom: 16,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 6,
     }}>

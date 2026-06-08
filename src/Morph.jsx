@@ -16,10 +16,10 @@ export default function Morph({ leftVal, rightVal }) {
 
     const xScale = THREE.MathUtils.lerp(2.0, 1.2, lv)
     const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
-    const yScale = THREE.MathUtils.lerp(4, 0.25, rv)
+    const yScale = THREE.MathUtils.lerp(3.5, 0.25, rv)
     meshRef.current.scale.set(xScale, yScale, zScale)
 
-    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(3, 0.2, rv)
+    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(2, 0.2, rv)
   })
 
   return (
