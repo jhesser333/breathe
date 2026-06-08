@@ -14,7 +14,7 @@ export default function Morph({ leftVal, rightVal }) {
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const xScale = THREE.MathUtils.lerp(2.5, 1.2, lv)
+    const xScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
     const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.25, rv)
     meshRef.current.scale.set(xScale, yScale, zScale)
@@ -23,7 +23,7 @@ export default function Morph({ leftVal, rightVal }) {
   })
 
   return (
-    <mesh ref={meshRef} position={[0, 0.5, 0]}>
+    <mesh ref={meshRef} position={[0, 0.25, 0]}>
       <sphereGeometry args={[0.5, 32, 16]} />
       <meshStandardMaterial
         ref={matRef}
