@@ -1,33 +1,55 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
 export default function MorphB({ leftVal, rightVal, palette }) {
   const meshRef = useRef()
-  const matRef = useRef()
+
+  const material = useMemo(() => {
+    const mat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(palette.morphBase),
+      emissive: new THREE.Color(palette.morphEmissive),
+      emissiveIntensity: 0.2,
+      roughness: 0.3,
+      metalness: 0.1,
+    })
+
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.fresnelColor = { value: new THREE.Color(palette.morphEmissive) }
+      shader.uniforms.fresnelPower = { value: 3.0 }
+      shader.uniforms.fresnelIntensity = { value: 1.5 }
+
+      shader.fragmentShader =
+        `uniform vec3 fresnelColor;
+uniform float fresnelPower;
+uniform float fresnelIntensity;\n` + shader.fragmentShader
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <output_fragment>',
+        `#include <output_fragment>
+        float fr = pow(1.0 - max(dot(normal, normalize(vViewPosition)), 0.0), fresnelPower);
+        gl_FragColor.rgb += fresnelColor * fr * fresnelIntensity;`
+      )
+    }
+
+    return mat
+  }, [palette.morphBase, palette.morphEmissive])
 
   useFrame(() => {
-    if (!meshRef.current || !matRef.current) return
+    if (!meshRef.current) return
     const lv = leftVal.current
     const rv = rightVal.current
     const xScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
     const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.25, rv)
     meshRef.current.scale.set(xScale, yScale, zScale)
-    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(2, 0.2, rv)
+    material.emissiveIntensity = THREE.MathUtils.lerp(2, 0.2, rv)
   })
 
   return (
     <RoundedBox ref={meshRef} args={[1, 1, 1]} radius={0.15} smoothness={4} position={[0, 0.25, 0]}>
-      <meshStandardMaterial
-        ref={matRef}
-        color={palette.morphBase}
-        emissive={palette.morphEmissive}
-        emissiveIntensity={0.2}
-        roughness={0.3}
-        metalness={0.1}
-      />
+      <primitive object={material} attach="material" />
     </RoundedBox>
   )
 }
