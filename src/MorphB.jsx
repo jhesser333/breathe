@@ -8,9 +8,8 @@ export default function MorphB({ leftVal, rightVal, palette }) {
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
-      fresnelColor:     { value: new THREE.Color(palette.morphEmissive) },
       fresnelPower:     { value: 4.0 },
-      fresnelIntensity: { value: 0.5 },
+      fresnelIntensity: { value: 0.3 },
     }
 
     const mat = new THREE.MeshStandardMaterial({
@@ -34,8 +33,7 @@ export default function MorphB({ leftVal, rightVal, palette }) {
       )
 
       shader.fragmentShader =
-        `uniform vec3 fresnelColor;
-uniform float fresnelPower;
+        `uniform float fresnelPower;
 uniform float fresnelIntensity;
 varying vec3 vFresnelDir;\n` + shader.fragmentShader
 
@@ -44,7 +42,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
         `#include <emissivemap_fragment>
         {
           float fr = pow(1.0 - max(dot(normalize(vNormal), vFresnelDir), 0.0), fresnelPower);
-          totalEmissiveRadiance += fresnelColor * fr * fresnelIntensity;
+          totalEmissiveRadiance *= (1.0 - fr * fresnelIntensity);
         }`
       )
     }
@@ -63,7 +61,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     groupRef.current.scale.set(xScale, yScale, zScale)
 
     material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.2, rv)
-    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(0.5, 3.0, lv)
+    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(0.3, 1.0, lv)
   })
 
   return (
