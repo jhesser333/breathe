@@ -18,7 +18,7 @@ const BASE_INNER = BASE_RADIUS - BASE_TUBE  // 0.94
 
 // Morph actual half-extents (sphere r=0.5 × scale)
 const EXHALE_X = 0.5 * 2.2   // 1.1
-const EXHALE_Y = 0.5 * 0.25  // 0.125
+const EXHALE_Y = 0.5 * 0.4   // 0.2
 const INHALE_X = 0.5 * 1.2   // 0.6
 const INHALE_Y = 0.5 * 3.5   // 1.75
 
