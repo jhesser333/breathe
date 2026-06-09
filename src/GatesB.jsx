@@ -29,9 +29,17 @@ function calcEmissive(z) {
   return 0
 }
 
-const GATE_X = 0.65
-const GATE_ARGS = [0.5, 0.75, 0.5]
-const GATE_RADIUS = 0.07
+// Gate A (exhale) — top and bottom bars framing the flat morph
+const GATE_A_ARGS = [2.8, 0.25, 0.5]
+const GATE_A_RADIUS = 0.07
+const GATE_A_TOP_Y = 0.65    // above morph at exhale (center 0.25 + half-extent 0.2 + clearance)
+const GATE_A_BOT_Y = -0.15   // below morph at exhale
+
+// Gate B (inhale) — left and right pillars framing the tall morph
+const GATE_B_ARGS = [0.4, 4.5, 0.5]
+const GATE_B_RADIUS = 0.07
+const GATE_B_X = 0.9         // morph X half-extent (0.6) + clearance + pillar half-width
+const GATE_B_Y = 0.25        // centered at morph height
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
@@ -43,12 +51,13 @@ function makeSlotB() {
 export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
-  const matLeftRefsA = useRef(Array.from({ length: POOL_A }, () => null))
-  const matRightRefsA = useRef(Array.from({ length: POOL_A }, () => null))
+  const matTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
+  const matBotRefsA = useRef(Array.from({ length: POOL_A }, () => null))
 
   const slotsB = useRef(Array.from({ length: POOL_B }, makeSlotB))
   const groupRefsB = useRef(Array.from({ length: POOL_B }, () => null))
-  const matRefsB = useRef(Array.from({ length: POOL_B }, () => null))
+  const matLeftRefsB = useRef(Array.from({ length: POOL_B }, () => null))
+  const matRightRefsB = useRef(Array.from({ length: POOL_B }, () => null))
 
   const wasEnabled = useRef(false)
 
@@ -84,18 +93,18 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (!slot.active) { group.visible = false; return }
 
       slot.fadeElapsed += delta
-      const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1)
       const emissive = calcEmissive(slot.z)
       const fadeOut = slot.z > FADE_OUT_START
         ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
-      if (matLeftRefsA.current[i]) {
-        matLeftRefsA.current[i].opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
-        matLeftRefsA.current[i].emissiveIntensity = emissive
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      if (matTopRefsA.current[i]) {
+        matTopRefsA.current[i].opacity = opacity
+        matTopRefsA.current[i].emissiveIntensity = emissive
       }
-      if (matRightRefsA.current[i]) {
-        matRightRefsA.current[i].opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
-        matRightRefsA.current[i].emissiveIntensity = emissive
+      if (matBotRefsA.current[i]) {
+        matBotRefsA.current[i].opacity = opacity
+        matBotRefsA.current[i].emissiveIntensity = emissive
       }
 
       slot.z += slot.speed * delta
@@ -129,9 +138,14 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       const fadeOut = slot.z > FADE_OUT_START
         ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
-      if (matRefsB.current[i]) {
-        matRefsB.current[i].opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
-        matRefsB.current[i].emissiveIntensity = emissive
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      if (matLeftRefsB.current[i]) {
+        matLeftRefsB.current[i].opacity = opacity
+        matLeftRefsB.current[i].emissiveIntensity = emissive
+      }
+      if (matRightRefsB.current[i]) {
+        matRightRefsB.current[i].opacity = opacity
+        matRightRefsB.current[i].emissiveIntensity = emissive
       }
       group.visible = true
     })
@@ -141,13 +155,13 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
     <>
       {Array.from({ length: POOL_A }, (_, i) => (
         <group key={`a${i}`} ref={el => { groupRefsA.current[i] = el }} visible={false}>
-          <RoundedBox position={[-GATE_X, 0, 0]} args={GATE_ARGS} radius={GATE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matLeftRefsA.current[i] = el }}
+          <RoundedBox position={[0, GATE_A_TOP_Y, 0]} args={GATE_A_ARGS} radius={GATE_A_RADIUS} smoothness={3}>
+            <meshStandardMaterial ref={el => { matTopRefsA.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </RoundedBox>
-          <RoundedBox position={[GATE_X, 0, 0]} args={GATE_ARGS} radius={GATE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matRightRefsA.current[i] = el }}
+          <RoundedBox position={[0, GATE_A_BOT_Y, 0]} args={GATE_A_ARGS} radius={GATE_A_RADIUS} smoothness={3}>
+            <meshStandardMaterial ref={el => { matBotRefsA.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </RoundedBox>
@@ -155,8 +169,13 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       ))}
       {Array.from({ length: POOL_B }, (_, i) => (
         <group key={`b${i}`} ref={el => { groupRefsB.current[i] = el }} visible={false}>
-          <RoundedBox position={[0, 0, 0]} args={GATE_ARGS} radius={GATE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matRefsB.current[i] = el }}
+          <RoundedBox position={[-GATE_B_X, GATE_B_Y, 0]} args={GATE_B_ARGS} radius={GATE_B_RADIUS} smoothness={3}>
+            <meshStandardMaterial ref={el => { matLeftRefsB.current[i] = el }}
+              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
+              roughness={0.5} metalness={0.1} transparent opacity={0} />
+          </RoundedBox>
+          <RoundedBox position={[GATE_B_X, GATE_B_Y, 0]} args={GATE_B_ARGS} radius={GATE_B_RADIUS} smoothness={3}>
+            <meshStandardMaterial ref={el => { matRightRefsB.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </RoundedBox>
