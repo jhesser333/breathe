@@ -159,7 +159,7 @@ export default function App() {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [0, 2, 5], fov: 50 }}
+        camera={{ position: [0, 3.5, 5], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
       >
         <color attach="background" args={[palette.background]} />

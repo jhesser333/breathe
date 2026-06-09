@@ -27,10 +27,25 @@ const INHALE_Y = 0.5 * 3.5   // 1.75
 const EXHALE_SCALE = [EXHALE_X * 1.05 / BASE_INNER, EXHALE_Y * 1.15 / BASE_INNER, 1]
 const INHALE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER, 1]
 
-const EMISSIVE_RAMP_IN = 1   // units before Morph where glow ramps to max
-const MAX_EMISSIVE = 3       // holds at max after passing Morph
-const FADE_OUT_START = 0     // start fading as gate passes Morph
-const FADE_OUT_DURATION = 2  // fully invisible 2 units past Morph
+const EMISSIVE_START_Z = -3   // begin ramp: 0 → 1
+const EMISSIVE_MID_Z = -0.5  // steeper ramp: 1 → 2
+const MAX_EMISSIVE = 2
+const FADE_OUT_START = 0
+const FADE_OUT_DURATION = 2
+
+function smoothstep(t) {
+  t = Math.max(0, Math.min(1, t))
+  return t * t * (3 - 2 * t)
+}
+
+function calcEmissive(z) {
+  if (z >= 0) return MAX_EMISSIVE
+  if (z >= EMISSIVE_MID_Z)
+    return 1 + smoothstep((z - EMISSIVE_MID_Z) / (-EMISSIVE_MID_Z))
+  if (z >= EMISSIVE_START_Z)
+    return smoothstep((z - EMISSIVE_START_Z) / (EMISSIVE_MID_Z - EMISSIVE_START_Z))
+  return 0
+}
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
@@ -82,13 +97,11 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (!slot.active) { group.visible = false; return }
 
       slot.fadeElapsed += delta
-      const emissive = slot.z < 0
-        ? MAX_EMISSIVE * Math.max(0, 1 + slot.z / EMISSIVE_RAMP_IN)
-        : MAX_EMISSIVE
+      const emissive = calcEmissive(slot.z)
       const fadeOut = slot.z > FADE_OUT_START
-        ? Math.max(0, 1 - (slot.z - FADE_OUT_START) / FADE_OUT_DURATION)
+        ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
-      const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1) * fadeOut
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
       if (matRefsA.current[i]) {
         matRefsA.current[i].opacity = opacity
         matRefsA.current[i].emissiveIntensity = emissive
@@ -121,13 +134,11 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (slot.z < GATE_B_FADE_Z) { group.visible = false; return }
 
       slot.fadeElapsed += delta
-      const emissive = slot.z < 0
-        ? MAX_EMISSIVE * Math.max(0, 1 + slot.z / EMISSIVE_RAMP_IN)
-        : MAX_EMISSIVE
+      const emissive = calcEmissive(slot.z)
       const fadeOut = slot.z > FADE_OUT_START
-        ? Math.max(0, 1 - (slot.z - FADE_OUT_START) / FADE_OUT_DURATION)
+        ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
-      const opacity = Math.min(slot.fadeElapsed / FADE_DURATION, 1) * fadeOut
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
       if (matRefsB.current[i]) {
         matRefsB.current[i].opacity = opacity
         matRefsB.current[i].emissiveIntensity = emissive

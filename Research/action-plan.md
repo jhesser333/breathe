@@ -83,9 +83,9 @@ Registration creates a legal record and is required before you can sue for infri
 
 1. Have your attorney run a **trademark clearance search** on "Breathe" (~$500–$1,000)
 2. Based on the results, decide:
-   - Proceed with "Breathe" (if the Apple conflict risk is acceptable)
-   - Modify the name ("Breathe Form," "Breathe / Morph," etc.)
-   - Coin a new, invented name for stronger protection
+  - Proceed with "Breathe" (if the Apple conflict risk is acceptable)
+  - Modify the name ("Breathe Form," "Breathe / Morph," etc.)
+  - Coin a new, invented name for stronger protection
 3. File trademark application: ~$250–$400 per class (Classes 9 and 41 are most relevant)
 
 ---
@@ -105,15 +105,15 @@ Full utility patent costs ~$10,000–$20,000 with an attorney and takes 2–5 ye
 ## Total Cost Estimate
 
 | Action | Filing Fee | Attorney Estimate | Total Estimate |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Attorney consultation (1 hr) | — | $300–$500 | $300–$500 |
 | Provisional patent | $320 | $1,000–$2,500 | $1,500–$3,000 |
 | Copyright registration | $65–$85 | DIY possible | $65–$85 |
 | Trademark clearance search | — | $500–$1,000 | $500–$1,000 |
 | Trademark registration (1 class) | $250–$400 | $500–$1,000 | $750–$1,500 |
 | Full utility patent | $1,600+ | $8,000–$18,000 | $10,000–$20,000 |
-| **Near-term total (steps 1–4)** | | | **~$2,000–$5,000** |
-| **Full program total** | | | **~$12,000–$25,000** |
+| **Near-term total (steps 1–4)** |  |  | **\~$2,000–$5,000** |
+| **Full program total** |  |  | **\~$12,000–$25,000** |
 
 ---
 
