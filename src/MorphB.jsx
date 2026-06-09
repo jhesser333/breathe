@@ -56,8 +56,8 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const rv = rightVal.current
 
     const xScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
-    const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
-    const yScale = THREE.MathUtils.lerp(3.5, 0.25, rv)
+    const zScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
+    const yScale = THREE.MathUtils.lerp(3.5, 0.5, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
     material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.2, rv)

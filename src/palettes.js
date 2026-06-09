@@ -1,6 +1,6 @@
 export const PALETTES = {
   a: {
-    morphBase: '#2299aa',
+    morphBase: '#2266cc',
     morphEmissive: '#ff69b4',
     gateColor: '#9955dd',
     background: '#1a1028',
