@@ -1,6 +1,7 @@
-import { useRef } from 'react'
+import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { RoundedBox } from '@react-three/drei'
+import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three-stdlib'
 
 const POOL_A = 3
 const POOL_B = 3
@@ -29,17 +30,29 @@ function calcEmissive(z) {
   return 0
 }
 
-// Gate A (exhale) — top and bottom bars framing the flat morph
-const GATE_A_ARGS = [2.8, 0.25, 0.5]
-const GATE_A_RADIUS = 0.07
+// Shared cube geometry for rounded-cube gate segments
+const CUBE_SIZE = 0.5
+const CUBE_RADIUS = 0.12
+const CUBE_SEGMENTS = 2
+
+function rowPositions(span, count) {
+  const spacing = span / count
+  return Array.from({ length: count }, (_, i) => (i - (count - 1) / 2) * spacing)
+}
+
+// Gate A (exhale) — rows of cubes above and below, framing the flat morph
+const GATE_A_SPAN = 2.8
+const GATE_A_COUNT = 6
 const GATE_A_TOP_Y = 0.65    // above morph at exhale (center 0.25 + half-extent 0.2 + clearance)
 const GATE_A_BOT_Y = -0.15   // below morph at exhale
+const GATE_A_POSITIONS = rowPositions(GATE_A_SPAN, GATE_A_COUNT)
 
-// Gate B (inhale) — left and right pillars framing the tall morph
-const GATE_B_ARGS = [0.4, 4.5, 0.5]
-const GATE_B_RADIUS = 0.07
-const GATE_B_X = 0.9         // morph X half-extent (0.6) + clearance + pillar half-width
+// Gate B (inhale) — columns of cubes left and right, framing the tall morph
+const GATE_B_SPAN = 4.5
+const GATE_B_COUNT = 10
+const GATE_B_X = 0.9         // morph X half-extent (0.6) + clearance + cube half-width
 const GATE_B_Y = 0.25        // centered at morph height
+const GATE_B_POSITIONS = rowPositions(GATE_B_SPAN, GATE_B_COUNT).map(p => p + GATE_B_Y)
 
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
@@ -48,7 +61,37 @@ function makeSlotB() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0 }
 }
 
+// A row/column of rounded cubes, rendered as an instanced mesh with one shared material
+function CubeRow({ positions, axis, offset, geometry, materialRef, gateColor, emissiveColor }) {
+  const meshRef = useRef()
+
+  useEffect(() => {
+    const mesh = meshRef.current
+    if (!mesh) return
+    const m = new THREE.Matrix4()
+    positions.forEach((p, i) => {
+      if (axis === 'x') m.makeTranslation(p, offset, 0)
+      else m.makeTranslation(offset, p, 0)
+      mesh.setMatrixAt(i, m)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+  }, [positions, axis, offset])
+
+  return (
+    <instancedMesh ref={meshRef} args={[geometry, undefined, positions.length]}>
+      <meshStandardMaterial ref={materialRef}
+        color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
+        roughness={0.5} metalness={0.1} transparent opacity={0} />
+    </instancedMesh>
+  )
+}
+
 export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
+  const cubeGeometry = useMemo(
+    () => new RoundedBoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE, CUBE_SEGMENTS, CUBE_RADIUS),
+    []
+  )
+
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
@@ -155,30 +198,22 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
     <>
       {Array.from({ length: POOL_A }, (_, i) => (
         <group key={`a${i}`} ref={el => { groupRefsA.current[i] = el }} visible={false}>
-          <RoundedBox position={[0, GATE_A_TOP_Y, 0]} args={GATE_A_ARGS} radius={GATE_A_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matTopRefsA.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
-          </RoundedBox>
-          <RoundedBox position={[0, GATE_A_BOT_Y, 0]} args={GATE_A_ARGS} radius={GATE_A_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matBotRefsA.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
-          </RoundedBox>
+          <CubeRow positions={GATE_A_POSITIONS} axis="x" offset={GATE_A_TOP_Y} geometry={cubeGeometry}
+            materialRef={el => { matTopRefsA.current[i] = el }}
+            gateColor={gateColor} emissiveColor={emissiveColor} />
+          <CubeRow positions={GATE_A_POSITIONS} axis="x" offset={GATE_A_BOT_Y} geometry={cubeGeometry}
+            materialRef={el => { matBotRefsA.current[i] = el }}
+            gateColor={gateColor} emissiveColor={emissiveColor} />
         </group>
       ))}
       {Array.from({ length: POOL_B }, (_, i) => (
         <group key={`b${i}`} ref={el => { groupRefsB.current[i] = el }} visible={false}>
-          <RoundedBox position={[-GATE_B_X, GATE_B_Y, 0]} args={GATE_B_ARGS} radius={GATE_B_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matLeftRefsB.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
-          </RoundedBox>
-          <RoundedBox position={[GATE_B_X, GATE_B_Y, 0]} args={GATE_B_ARGS} radius={GATE_B_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matRightRefsB.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
-          </RoundedBox>
+          <CubeRow positions={GATE_B_POSITIONS} axis="y" offset={-GATE_B_X} geometry={cubeGeometry}
+            materialRef={el => { matLeftRefsB.current[i] = el }}
+            gateColor={gateColor} emissiveColor={emissiveColor} />
+          <CubeRow positions={GATE_B_POSITIONS} axis="y" offset={GATE_B_X} geometry={cubeGeometry}
+            materialRef={el => { matRightRefsB.current[i] = el }}
+            gateColor={gateColor} emissiveColor={emissiveColor} />
         </group>
       ))}
     </>
