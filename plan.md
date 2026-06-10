@@ -15,7 +15,7 @@
 ### Morph
 - **Shape A**: sphere (radius 0.5), positioned at [0, 0.25, 0]
 - **Shape B**: RoundedBox (args=[1,1,1], radius=0.15)
-- Scaled via group: X = lerp(2.2, 1.2, lv), Y = lerp(3.5, 0.25, rv), Z = lerp(0.5, 1.2, lv)
+- Scaled via group: X = lerp(2.2, 1.2, lv), Y = lerp(3.5, 0.4, rv), Z = lerp(0.5, 1.2, lv)
 - **Inhale State** (lv=1, rv=0): tall, narrow, bright inner glow
 - **Exhale State** (lv=0, rv=1): wide, flat, dim emissive
 - Emissive intensity: lerp(1, 0.2, rv) — right slider drives brightness
@@ -43,7 +43,7 @@
 
 ### Gates (Shape Option B — GatesB)
 - Same spawning/timing logic as GatesA
-- Different mesh: Gate A = two RoundedBox pillars at x=±0.65; Gate B = single RoundedBox at center
+- Different mesh: Gate A = two RoundedBox bars at X=0 (one above morph at Y=0.65, one below at Y=-0.15); Gate B = two RoundedBox pillars at Y=0.25 (one left at X=-0.9, one right at X=0.9)
 - Same emissive ramp and alpha fade rules
 
 ### Modes
@@ -74,14 +74,14 @@
 ---
 
 ## Known open issue
-- Screen goes black at full Exhale on phone — under investigation. Likely morph too flat/dim at yScale=0.25 combined with camera at y=3.5. Possible fix: raise minimum yScale or emissive at exhale.
+- Screen goes black at full Exhale on phone — addressed by changing exhale scale from [2.2, 0.25, 0.5] to [2.2, 0.4, 0.5] and raising the morph base color visibility (Palette A morphBase now `#2266cc` blue). Pending phone verification.
 
 ---
 
 ## Ideas / next iterations
 
 ### Morph
-- Fix black-screen at exhale (raise minimum yScale / emissive)
+- Verify black-screen-at-exhale fix on phone
 - Investigate Fresnel `onBeforeCompile` reliability on all mobile devices
 - Add smooth easing/lerp to slider response
 - Morph reacts on gate pass-through (flash, pulse)

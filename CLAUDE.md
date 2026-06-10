@@ -32,7 +32,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - Fresnel intensity: lerp(0.3, 1.0, lv)
 
 **Right slider (rv):**
-- Y scale: lerp(3.5, 0.25, rv) — tall at inhale, flat at exhale
+- Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale
 - Emissive intensity: lerp(1, 0.2, rv) — brightest at inhale
 
 - Left slider starts at 0 (bottom / Exhale). Right slider starts at 1 (top / Exhale).
@@ -41,7 +41,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - Slider fill indicator shows progress from exhale toward inhale on both sliders.
 
 ## Morph material
-- Base color: `palette.morphBase` (Palette A: `#2299aa` teal)
+- Base color: `palette.morphBase` (Palette A: `#2266cc` blue)
 - Emissive color: `palette.morphEmissive` (Palette A: `#ff69b4` pink)
 - Fresnel inner glow via `onBeforeCompile` shader injection — masks `totalEmissiveRadiance` using inverse Fresnel factor, creating a center glow that fades toward edges
 - Bloom post-processing (luminanceThreshold 0.2, intensity 1.5)
@@ -57,8 +57,13 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 ## Gate geometry (Shape Option A — GatesA.jsx)
 - Base torus: radius=1.0, tube=0.06, scaled non-uniformly to match morph shape
-- Exhale Gate scale: [1.229, 0.153, 1] — wide flat ellipse
+- Exhale Gate scale: [1.229, 0.245, 1] — wide flat ellipse
 - Inhale Gate scale: [0.734, 1.954, 1] — narrow tall ellipse
+- Pool: 3 slots each for Gate A and Gate B
+
+## Gate geometry (Shape Option B — GatesB.jsx)
+- **Exhale Gate (A)**: two RoundedBox bars at X=0, args [2.8, 0.25, 0.5] — one above the morph (Y=0.65), one below (Y=-0.15)
+- **Inhale Gate (B)**: two RoundedBox pillars at Y=0.25, args [0.4, 4.5, 0.5] — one left (X=-0.9), one right (X=0.9)
 - Pool: 3 slots each for Gate A and Gate B
 
 ## Modes
@@ -94,7 +99,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - **Option B**: rounded-box Morph + cube-style Gates (GatesB)
 
 **Color Palettes:**
-- **Palette A** (default): morphBase=#2299aa, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
+- **Palette A** (default): morphBase=#2266cc, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
 - **Palette B**: morphBase=#ff8800, morphEmissive=#4499ff, gateColor=#ffd700, background=#0d1f1a
 
 ## Current scene setup
