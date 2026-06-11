@@ -109,6 +109,14 @@ export default function App() {
     setTimeout(() => showTutorial({ force: true }), 0)
   }, [showTutorial])
 
+  const handleContinue = useCallback(() => {
+    if (!mode) {
+      handleSelectMode('basic')
+    } else {
+      setScreen('experience')
+    }
+  }, [mode, handleSelectMode])
+
   const handleBackFromExperience = useCallback(() => {
     gatesEnabledRef.current = false
     clearTimeout(displayTimerRef.current)
@@ -128,6 +136,7 @@ export default function App() {
         onShape={() => setScreen('shape')}
         onColor={() => setScreen('color')}
         onBack={() => setScreen('home')}
+        onContinue={handleContinue}
       />
     )
   }
@@ -138,6 +147,7 @@ export default function App() {
         onSelect={setShapeOption}
         onBack={() => setScreen('personalize')}
         onHome={() => setScreen('home')}
+        onContinue={handleContinue}
       />
     )
   }
@@ -148,6 +158,7 @@ export default function App() {
         onSelect={setColorPalette}
         onBack={() => setScreen('personalize')}
         onHome={() => setScreen('home')}
+        onContinue={handleContinue}
       />
     )
   }

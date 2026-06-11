@@ -29,7 +29,7 @@ export default function HomeScreen({ onSelect, onPersonalize }) {
       <button
         onClick={onPersonalize}
         style={{
-          position: 'absolute', top: 16, left: 16,
+          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(255,255,255,0.08)',
           border: '1px solid rgba(255,255,255,0.18)',
           borderRadius: 8, color: 'rgba(255,255,255,0.7)',

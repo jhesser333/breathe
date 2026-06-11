@@ -7,6 +7,15 @@ const backBtnStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
+const continueBtnStyle = {
+  position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+  background: 'rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+  padding: '8px 14px', fontSize: 13,
+  cursor: 'pointer', fontFamily: 'sans-serif',
+}
+
 function optionBtn(selected) {
   return {
     width: '100%', maxWidth: 320,
@@ -19,7 +28,7 @@ function optionBtn(selected) {
   }
 }
 
-export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome }) {
+export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome, onContinue }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -42,6 +51,7 @@ export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome 
         <div style={{ fontSize: 17, fontWeight: 500 }}>Palette B {selected === 'b' && '✓'}</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Orange · Blue glow · Yellow gates</div>
       </button>
+      <button style={continueBtnStyle} onClick={onContinue}>Continue Playing</button>
     </div>
   )
 }

@@ -2,8 +2,8 @@ export default function TutorialText({ text, visible }) {
   return (
     <div style={{
       position: 'absolute',
-      top: 72, left: 0, right: 0,
-      display: 'flex', justifyContent: 'center',
+      top: '63%', bottom: 16, left: 0, right: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
       padding: '0 80px',
     }}>

@@ -17,7 +17,16 @@ const backBtnStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-export default function PersonalizeScreen({ onShape, onColor, onBack }) {
+const continueBtnStyle = {
+  position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+  background: 'rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+  padding: '8px 14px', fontSize: 13,
+  cursor: 'pointer', fontFamily: 'sans-serif',
+}
+
+export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -39,6 +48,7 @@ export default function PersonalizeScreen({ onShape, onColor, onBack }) {
         <div style={{ fontSize: 17, fontWeight: 500 }}>Color Options</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Choose a color palette</div>
       </button>
+      <button style={continueBtnStyle} onClick={onContinue}>Continue Playing</button>
     </div>
   )
 }
