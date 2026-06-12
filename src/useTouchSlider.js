@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 
-export function useTouchSlider(initialValue = 0) {
+export function useTouchSlider(initialValue = 0, rawRef = null) {
   const ref = useRef(null)
   const touchId = useRef(null)
   const [value, setValue] = useState(initialValue)
@@ -12,6 +12,7 @@ export function useTouchSlider(initialValue = 0) {
     function getValueFromClientY(clientY) {
       const rect = el.getBoundingClientRect()
       const ratio = 1 - (clientY - rect.top) / rect.height
+      if (rawRef) rawRef.current = ratio
       setValue(Math.min(1, Math.max(0, ratio)))
     }
 

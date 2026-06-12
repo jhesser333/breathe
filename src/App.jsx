@@ -27,7 +27,7 @@ export default function App() {
 
   const [screen, setScreen] = useState('home')
   const [mode, setMode] = useState(null)
-  const [levelKey, setLevelKey] = useState(0)
+  const [modeKey, setModeKey] = useState(0)
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
   const [shapeOption, setShapeOptionState] = useState(() => localStorage.getItem('shapeOption') || 'a')
@@ -56,20 +56,30 @@ export default function App() {
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
 
+  // Raw (unclamped) left-slider position, tracks thumb movement past the
+  // slider's visual bounds. Used by SlowingDownController for breath timing.
+  const leftRawRef = useRef(0)
+
   // Slowing Down breath-tracking state, lifted here so it survives
   // SlowingDownController unmounting/remounting (e.g. when visiting Personalize)
-  const prevLeftRef = useRef(null)
-  const cycleStartRef = useRef(null)
-  const hadPeakRef = useRef(false)
+  const prevRawRef = useRef(null)
+  const directionRef = useRef(0)
+  const extremeValueRef = useRef(0)
+  const extremeTimeRef = useRef(0)
+  const lastMinTimeRef = useRef(null)
+  const hadMaxRef = useRef(false)
   const breathsRef = useRef([])
   const phaseRef = useRef('learning')
   const avgBreathRef = useRef(0)
   const phase2StartRef = useRef(0)
 
   const resetSlowingState = useCallback(() => {
-    prevLeftRef.current = null
-    cycleStartRef.current = null
-    hadPeakRef.current = false
+    prevRawRef.current = null
+    directionRef.current = 0
+    extremeValueRef.current = 0
+    extremeTimeRef.current = 0
+    lastMinTimeRef.current = null
+    hadMaxRef.current = false
     breathsRef.current = []
     phaseRef.current = 'learning'
     avgBreathRef.current = 0
@@ -184,7 +194,7 @@ export default function App() {
     if (m === 'timed') pendingGatesTextRef.current = true
 
     setMode(m)
-    setLevelKey(k => k + 1)
+    setModeKey(k => k + 1)
     setScreen('experience')
   }, [resetSlowingState])
 
@@ -250,7 +260,7 @@ export default function App() {
   const GatesComponent = shapeOption === 'b' ? GatesB : GatesA
 
   return (
-    <div key={levelKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         camera={{ position: [0, 3.5, 5], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
@@ -272,13 +282,16 @@ export default function App() {
         )}
         {mode === 'slowing' && (
           <SlowingDownController
-            leftVal={leftVal}
+            leftRawRef={leftRawRef}
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             onGatesReady={requestGatesText}
-            prevLeftRef={prevLeftRef}
-            cycleStartRef={cycleStartRef}
-            hadPeakRef={hadPeakRef}
+            prevRawRef={prevRawRef}
+            directionRef={directionRef}
+            extremeValueRef={extremeValueRef}
+            extremeTimeRef={extremeTimeRef}
+            lastMinTimeRef={lastMinTimeRef}
+            hadMaxRef={hadMaxRef}
             breathsRef={breathsRef}
             phaseRef={phaseRef}
             avgBreathRef={avgBreathRef}
@@ -288,7 +301,7 @@ export default function App() {
       </Canvas>
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
-          <Sliders onLeft={setLeft} onRight={setRight} />
+          <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
         <button

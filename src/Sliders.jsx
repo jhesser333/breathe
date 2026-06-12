@@ -76,8 +76,8 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
   )
 }
 
-export default function Sliders({ onLeft, onRight }) {
-  const [leftRef, leftVal] = useTouchSlider(0)
+export default function Sliders({ onLeft, onRight, leftRawRef }) {
+  const [leftRef, leftVal] = useTouchSlider(0, leftRawRef)
   const [rightRef, rightVal] = useTouchSlider(1)
 
   useEffect(() => { onLeft(leftVal) }, [leftVal])
