@@ -26,11 +26,11 @@ const continueBtnStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue }) {
+export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: '#1a1028',
+      background: palette.background,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       gap: 16, padding: 32,

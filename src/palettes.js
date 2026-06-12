@@ -6,9 +6,9 @@ export const PALETTES = {
     background: '#1a1028',
   },
   b: {
-    morphBase: '#ff8800',
-    morphEmissive: '#4499ff',
-    gateColor: '#ffd700',
-    background: '#0d1f1a',
+    morphBase: '#03455e',
+    morphEmissive: '#12ffdb',
+    gateColor: '#5e4972',
+    background: '#002748',
   },
 }

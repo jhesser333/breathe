@@ -220,7 +220,7 @@ export default function App() {
   }, [])
 
   if (screen === 'home') {
-    return <HomeScreen onSelect={handleSelectMode} onPersonalize={() => setScreen('personalize')} />
+    return <HomeScreen onSelect={handleSelectMode} onPersonalize={() => setScreen('personalize')} palette={palette} />
   }
   if (screen === 'personalize') {
     return (
@@ -229,6 +229,7 @@ export default function App() {
         onColor={() => setScreen('color')}
         onBack={() => setScreen('home')}
         onContinue={handleContinue}
+        palette={palette}
       />
     )
   }
@@ -240,6 +241,7 @@ export default function App() {
         onBack={() => setScreen('personalize')}
         onHome={() => setScreen('home')}
         onContinue={handleContinue}
+        palette={palette}
       />
     )
   }
@@ -251,6 +253,7 @@ export default function App() {
         onBack={() => setScreen('personalize')}
         onHome={() => setScreen('home')}
         onContinue={handleContinue}
+        palette={palette}
       />
     )
   }

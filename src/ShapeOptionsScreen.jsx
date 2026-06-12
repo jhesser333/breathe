@@ -28,11 +28,11 @@ function optionBtn(selected) {
   }
 }
 
-export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome, onContinue }) {
+export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome, onContinue, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: '#1a1028',
+      background: palette.background,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       gap: 16, padding: 32,

@@ -102,7 +102,8 @@ Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
 
 **Color Palettes:**
 - **Palette A** (default): morphBase=#0a0a6e, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
-- **Palette B**: morphBase=#ff8800, morphEmissive=#4499ff, gateColor=#ffd700, background=#0d1f1a
+- **Palette B**: morphBase=#03455e, morphEmissive=#12ffdb, gateColor=#5e4972, background=#002748
+- All UI screens (Home, Personalize, Shape Options, Color Options) use `palette.background` so the active palette's background color is consistent everywhere
 
 ## Current scene setup
 - **Camera**: position `[0, 3.5, 5]`, fov 50 — ~35° downward angle

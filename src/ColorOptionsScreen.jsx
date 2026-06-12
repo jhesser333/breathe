@@ -28,11 +28,11 @@ function optionBtn(selected) {
   }
 }
 
-export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome, onContinue }) {
+export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome, onContinue, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: '#1a1028',
+      background: palette.background,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
       gap: 16, padding: 32,
@@ -49,7 +49,7 @@ export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome,
       </button>
       <button style={optionBtn(selected === 'b')} onClick={() => onSelect('b')}>
         <div style={{ fontSize: 17, fontWeight: 500 }}>Palette B {selected === 'b' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Orange · Blue glow · Yellow gates</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Deep blue · Teal glow · Purple gates</div>
       </button>
       <button style={continueBtnStyle} onClick={onContinue}>Continue Playing</button>
     </div>
