@@ -48,6 +48,26 @@ export default function App() {
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
 
+  // Slowing Down breath-tracking state, lifted here so it survives
+  // SlowingDownController unmounting/remounting (e.g. when visiting Personalize)
+  const prevLeftRef = useRef(null)
+  const cycleStartRef = useRef(null)
+  const hadPeakRef = useRef(false)
+  const breathsRef = useRef([])
+  const phaseRef = useRef('learning')
+  const avgBreathRef = useRef(0)
+  const phase2StartRef = useRef(0)
+
+  const resetSlowingState = useCallback(() => {
+    prevLeftRef.current = null
+    cycleStartRef.current = null
+    hadPeakRef.current = false
+    breathsRef.current = []
+    phaseRef.current = 'learning'
+    avgBreathRef.current = 0
+    phase2StartRef.current = 0
+  }, [])
+
   const showTutorial = useCallback((opts = {}) => {
     tutorialForcedRef.current = opts.force ?? false
     setTutorialVisible(true)
@@ -97,12 +117,13 @@ export default function App() {
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     clearTimeout(displayTimerRef.current)
+    if (m === 'slowing') resetSlowingState()
     const text = m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic']
     setTutorialText(text)
     setMode(m)
     setScreen('experience')
     setTimeout(() => showTutorial(), 0)
-  }, [showTutorial])
+  }, [showTutorial, resetSlowingState])
 
   const handleGatesReady = useCallback(() => {
     setTutorialText(TEXTS.slowing_gates)
@@ -115,6 +136,10 @@ export default function App() {
     } else {
       setScreen('experience')
     }
+  }, [mode, handleSelectMode])
+
+  const handleRestart = useCallback(() => {
+    handleSelectMode(mode)
   }, [mode, handleSelectMode])
 
   const handleBackFromExperience = useCallback(() => {
@@ -194,6 +219,13 @@ export default function App() {
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             onGatesReady={handleGatesReady}
+            prevLeftRef={prevLeftRef}
+            cycleStartRef={cycleStartRef}
+            hadPeakRef={hadPeakRef}
+            breathsRef={breathsRef}
+            phaseRef={phaseRef}
+            avgBreathRef={avgBreathRef}
+            phase2StartRef={phase2StartRef}
           />
         )}
       </Canvas>
@@ -215,6 +247,34 @@ export default function App() {
           }}
         >
           ← Home
+        </button>
+        <button
+          onClick={handleRestart}
+          style={{
+            position: 'absolute', top: 16, right: 16,
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+            padding: '8px 14px', fontSize: 13,
+            cursor: 'pointer', pointerEvents: 'auto',
+            fontFamily: 'sans-serif', letterSpacing: '0.03em',
+          }}
+        >
+          Restart
+        </button>
+        <button
+          onClick={() => setScreen('personalize')}
+          style={{
+            position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+            padding: '8px 14px', fontSize: 13,
+            cursor: 'pointer', pointerEvents: 'auto',
+            fontFamily: 'sans-serif', letterSpacing: '0.03em',
+          }}
+        >
+          Personalize
         </button>
       </div>
     </div>

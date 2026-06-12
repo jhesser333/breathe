@@ -7,63 +7,59 @@ const MIN_BREATH_SECONDS = 1.5
 const MIN_BREATHS = 3
 const RAMP_SECONDS = 60
 
-export default function SlowingDownController({ leftVal, gatesEnabledRef, spawnIntervalRef, onGatesReady }) {
-  const prevLeft = useRef(null)
-  const cycleStart = useRef(null)
-  const hadPeak = useRef(false)
-  const breaths = useRef([])
-  const phase = useRef('learning')
-  const avgBreath = useRef(0)
-  const phase2Start = useRef(0)
+export default function SlowingDownController({
+  leftVal, gatesEnabledRef, spawnIntervalRef, onGatesReady,
+  prevLeftRef, cycleStartRef, hadPeakRef, breathsRef, phaseRef, avgBreathRef, phase2StartRef,
+}) {
   const onGatesReadyRef = useRef(onGatesReady)
   onGatesReadyRef.current = onGatesReady
 
-  useFrame((state) => {
-    const now = state.clock.elapsedTime
+  useFrame(() => {
+    const now = Date.now() / 1000
 
-    if (prevLeft.current === null) {
-      prevLeft.current = leftVal.current
+    if (prevLeftRef.current === null) {
+      prevLeftRef.current = leftVal.current
       return
     }
 
     const lv = leftVal.current
-    const prev = prevLeft.current
+    const prev = prevLeftRef.current
 
     // Slider reached top (inhale peak)
-    if (prev < HIGH_THRESHOLD && lv >= HIGH_THRESHOLD && cycleStart.current !== null) {
-      hadPeak.current = true
+    if (prev < HIGH_THRESHOLD && lv >= HIGH_THRESHOLD && cycleStartRef.current !== null) {
+      hadPeakRef.current = true
     }
 
     // Slider returned to bottom (cycle end / next cycle start)
     if (prev > LOW_THRESHOLD && lv <= LOW_THRESHOLD) {
-      if (cycleStart.current !== null && hadPeak.current) {
-        const duration = now - cycleStart.current
+      if (cycleStartRef.current !== null && hadPeakRef.current) {
+        const duration = now - cycleStartRef.current
         if (duration >= MIN_BREATH_SECONDS) {
-          breaths.current.push(duration)
+          breathsRef.current.push(duration)
         }
       }
       // Start tracking the next cycle from this bottom point
-      cycleStart.current = now
-      hadPeak.current = false
+      cycleStartRef.current = now
+      hadPeakRef.current = false
     }
 
-    prevLeft.current = lv
+    prevLeftRef.current = lv
 
-    if (phase.current === 'learning') {
-      const count = breaths.current.length
+    if (phaseRef.current === 'learning') {
+      const count = breathsRef.current.length
       if (count >= MIN_BREATHS) {
-        const avg = breaths.current.reduce((a, b) => a + b, 0) / count
-        avgBreath.current = avg
+        const avg = breathsRef.current.reduce((a, b) => a + b, 0) / count
+        avgBreathRef.current = avg
         spawnIntervalRef.current = avg
-        phase2Start.current = now
-        phase.current = 'gates'
+        phase2StartRef.current = now
+        phaseRef.current = 'gates'
         gatesEnabledRef.current = true
         onGatesReadyRef.current()
       }
     } else {
       // Linearly ramp spawn interval from avg → avg*2 over RAMP_SECONDS
-      const t = Math.min((now - phase2Start.current) / RAMP_SECONDS, 1)
-      spawnIntervalRef.current = avgBreath.current * (1 + t)
+      const t = Math.min(Math.max((now - phase2StartRef.current) / RAMP_SECONDS, 0), 1)
+      spawnIntervalRef.current = avgBreathRef.current * (1 + t)
     }
   })
 
