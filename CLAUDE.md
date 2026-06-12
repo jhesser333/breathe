@@ -44,7 +44,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - The left slider also exposes a raw (unclamped) ratio via `leftRawRef`, tracking the thumb's true position even past the slider's visual bounds — used by `SlowingDownController` for breath-cycle timing in "Slowing Down" mode.
 
 ## Morph material
-- Base color: `palette.morphBase` (Palette A: `#2266cc` blue)
+- Base color: `palette.morphBase` (Palette A: `#1717a6` blue)
 - Emissive color: `palette.morphEmissive` (Palette A: `#ff69b4` pink)
 - Fresnel inner glow via `onBeforeCompile` shader injection — masks `totalEmissiveRadiance` using inverse Fresnel factor, creating a center glow that fades toward edges
 - Bloom post-processing (luminanceThreshold 0.2, intensity 1.5)
@@ -101,7 +101,7 @@ Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
 - **Option B**: rounded-box Morph + cube-style Gates (GatesB)
 
 **Color Palettes:**
-- **Palette A** (default): morphBase=#2266cc, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
+- **Palette A** (default): morphBase=#1717a6, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
 - **Palette B**: morphBase=#ff8800, morphEmissive=#4499ff, gateColor=#ffd700, background=#0d1f1a
 
 ## Current scene setup
