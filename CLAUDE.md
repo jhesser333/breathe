@@ -34,7 +34,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 **Right slider (rv):**
 - Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale
-- Emissive intensity: lerp(1.5, 2, rv) — brightest at exhale
+- Emissive intensity: piecewise — 2 at inhale (rv=0), dips to 1 at midpoint (rv=0.5), rises to 3 at exhale (rv=1)
 - Roughness: lerp(0.3, 1, rv) — smoother at inhale, rougher at exhale
 
 - Left slider starts at 0 (bottom / Exhale). Right slider starts at 1 (top / Exhale).
@@ -44,7 +44,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - The left slider also exposes a raw (unclamped) ratio via `leftRawRef`, tracking the thumb's true position even past the slider's visual bounds — used by `SlowingDownController` for breath-cycle timing in "Slowing Down" mode.
 
 ## Morph material
-- Base color: `palette.morphBase` (Palette A: `#1717a6` blue)
+- Base color: `palette.morphBase` (Palette A: `#0a0a6e` blue)
 - Emissive color: `palette.morphEmissive` (Palette A: `#ff69b4` pink)
 - Fresnel inner glow via `onBeforeCompile` shader injection — masks `totalEmissiveRadiance` using inverse Fresnel factor, creating a center glow that fades toward edges
 - Bloom post-processing (luminanceThreshold 0.2, intensity 1.5)
@@ -101,7 +101,7 @@ Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
 - **Option B**: rounded-box Morph + cube-style Gates (GatesB)
 
 **Color Palettes:**
-- **Palette A** (default): morphBase=#1717a6, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
+- **Palette A** (default): morphBase=#0a0a6e, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
 - **Palette B**: morphBase=#ff8800, morphEmissive=#4499ff, gateColor=#ffd700, background=#0d1f1a
 
 ## Current scene setup
