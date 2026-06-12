@@ -24,6 +24,7 @@ export default function App() {
 
   const [screen, setScreen] = useState('home')
   const [mode, setMode] = useState(null)
+  const [levelKey, setLevelKey] = useState(0)
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
   const [shapeOption, setShapeOptionState] = useState(() => localStorage.getItem('shapeOption') || 'a')
@@ -121,6 +122,7 @@ export default function App() {
     const text = m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic']
     setTutorialText(text)
     setMode(m)
+    setLevelKey(k => k + 1)
     setScreen('experience')
     setTimeout(() => showTutorial(), 0)
   }, [showTutorial, resetSlowingState])
@@ -193,7 +195,7 @@ export default function App() {
   const GatesComponent = shapeOption === 'b' ? GatesB : GatesA
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div key={levelKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         camera={{ position: [0, 3.5, 5], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
