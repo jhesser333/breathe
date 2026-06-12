@@ -30,11 +30,12 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - X scale: lerp(2.2, 1.2, lv) — wide at exhale, narrow at inhale
 - Z scale: lerp(0.5, 1.2, lv)
 - Fresnel intensity: constant 1.0
-- Fresnel power: lerp(0.4, 1.5, lv) — exhale has a much narrower, more concentrated glow (almost fully dark except a small center spot); inhale uses the wider/brighter glow that was previously the exhale mask
+- Fresnel power: lerp(0.2, 1.5, lv) — exhale has a much narrower, more concentrated glow (almost fully dark except a small center spot); inhale uses the wider/brighter glow that was previously the exhale mask
 
 **Right slider (rv):**
 - Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale
 - Emissive intensity: lerp(1.5, 2, rv) — brightest at exhale
+- Roughness: lerp(0.3, 1, rv) — smoother at inhale, rougher at exhale
 
 - Left slider starts at 0 (bottom / Exhale). Right slider starts at 1 (top / Exhale).
 - Morph starts in Exhale state: wide flat disc.
