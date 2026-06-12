@@ -33,12 +33,13 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 **Right slider (rv):**
 - Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale
-- Emissive intensity: lerp(1, 0.2, rv) — brightest at inhale
+- Emissive intensity: lerp(1, 0.5, rv) — brightest at inhale
 
 - Left slider starts at 0 (bottom / Exhale). Right slider starts at 1 (top / Exhale).
 - Morph starts in Exhale state: wide flat disc.
 - Slider values are refs (not state) to avoid re-renders. Updates happen in `useFrame`.
 - Slider fill indicator shows progress from exhale toward inhale on both sliders.
+- The left slider also exposes a raw (unclamped) ratio via `leftRawRef`, tracking the thumb's true position even past the slider's visual bounds — used by `SlowingDownController` for breath-cycle timing in "Slowing Down" mode.
 
 ## Morph material
 - Base color: `palette.morphBase` (Palette A: `#2266cc` blue)
@@ -70,23 +71,22 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 ### Basic
 - Morph + environment, no Gates.
-- Tutorial text: *"Move the sliders up and down along with your breath"*
 
 ### Paced Breathing
 - Full experience with Gates at a fixed 12-second interval.
-- Tutorial text: *"Move the sliders up and down with your breath. Time your breathing so the object fits through the gates"*
 
 ### Slowing Down
-- **Phase 1 (learning)**: No Gates. Tracks breath cycles via left slider (bottom→peak→bottom = one cycle). After 3 cycles, Phase 2 begins.
-- **Phase 2 (gates)**: Gates spawn at avg breath length interval, ramping to 2× over 60 seconds.
-- Tutorial text phase 1: *"Move the sliders up and down along with your breath"*
-- Tutorial text phase 2: *"Now begin to time your breath so the object fits through the gates"* (force-shown 5s)
+- **Phase 1 (learning)**: No Gates. Tracks breath cycles using the left thumb's raw (unclamped) screen position, not the slider's clamped 0-1 value — so swinging the thumb past the slider's visual top/bottom edges still counts correctly. A zigzag/deadband reversal detector (`DEADBAND = 0.08`, i.e. 8% of slider height) finds local min/max reversals; a full breath cycle = min→max→min (inhale + exhale), and must last at least `MIN_BREATH_SECONDS = 1.5`. After 5 cycles are recorded (`MIN_BREATHS = 5`), Phase 2 begins using the average of the **last 2** recorded cycles as the spawn interval.
+- **Phase 2 (gates)**: Gates spawn at that avg breath interval, ramping to 2× over 60 seconds. Exhale gates (A) are one full breath cycle apart; inhale gates (B) spawn halfway between exhale gates (an inherent result of Gate A spawning at z=-20 and Gate B at z=-30 with the same speed).
 
 ## Tutorial text rules
-- Visible for 5 seconds, then fades out.
-- Hides immediately when sliders move (unless force-shown).
-- Reappears after 10 consecutive seconds of no slider movement.
-- Force-show: used for Phase 2 start in Slowing Down.
+Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
+
+- **Text A** — "Move the sliders in opposite directions." Shown at mode start. Stays visible until the sliders start moving, then waits 2 seconds before fading out. If the user never moves the sliders, Text A stays up indefinitely (no movement → no timer starts).
+- **Text B** — "Move the sliders with your breath." Fades in once Text A fades out. Stays visible for 3 seconds, then fades out.
+- **Text C** — "Time your breath with the gates." Fades in whenever gates are about to start spawning (immediately at mode start for Paced Breathing; at the start of Phase 2 for Slowing Down). If Text A/B is still showing when gates are about to spawn, Text C waits until the A/B sequence finishes, then fades in. Stays visible for 5 seconds, then fades out.
+- **Idle re-show**: if the sliders are still for 10 seconds, the most recently shown text (A, B, or C — whichever was last) reappears and stays until 2 seconds after the sliders start moving again, then fades out (does not restart the A/B/C sequence).
+- Fade transitions take 1.5 seconds (`FADE_TRANSITION_MS` in `App.jsx`, must match the CSS transition in `TutorialText.jsx`).
 
 ## Personalization system
 - **Personalize** button on Home screen (top left)
@@ -132,7 +132,7 @@ src/
   TutorialText.jsx          — fade-in/out tutorial overlay (top of screen)
   SlowingDownController.jsx — breath cycle detection + dynamic gate interval
   palettes.js               — PALETTES object: morphBase, morphEmissive, gateColor, background
-  copy.js                   — tutorial text strings (TEXTS object, edit here to change wording)
+  copy.js                   — tutorial text strings (TEXT_A, TEXT_B, TEXTS.gates — edit here to change wording)
   Track.jsx                 — wave track lines (not currently rendered, kept for reference)
   Morph.jsx                 — legacy, superseded by MorphA/MorphB
   Gates.jsx                 — legacy, superseded by GatesA/GatesB

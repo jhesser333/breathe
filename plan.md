@@ -30,6 +30,7 @@
 - Fill indicator: grows from exhale end toward inhale end as slider moves
 - Large thumb (52px), track 62px wide, thumb stays within track bounds
 - Multi-touch, mouse fallback
+- Left slider also tracks raw (unclamped) thumb position via `leftRawRef`, used by Slowing Down breath timing
 
 ### Gates (Shape Option A — GatesA)
 - **Exhale Gate (A)**: single torus at center, scaled as wide flat ellipse to frame exhale morph
@@ -53,11 +54,15 @@
 **Paced Breathing** — Gates at fixed 12-second interval.
 
 **Slowing Down** — Two phases:
-- Phase 1: No gates, records breath cycles (bottom→peak→bottom, min 1.5s, needs 3 cycles)
-- Phase 2: Gates at avg breath interval, ramping to 2× over 60s
+- Phase 1: No gates. Records breath cycles from the left thumb's raw (unclamped) position — a zigzag/deadband detector (8% of slider height) finds min→max→min reversals, each one a full breath cycle (min 1.5s). Needs 5 cycles; spawn interval = avg of the last 2 cycles.
+- Phase 2: Gates at that avg breath interval, ramping to 2× over 60s. Inhale gates (B) land halfway between exhale gates (A) automatically, since B spawns at z=-30 vs A's z=-20 at the same speed.
 
 ### Tutorial Text
-- Visible 5 seconds, fades out. Hides on slider movement (unless force-shown). Returns after 10s stillness.
+- Universal A/B/C sequence, same across all modes:
+  - **Text A** ("Move the sliders in opposite directions.") — shown at level start, stays until 2s after sliders start moving, then fades out. Stays up indefinitely if sliders never move.
+  - **Text B** ("Move the sliders with your breath.") — fades in after Text A, visible 3s, fades out.
+  - **Text C** ("Time your breath with the gates.") — fades in when gates are about to spawn (immediately for Paced Breathing, at Phase 2 for Slowing Down); waits for A/B to finish if still showing. Visible 5s, fades out.
+  - Idle re-show: after 10s of no movement, the most recent text reappears until 2s after movement resumes.
 - Strings in `src/copy.js` — edit that file to change wording
 
 ### Scene

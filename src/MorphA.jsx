@@ -15,7 +15,7 @@ export default function MorphA({ leftVal, rightVal, palette }) {
     const mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.morphBase),
       emissive: new THREE.Color(palette.morphEmissive),
-      emissiveIntensity: 0.2,
+      emissiveIntensity: 0.5,
       roughness: 0.3,
       metalness: 0.1,
     })
@@ -62,7 +62,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
-    material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.2, rv)
+    material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.5, rv)
     fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(0.3, 1.0, lv)
   })
 
