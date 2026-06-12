@@ -29,7 +29,8 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 **Left slider (lv):**
 - X scale: lerp(2.2, 1.2, lv) — wide at exhale, narrow at inhale
 - Z scale: lerp(0.5, 1.2, lv)
-- Fresnel intensity: lerp(0.3, 1.0, lv)
+- Fresnel intensity: lerp(1.0, 0.3, lv) — darker mask at exhale
+- Fresnel power: lerp(1.5, 4.0, lv) — wider mask at exhale
 
 **Right slider (rv):**
 - Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale

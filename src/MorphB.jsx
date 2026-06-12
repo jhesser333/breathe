@@ -61,7 +61,8 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     groupRef.current.scale.set(xScale, yScale, zScale)
 
     material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.5, rv)
-    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(0.3, 1.0, lv)
+    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(1.0, 0.3, lv)
+    fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(1.5, 4.0, lv)
   })
 
   return (
