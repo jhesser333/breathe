@@ -34,7 +34,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 **Right slider (rv):**
 - Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale
-- Emissive intensity: lerp(1.5, 0.8, rv) — brightest at inhale
+- Emissive intensity: lerp(1.5, 2, rv) — brightest at exhale
 
 - Left slider starts at 0 (bottom / Exhale). Right slider starts at 1 (top / Exhale).
 - Morph starts in Exhale state: wide flat disc.
