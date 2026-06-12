@@ -13,11 +13,12 @@ import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
-import { TEXT_A, TEXTS_B, TEXTS } from './copy'
+import { TEXT_A, TEXT_B, TEXTS } from './copy'
 
 const STILLNESS_MS = 10000
-const MOVEMENT_FADE_DELAY_MS = 3000
-const TEXT_B_DISPLAY_MS = 5000
+const MOVEMENT_FADE_DELAY_MS = 2000
+const TEXT_B_DISPLAY_MS = 3000
+const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 1500
 
 export default function App() {
@@ -50,9 +51,8 @@ export default function App() {
   const awaitingMovementRef = useRef(false)
   const skipMovementRef = useRef(0)
   const stageRef = useRef('done')
-  const pendingPhase2Ref = useRef(false)
+  const pendingGatesTextRef = useRef(false)
   const currentMainTextRef = useRef('')
-  const modeTextKeyRef = useRef('basic')
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
 
@@ -76,25 +76,32 @@ export default function App() {
     phase2StartRef.current = 0
   }, [])
 
-  const showPhase2Text = useCallback(() => {
+  const showGatesText = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.slowing_gates
-    setTutorialText(TEXTS.slowing_gates)
+    currentMainTextRef.current = TEXTS.gates
+    setTutorialText(TEXTS.gates)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
-    }, TEXT_B_DISPLAY_MS)
+    }, TEXT_C_DISPLAY_MS)
   }, [])
+
+  const requestGatesText = useCallback(() => {
+    if (stageRef.current === 'done') {
+      showGatesText()
+    } else {
+      pendingGatesTextRef.current = true
+    }
+  }, [showGatesText])
 
   const advanceSequence = useCallback(() => {
     if (stageRef.current !== 'A') return
     stageRef.current = 'B'
-    const textB = TEXTS_B[modeTextKeyRef.current]
-    currentMainTextRef.current = textB
-    setTutorialText(textB)
+    currentMainTextRef.current = TEXT_B
+    setTutorialText(TEXT_B)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
@@ -103,13 +110,13 @@ export default function App() {
       tutorialVisibleRef.current = false
       tutorialTimerRef.current = setTimeout(() => {
         stageRef.current = 'done'
-        if (pendingPhase2Ref.current) {
-          pendingPhase2Ref.current = false
-          showPhase2Text()
+        if (pendingGatesTextRef.current) {
+          pendingGatesTextRef.current = false
+          showGatesText()
         }
       }, FADE_TRANSITION_MS)
     }, TEXT_B_DISPLAY_MS)
-  }, [showPhase2Text])
+  }, [showGatesText])
 
   const handleMovement = useCallback(() => {
     if (!awaitingMovementRef.current) return
@@ -166,28 +173,20 @@ export default function App() {
     if (m === 'slowing') resetSlowingState()
 
     clearTimeout(tutorialTimerRef.current)
-    modeTextKeyRef.current = m === 'slowing' ? 'slowing_learn' : m
     stageRef.current = 'A'
-    pendingPhase2Ref.current = false
+    pendingGatesTextRef.current = false
     awaitingMovementRef.current = true
     skipMovementRef.current = 2
-    currentMainTextRef.current = TEXTS_B[modeTextKeyRef.current]
+    currentMainTextRef.current = TEXT_B
     setTutorialText(TEXT_A)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
+    if (m === 'timed') pendingGatesTextRef.current = true
 
     setMode(m)
     setLevelKey(k => k + 1)
     setScreen('experience')
   }, [resetSlowingState])
-
-  const handleGatesReady = useCallback(() => {
-    if (stageRef.current === 'done') {
-      showPhase2Text()
-    } else {
-      pendingPhase2Ref.current = true
-    }
-  }, [showPhase2Text])
 
   const handleContinue = useCallback(() => {
     if (!mode) {
@@ -203,10 +202,9 @@ export default function App() {
 
   const handleBackFromExperience = useCallback(() => {
     gatesEnabledRef.current = false
-    clearTimeout(displayTimerRef.current)
+    clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
-    tutorialForcedRef.current = false
     setMode(null)
     setScreen('home')
   }, [])
@@ -277,7 +275,7 @@ export default function App() {
             leftVal={leftVal}
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
-            onGatesReady={handleGatesReady}
+            onGatesReady={requestGatesText}
             prevLeftRef={prevLeftRef}
             cycleStartRef={cycleStartRef}
             hadPeakRef={hadPeakRef}
