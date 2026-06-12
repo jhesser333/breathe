@@ -13,10 +13,12 @@ import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
-import { TEXTS } from './copy'
+import { TEXT_A, TEXTS_B, TEXTS } from './copy'
 
-const DISPLAY_MS = 5000
 const STILLNESS_MS = 10000
+const MOVEMENT_FADE_DELAY_MS = 3000
+const TEXT_B_DISPLAY_MS = 5000
+const FADE_TRANSITION_MS = 1500
 
 export default function App() {
   const leftVal = useRef(0)
@@ -44,8 +46,13 @@ export default function App() {
 
   const lastMoveTime = useRef(0)
   const tutorialVisibleRef = useRef(false)
-  const tutorialForcedRef = useRef(false)
-  const displayTimerRef = useRef(null)
+  const tutorialTimerRef = useRef(null)
+  const awaitingMovementRef = useRef(false)
+  const skipMovementRef = useRef(0)
+  const stageRef = useRef('done')
+  const pendingPhase2Ref = useRef(false)
+  const currentMainTextRef = useRef('')
+  const modeTextKeyRef = useRef('basic')
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
 
@@ -69,68 +76,118 @@ export default function App() {
     phase2StartRef.current = 0
   }, [])
 
-  const showTutorial = useCallback((opts = {}) => {
-    tutorialForcedRef.current = opts.force ?? false
+  const showPhase2Text = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = TEXTS.slowing_gates
+    setTutorialText(TEXTS.slowing_gates)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
-    clearTimeout(displayTimerRef.current)
-    displayTimerRef.current = setTimeout(() => {
+    awaitingMovementRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
-      tutorialForcedRef.current = false
-    }, DISPLAY_MS)
+    }, TEXT_B_DISPLAY_MS)
   }, [])
+
+  const advanceSequence = useCallback(() => {
+    if (stageRef.current !== 'A') return
+    stageRef.current = 'B'
+    const textB = TEXTS_B[modeTextKeyRef.current]
+    currentMainTextRef.current = textB
+    setTutorialText(textB)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+      tutorialTimerRef.current = setTimeout(() => {
+        stageRef.current = 'done'
+        if (pendingPhase2Ref.current) {
+          pendingPhase2Ref.current = false
+          showPhase2Text()
+        }
+      }, FADE_TRANSITION_MS)
+    }, TEXT_B_DISPLAY_MS)
+  }, [showPhase2Text])
+
+  const handleMovement = useCallback(() => {
+    if (!awaitingMovementRef.current) return
+    awaitingMovementRef.current = false
+    clearTimeout(tutorialTimerRef.current)
+    tutorialTimerRef.current = setTimeout(() => {
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+      tutorialTimerRef.current = setTimeout(() => {
+        advanceSequence()
+      }, FADE_TRANSITION_MS)
+    }, MOVEMENT_FADE_DELAY_MS)
+  }, [advanceSequence])
 
   useEffect(() => {
     if (screen !== 'experience') return
     const id = setInterval(() => {
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
-        showTutorial()
+        awaitingMovementRef.current = true
+        setTutorialText(currentMainTextRef.current)
+        setTutorialVisible(true)
+        tutorialVisibleRef.current = true
       }
     }, 500)
     return () => clearInterval(id)
-  }, [screen, showTutorial])
+  }, [screen])
 
-  useEffect(() => () => clearTimeout(displayTimerRef.current), [])
+  useEffect(() => () => clearTimeout(tutorialTimerRef.current), [])
 
   const setLeft = useCallback((v) => {
     leftVal.current = v
     lastMoveTime.current = Date.now()
-    if (tutorialVisibleRef.current && !tutorialForcedRef.current) {
-      clearTimeout(displayTimerRef.current)
-      setTutorialVisible(false)
-      tutorialVisibleRef.current = false
+    if (skipMovementRef.current > 0) {
+      skipMovementRef.current -= 1
+    } else {
+      handleMovement()
     }
-  }, [])
+  }, [handleMovement])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
     lastMoveTime.current = Date.now()
-    if (tutorialVisibleRef.current && !tutorialForcedRef.current) {
-      clearTimeout(displayTimerRef.current)
-      setTutorialVisible(false)
-      tutorialVisibleRef.current = false
+    if (skipMovementRef.current > 0) {
+      skipMovementRef.current -= 1
+    } else {
+      handleMovement()
     }
-  }, [])
+  }, [handleMovement])
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = m === 'timed'
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
-    clearTimeout(displayTimerRef.current)
     if (m === 'slowing') resetSlowingState()
-    const text = m === 'timed' ? TEXTS.timed : TEXTS[m === 'slowing' ? 'slowing_learn' : 'basic']
-    setTutorialText(text)
+
+    clearTimeout(tutorialTimerRef.current)
+    modeTextKeyRef.current = m === 'slowing' ? 'slowing_learn' : m
+    stageRef.current = 'A'
+    pendingPhase2Ref.current = false
+    awaitingMovementRef.current = true
+    skipMovementRef.current = 2
+    currentMainTextRef.current = TEXTS_B[modeTextKeyRef.current]
+    setTutorialText(TEXT_A)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+
     setMode(m)
     setLevelKey(k => k + 1)
     setScreen('experience')
-    setTimeout(() => showTutorial(), 0)
-  }, [showTutorial, resetSlowingState])
+  }, [resetSlowingState])
 
   const handleGatesReady = useCallback(() => {
-    setTutorialText(TEXTS.slowing_gates)
-    setTimeout(() => showTutorial({ force: true }), 0)
-  }, [showTutorial])
+    if (stageRef.current === 'done') {
+      showPhase2Text()
+    } else {
+      pendingPhase2Ref.current = true
+    }
+  }, [showPhase2Text])
 
   const handleContinue = useCallback(() => {
     if (!mode) {
