@@ -8,8 +8,8 @@ export default function MorphB({ leftVal, rightVal, palette }) {
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
-      fresnelPower:     { value: 4.0 },
-      fresnelIntensity: { value: 0.3 },
+      fresnelPower:     { value: 1.5 },
+      fresnelIntensity: { value: 1.0 },
     }
 
     const mat = new THREE.MeshStandardMaterial({
@@ -61,8 +61,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     groupRef.current.scale.set(xScale, yScale, zScale)
 
     material.emissiveIntensity = THREE.MathUtils.lerp(1, 0.5, rv)
-    fresnelUniforms.fresnelIntensity.value = THREE.MathUtils.lerp(1.0, 0.3, lv)
-    fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(1.5, 4.0, lv)
+    fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.4, 1.5, lv)
   })
 
   return (
