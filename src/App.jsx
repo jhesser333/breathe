@@ -2,6 +2,7 @@ import { useRef, useCallback, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import MorphA from './MorphA'
 import MorphB from './MorphB'
+import MorphC from './MorphC'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import Sliders from './Sliders'
@@ -259,7 +260,7 @@ export default function App() {
   }
 
   const hasGates = mode === 'timed' || mode === 'slowing'
-  const MorphComponent = shapeOption === 'b' ? MorphB : MorphA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : MorphA
   const GatesComponent = shapeOption === 'b' ? GatesB : GatesA
 
   return (
