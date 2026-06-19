@@ -136,7 +136,7 @@ export default function MorphC({ leftVal, rightVal, palette }) {
       fresnelPower:     { value: 1.5 },
       fresnelIntensity: { value: 1.0 },
       dissolveProgress: { value: 0 },
-      dissolveScale:    { value: 14.0 },
+      dissolveScale:    { value: 36.0 },
       dissolveEdge:     { value: 0.12 },
     }
 
@@ -191,23 +191,36 @@ float dissolveHash(vec3 p) {
         }`
       )
 
-      // Dissolve: quantize the surface into grain cells. Intact cells render
-      // as full squares that tile seamlessly into a smooth surface; as a
-      // cell's threshold drops (in noise order, as dissolveProgress rises)
-      // its visible area shrinks from a full square down through a shrinking
-      // dot to nothing -- so only cells actively dissolving look dot-like.
+      // Dissolve: each lattice point owns a small soft circle (never a square
+      // -- that's the only shape ever drawn). A fragment unions the circles
+      // from its cell's nearby lattice neighbors (a cheap metaball blend), so
+      // when neighbors are all intact their overlapping circles merge into a
+      // seamless smooth surface with no cell-boundary edges; as cells dissolve
+      // in noise order, the union shrinks down to isolated shrinking/fading
+      // dots before disappearing entirely. Pure corner neighbors are skipped
+      // to keep the loop cheap without leaving gaps (the remaining face/edge
+      // neighbors already give full overlap at the chosen radius).
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <opaque_fragment>',
         `#include <opaque_fragment>
         {
           vec3 dScaled = vDissolvePos * dissolveScale;
-          vec3 dCell = floor(dScaled);
-          float dNoise = dissolveHash(dCell);
-          float dThreshold = smoothstep(dissolveProgress - dissolveEdge, dissolveProgress + dissolveEdge, dNoise);
-          float dDistToCenter = length(dScaled - (dCell + 0.5)) * 2.0;
-          float dCutoff = dThreshold * 1.8;
-          float dDotMask = 1.0 - smoothstep(dCutoff - 0.3, dCutoff, dDistToCenter);
-          gl_FragColor.a *= dDotMask;
+          vec3 dBaseCell = floor(dScaled);
+          float dCoverage = 0.0;
+          for (int ix = -1; ix <= 1; ix++) {
+            for (int iy = -1; iy <= 1; iy++) {
+              for (int iz = -1; iz <= 1; iz++) {
+                if (abs(ix) + abs(iy) + abs(iz) > 2) continue;
+                vec3 dNeighbor = dBaseCell + vec3(float(ix), float(iy), float(iz));
+                float dNoise = dissolveHash(dNeighbor);
+                float dProgress = smoothstep(dissolveProgress - dissolveEdge, dissolveProgress + dissolveEdge, dNoise);
+                float dDist = length(dScaled - (dNeighbor + 0.5));
+                float dFalloff = 1.0 - smoothstep(0.8, 1.0, dDist);
+                dCoverage = max(dCoverage, dFalloff * dProgress);
+              }
+            }
+          }
+          gl_FragColor.a *= dCoverage;
         }`
       )
     }
@@ -332,7 +345,11 @@ float dissolveHash(vec3 p) {
     // controls how much of the surface has "burned away" into dots.
     const fadeProgress = THREE.MathUtils.smoothstep(rv, 0.5, 1.0)
     material.opacity = 0.75
-    fresnelUniforms.dissolveProgress.value = fadeProgress
+    // Push the mapped range past the noise's [0,1) span by a safety margin so
+    // every cell is fully solid at fadeProgress=0 (no holes at rest) and fully
+    // gone at fadeProgress=1, instead of some cells already being mid-fade.
+    const dissolveMargin = fresnelUniforms.dissolveEdge.value * 2
+    fresnelUniforms.dissolveProgress.value = THREE.MathUtils.lerp(-dissolveMargin, 1 + dissolveMargin, fadeProgress)
 
     // Spawn rate holds steady through 75% of the way to exhale, then ramps to 0.
     const spawnRampProgress = THREE.MathUtils.smoothstep(rv, 0.75, 1.0)
