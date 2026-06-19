@@ -28,7 +28,7 @@ void main() {
   float envelope = fadeIn * fadeOut;
 
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = uSize * (0.5 + aSeed * 0.8) * envelope / -mvPosition.z;
+  gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
   vAlpha = envelope;
@@ -73,7 +73,7 @@ void main() {
   );
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
-  gl_PointSize = uSize * (0.5 + aSeed * 0.8) * envelope / -mvPosition.z;
+  gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
   vAlpha = envelope;
@@ -135,6 +135,9 @@ export default function MorphC({ leftVal, rightVal, palette }) {
     const fresnelUniforms = {
       fresnelPower:     { value: 1.5 },
       fresnelIntensity: { value: 1.0 },
+      dissolveProgress: { value: 0 },
+      dissolveScale:    { value: 14.0 },
+      dissolveEdge:     { value: 0.12 },
     }
 
     const mat = new THREE.MeshStandardMaterial({
@@ -151,19 +154,33 @@ export default function MorphC({ leftVal, rightVal, palette }) {
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, fresnelUniforms)
 
-      // Pass view direction from vertex to fragment via custom varying
-      shader.vertexShader = 'varying vec3 vFresnelDir;\n' + shader.vertexShader
+      // Pass view direction and local (unscaled) position from vertex to
+      // fragment via custom varyings -- local position drives the dissolve
+      // grain so dot size stays stable regardless of the mesh's breathing scale.
+      shader.vertexShader = 'varying vec3 vFresnelDir;\nvarying vec3 vDissolvePos;\n' + shader.vertexShader
       shader.vertexShader = shader.vertexShader.replace(
         '#include <project_vertex>',
         `#include <project_vertex>
-        vFresnelDir = normalize(-mvPosition.xyz);`
+        vFresnelDir = normalize(-mvPosition.xyz);
+        vDissolvePos = position;`
       )
 
       // Inject uniforms + varying declaration, then add Fresnel to emissive
       shader.fragmentShader =
         `uniform float fresnelPower;
 uniform float fresnelIntensity;
-varying vec3 vFresnelDir;\n` + shader.fragmentShader
+uniform float dissolveProgress;
+uniform float dissolveScale;
+uniform float dissolveEdge;
+varying vec3 vFresnelDir;
+varying vec3 vDissolvePos;
+
+float dissolveHash(vec3 p) {
+  p = fract(p * vec3(443.897, 441.423, 437.195));
+  p += dot(p, p.yzx + 19.19);
+  return fract((p.x + p.y) * p.z);
+}
+\n` + shader.fragmentShader
 
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <emissivemap_fragment>',
@@ -171,6 +188,26 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
         {
           float fr = pow(1.0 - max(dot(normalize(vNormal), vFresnelDir), 0.0), fresnelPower);
           totalEmissiveRadiance *= (1.0 - fr * fresnelIntensity);
+        }`
+      )
+
+      // Dissolve: quantize the surface into grain cells. Intact cells render
+      // as full squares that tile seamlessly into a smooth surface; as a
+      // cell's threshold drops (in noise order, as dissolveProgress rises)
+      // its visible area shrinks from a full square down through a shrinking
+      // dot to nothing -- so only cells actively dissolving look dot-like.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <opaque_fragment>',
+        `#include <opaque_fragment>
+        {
+          vec3 dScaled = vDissolvePos * dissolveScale;
+          vec3 dCell = floor(dScaled);
+          float dNoise = dissolveHash(dCell);
+          float dThreshold = smoothstep(dissolveProgress - dissolveEdge, dissolveProgress + dissolveEdge, dNoise);
+          float dDistToCenter = length(dScaled - (dCell + 0.5)) * 2.0;
+          float dCutoff = dThreshold * 1.8;
+          float dDotMask = 1.0 - smoothstep(dCutoff - 0.3, dCutoff, dDistToCenter);
+          gl_FragColor.a *= dDotMask;
         }`
       )
     }
@@ -278,8 +315,8 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const xScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
-    const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
+    const xScale = THREE.MathUtils.lerp(2.8, 1.5, lv)
+    const zScale = THREE.MathUtils.lerp(0.5, 1.5, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
@@ -289,9 +326,13 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     material.roughness = THREE.MathUtils.lerp(0.3, 1, rv)
     fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.2, 1.5, lv)
 
-    // Mesh alpha fades out starting halfway to exhale, fully transparent at exhale.
+    // Mesh dissolves into grain starting halfway to exhale, fully gone at exhale,
+    // instead of fading alpha uniformly. Base opacity is capped at 0.75 even on
+    // inhale (the surface stays somewhat transparent); the dissolve uniform
+    // controls how much of the surface has "burned away" into dots.
     const fadeProgress = THREE.MathUtils.smoothstep(rv, 0.5, 1.0)
-    material.opacity = 1 - fadeProgress
+    material.opacity = 0.75
+    fresnelUniforms.dissolveProgress.value = fadeProgress
 
     // Spawn rate holds steady through 75% of the way to exhale, then ramps to 0.
     const spawnRampProgress = THREE.MathUtils.smoothstep(rv, 0.75, 1.0)
