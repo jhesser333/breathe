@@ -136,7 +136,7 @@ export default function MorphC({ leftVal, rightVal, palette }) {
       fresnelPower:     { value: 1.5 },
       fresnelIntensity: { value: 1.0 },
       dissolveProgress: { value: 0 },
-      dissolveScale:    { value: 36.0 },
+      dissolveScale:    { value: 80.0 },
       dissolveEdge:     { value: 0.12 },
     }
 
