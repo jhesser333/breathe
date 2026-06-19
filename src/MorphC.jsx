@@ -198,7 +198,11 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
   }, [])
 
   const flowAttrs = useMemo(() => {
-    const positions = sampleSpherePositions(PARTICLE_COUNT_2)
+    // Unscaled anchor points on the unit sphere -- used only at spawn time to
+    // compute where the mesh surface actually is (after applying the current
+    // breathing scale). Never touched again after a particle spawns.
+    const basePositions = sampleSpherePositions(PARTICLE_COUNT_2)
+    const positions = basePositions.slice()
     const seeds = new Float32Array(PARTICLE_COUNT_2)
     const spawnTimes = new Float32Array(PARTICLE_COUNT_2)
     const lifetimes = new Float32Array(PARTICLE_COUNT_2)
@@ -216,7 +220,8 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     }
 
     const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    const positionAttr = new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage)
+    geometry.setAttribute('position', positionAttr)
     geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
     geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1))
     const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
@@ -228,7 +233,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     geometry.setAttribute('aMode', modeAttr)
     geometry.setAttribute('aStartOffset', startOffsetAttr)
 
-    return { geometry, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr }
+    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr, basePositions }
   }, [])
 
   const sparkleMaterial = useMemo(() => {
@@ -334,16 +339,24 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
       flowAccumulatorRef.current -= toSpawnFlow
       toSpawnFlow = Math.min(toSpawnFlow, MAX_SPAWN_PER_FRAME)
 
-      const { spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr } = flowAttrs
+      const { positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr, basePositions } = flowAttrs
       const goingOut = flowDirRef.current > 0
       for (let k = 0; k < toSpawnFlow; k++) {
         const idx = flowCursorRef.current % PARTICLE_COUNT_2
         flowCursorRef.current += 1
+        // Spawn exactly on the mesh surface as it currently appears, by
+        // applying this frame's breathing scale to the base anchor. After
+        // this, the particle's position is driven only by the shader's own
+        // XZ velocity -- it never reads the scale again.
+        positionAttr.array[idx * 3]     = basePositions[idx * 3] * xScale
+        positionAttr.array[idx * 3 + 1] = basePositions[idx * 3 + 1] * yScale
+        positionAttr.array[idx * 3 + 2] = basePositions[idx * 3 + 2] * zScale
         spawnTimeAttr.array[idx] = now
         lifetimeAttr.array[idx] = 1 + Math.random()
         modeAttr.array[idx] = goingOut ? 1 : -1
         startOffsetAttr.array[idx] = goingOut ? 0 : SPREAD_2 * (0.4 + Math.random() * 0.6)
       }
+      positionAttr.needsUpdate = true
       spawnTimeAttr.needsUpdate = true
       lifetimeAttr.needsUpdate = true
       modeAttr.needsUpdate = true
