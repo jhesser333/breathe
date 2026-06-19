@@ -9,7 +9,7 @@ const MAX_SPAWN_RATE = 300        // particles/sec, shared by both systems
 const SPREAD_2 = 0.9              // max XZ travel distance for system 2
 const MAX_SPAWN_PER_FRAME = 150   // safety cap against huge dt spikes (e.g. tab refocus)
 const SPAWN_SENTINEL = -1e4
-const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel rv jitter when deciding flow direction
+const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel lv jitter when deciding flow direction
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -121,9 +121,10 @@ export default function MorphC({ leftVal, rightVal, palette }) {
   const flowCursorRef = useRef(0)
   const flowAccumulatorRef = useRef(0)
 
-  // Tracks whether rv is currently trending toward exhale (1) or inhale (-1),
+  // Tracks whether lv is currently trending toward exhale (1) or inhale (-1),
   // used only to decide which way newly-spawned flow particles travel.
-  const prevRvRef = useRef(rightVal.current)
+  // (lv=0 is exhale, lv=1 is inhale -- opposite numeric convention from rv.)
+  const prevLvRef = useRef(leftVal.current)
   const flowDirRef = useRef(1)
 
   const { material, fresnelUniforms } = useMemo(() => {
@@ -285,14 +286,20 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const spawnRampProgress = THREE.MathUtils.smoothstep(rv, 0.75, 1.0)
     const spawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, spawnRampProgress)
 
+    // System 2 is fully controlled by the left slider instead. lv=0 is exhale,
+    // so its "progress toward exhale" is the inverse of lv.
+    const leftExhaleProgress = 1 - lv
+    const flowRampProgress = THREE.MathUtils.smoothstep(leftExhaleProgress, 0.75, 1.0)
+    const flowSpawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, flowRampProgress)
+
     const now = state.clock.elapsedTime
 
-    // Track whether rv is currently trending toward exhale or inhale, for
+    // Track whether lv is currently trending toward exhale or inhale, for
     // newly-spawned flow particles -- held over when the slider is still.
-    const dRv = rv - prevRvRef.current
-    prevRvRef.current = rv
-    if (Math.abs(dRv) > DIRECTION_DEADBAND) {
-      flowDirRef.current = dRv > 0 ? 1 : -1
+    const dLv = lv - prevLvRef.current
+    prevLvRef.current = lv
+    if (Math.abs(dLv) > DIRECTION_DEADBAND) {
+      flowDirRef.current = dLv < 0 ? 1 : -1
     }
 
     // System 1: static surface sparkle, no velocity.
@@ -315,7 +322,8 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     sparkleMaterial.uniforms.uTime.value = now
 
     // System 2: blown-away (toward exhale) / sucked-in (toward inhale), XZ-only velocity.
-    flowAccumulatorRef.current += spawnRate * delta
+    // Driven entirely by the left slider.
+    flowAccumulatorRef.current += flowSpawnRate * delta
     let toSpawnFlow = Math.floor(flowAccumulatorRef.current)
     if (toSpawnFlow > 0) {
       flowAccumulatorRef.current -= toSpawnFlow
