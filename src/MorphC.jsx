@@ -23,13 +23,15 @@ varying float vSeed;
 void main() {
   float age = max(uTime - aSpawnTime, 0.0);
   float lifeT = clamp(age / aLifetime, 0.0, 1.0);
-  float fade = 1.0 - smoothstep(0.0, 1.0, lifeT);
+  float fadeIn = smoothstep(0.0, 0.15, lifeT);
+  float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
+  float envelope = fadeIn * fadeOut;
 
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = uSize * (0.5 + aSeed * 0.8) / -mvPosition.z;
+  gl_PointSize = uSize * (0.5 + aSeed * 0.8) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
-  vAlpha = fade;
+  vAlpha = envelope;
   vSeed = aSeed;
 }
 `
@@ -50,7 +52,9 @@ varying float vSeed;
 void main() {
   float age = max(uTime - aSpawnTime, 0.0);
   float lifeT = clamp(age / aLifetime, 0.0, 1.0);
-  float fade = 1.0 - smoothstep(0.0, 1.0, lifeT);
+  float fadeIn = smoothstep(0.0, 0.15, lifeT);
+  float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
+  float envelope = fadeIn * fadeOut;
 
   // Radial direction in the XZ plane only -- Y never moves.
   vec2 xz = position.xz;
@@ -69,10 +73,10 @@ void main() {
   );
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
-  gl_PointSize = uSize * (0.5 + aSeed * 0.8) / -mvPosition.z;
+  gl_PointSize = uSize * (0.5 + aSeed * 0.8) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
-  vAlpha = fade;
+  vAlpha = envelope;
   vSeed = aSeed;
 }
 `
