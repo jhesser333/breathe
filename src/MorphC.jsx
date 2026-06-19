@@ -242,6 +242,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
       fragmentShader: PARTICLE_FRAGMENT_SHADER,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
     })
   }, [palette.morphEmissive])
@@ -258,6 +259,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
       fragmentShader: PARTICLE_FRAGMENT_SHADER,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
     })
   }, [palette.morphEmissive])
@@ -286,10 +288,9 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const spawnRampProgress = THREE.MathUtils.smoothstep(rv, 0.75, 1.0)
     const spawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, spawnRampProgress)
 
-    // System 2 is fully controlled by the left slider instead. lv=0 is exhale,
-    // so its "progress toward exhale" is the inverse of lv.
-    const leftExhaleProgress = 1 - lv
-    const flowRampProgress = THREE.MathUtils.smoothstep(leftExhaleProgress, 0.75, 1.0)
+    // System 2 is fully controlled by the left slider instead, and ramps the
+    // opposite way: full rate through 50% toward inhale, then down to 0 by 75%.
+    const flowRampProgress = THREE.MathUtils.smoothstep(lv, 0.5, 0.75)
     const flowSpawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, flowRampProgress)
 
     const now = state.clock.elapsedTime
@@ -348,14 +349,18 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
   })
 
   return (
-    <group ref={groupRef} position={[0, 0.25, 0]}>
-      <mesh ref={matRef}>
-        <sphereGeometry args={[SPHERE_RADIUS, 32, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-      <points geometry={sparkleAttrs.geometry}>
-        <primitive object={sparkleMaterial} attach="material" />
-      </points>
+    <group position={[0, 0.25, 0]}>
+      <group ref={groupRef}>
+        <mesh ref={matRef}>
+          <sphereGeometry args={[SPHERE_RADIUS, 32, 16]} />
+          <primitive object={material} attach="material" />
+        </mesh>
+        <points geometry={sparkleAttrs.geometry}>
+          <primitive object={sparkleMaterial} attach="material" />
+        </points>
+      </group>
+      {/* System 2 sits outside the scaled group so its particles' travel is
+          never stretched/squished by the morph's breathing scale animation. */}
       <points geometry={flowAttrs.geometry}>
         <primitive object={flowMaterial} attach="material" />
       </points>
