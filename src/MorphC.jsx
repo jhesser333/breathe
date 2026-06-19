@@ -288,9 +288,12 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const spawnRampProgress = THREE.MathUtils.smoothstep(rv, 0.75, 1.0)
     const spawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, spawnRampProgress)
 
-    // System 2 is fully controlled by the left slider instead, and ramps the
-    // opposite way: full rate through 50% toward inhale, then down to 0 by 75%.
-    const flowRampProgress = THREE.MathUtils.smoothstep(lv, 0.5, 0.75)
+    // System 2 is fully controlled by the left slider. lv=0 is exhale, so its
+    // "progress toward exhale" is the inverse of lv -- using the same 0.75->1.0
+    // ramp shape as system 1 means the two line up when both sliders move
+    // together (in opposite directions, as the normal breathing gesture does).
+    const leftExhaleProgress = 1 - lv
+    const flowRampProgress = THREE.MathUtils.smoothstep(leftExhaleProgress, 0.75, 1.0)
     const flowSpawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, flowRampProgress)
 
     const now = state.clock.elapsedTime
