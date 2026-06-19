@@ -4,19 +4,15 @@ import * as THREE from 'three'
 
 const PARTICLE_COUNT = 1500
 const SPHERE_RADIUS = 0.5
-const SPREAD = 1.6
-const MAX_SPAWN_PER_FRAME = 25
+const MAX_SPAWN_RATE = 300 // particles/sec at the moment dissolve begins, ramping to 0 by full exhale
+const MAX_SPAWN_PER_FRAME = 150 // safety cap against huge dt spikes (e.g. tab refocus)
 const SPAWN_SENTINEL = -1e4
 
 const PARTICLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
 attribute float aLifetime;
-attribute float aSpeed;
-attribute float aMode;
-attribute float aStartOffset;
 attribute float aSeed;
 uniform float uTime;
-uniform float uSpread;
 uniform float uSize;
 varying float vAlpha;
 varying float vSeed;
@@ -26,14 +22,7 @@ void main() {
   float lifeT = clamp(age / aLifetime, 0.0, 1.0);
   float fade = 1.0 - smoothstep(0.0, 1.0, lifeT);
 
-  vec3 dir = normalize(position);
-  float travel = aSpeed * age;
-  float extraRadius = aMode > 0.0
-    ? min(travel, uSpread)
-    : max(aStartOffset - travel, 0.0);
-  vec3 displaced = position + dir * extraRadius;
-
-  vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
   gl_PointSize = uSize * (0.5 + aSeed * 0.8) / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
@@ -63,11 +52,10 @@ export default function MorphC({ leftVal, rightVal, palette }) {
   const matRef = useRef()
   const pointsMatRef = useRef()
 
-  // How many of the pool are currently considered "away from solid form"
-  // (flying out or mid-flight back in), and where to pick the next
-  // particle slot to (re)activate.
-  const dissolvedCountRef = useRef(0)
+  // Cyclic index into the particle pool, and leftover fractional spawn
+  // count carried between frames (rate * dt isn't usually a whole number).
   const spawnCursorRef = useRef(0)
+  const spawnAccumulatorRef = useRef(0)
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
@@ -118,12 +106,9 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
 
   const particleAttrs = useMemo(() => {
     const positions = new Float32Array(PARTICLE_COUNT * 3)
-    const speeds = new Float32Array(PARTICLE_COUNT)
     const seeds = new Float32Array(PARTICLE_COUNT)
     const spawnTimes = new Float32Array(PARTICLE_COUNT)
     const lifetimes = new Float32Array(PARTICLE_COUNT)
-    const modes = new Float32Array(PARTICLE_COUNT)
-    const startOffsets = new Float32Array(PARTICLE_COUNT)
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       // Uniform distribution on a sphere surface (Archimedes method)
@@ -136,37 +121,28 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
       positions[i * 3 + 1] = SPHERE_RADIUS * sinTheta * Math.sin(phi)
       positions[i * 3 + 2] = SPHERE_RADIUS * z
 
-      speeds[i] = 0.6 + Math.random() * 0.8
       seeds[i] = Math.random()
       spawnTimes[i] = SPAWN_SENTINEL
       lifetimes[i] = 1
-      modes[i] = 1
-      startOffsets[i] = 0
     }
 
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1))
     geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
     const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
     const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
-    const modeAttr = new THREE.BufferAttribute(modes, 1).setUsage(THREE.DynamicDrawUsage)
-    const startOffsetAttr = new THREE.BufferAttribute(startOffsets, 1).setUsage(THREE.DynamicDrawUsage)
     geometry.setAttribute('aSpawnTime', spawnTimeAttr)
     geometry.setAttribute('aLifetime', lifetimeAttr)
-    geometry.setAttribute('aMode', modeAttr)
-    geometry.setAttribute('aStartOffset', startOffsetAttr)
 
-    return { geometry, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr }
+    return { geometry, spawnTimeAttr, lifetimeAttr }
   }, [])
 
   const particleMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        uSpread: { value: SPREAD },
-        uSize:   { value: 60 },
-        uColor:  { value: new THREE.Color(palette.morphEmissive) },
-        uTime:   { value: 0 },
+        uSize:  { value: 60 },
+        uColor: { value: new THREE.Color(palette.morphEmissive) },
+        uTime:  { value: 0 },
       },
       vertexShader: PARTICLE_VERTEX_SHADER,
       fragmentShader: PARTICLE_FRAGMENT_SHADER,
@@ -176,7 +152,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     })
   }, [palette.morphEmissive])
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return
     const lv = leftVal.current
     const rv = rightVal.current
@@ -197,14 +173,19 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const progress = THREE.MathUtils.smoothstep(rv, 0.5, 1.0)
     material.opacity = 1 - progress
 
-    const now = state.clock.elapsedTime
-    const targetDissolved = Math.round(progress * PARTICLE_COUNT)
-    const diff = targetDissolved - dissolvedCountRef.current
+    // Spawn rate starts at MAX_SPAWN_RATE the moment dissolve begins and
+    // ramps down to 0 by full exhale (and mirrors symmetrically on the way
+    // back toward inhale, since it's purely a function of progress).
+    const spawnRate = progress <= 0 ? 0 : THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, progress)
 
-    if (diff !== 0) {
-      const goingOut = diff > 0
-      const toSpawn = Math.min(Math.abs(diff), MAX_SPAWN_PER_FRAME)
-      const { spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr } = particleAttrs
+    const now = state.clock.elapsedTime
+    spawnAccumulatorRef.current += spawnRate * delta
+    let toSpawn = Math.floor(spawnAccumulatorRef.current)
+    if (toSpawn > 0) {
+      spawnAccumulatorRef.current -= toSpawn
+      toSpawn = Math.min(toSpawn, MAX_SPAWN_PER_FRAME)
+
+      const { spawnTimeAttr, lifetimeAttr } = particleAttrs
 
       for (let k = 0; k < toSpawn; k++) {
         const idx = spawnCursorRef.current % PARTICLE_COUNT
@@ -212,16 +193,10 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
 
         spawnTimeAttr.array[idx] = now
         lifetimeAttr.array[idx] = 1 + Math.random() // fades out 1-2s after spawning
-        modeAttr.array[idx] = goingOut ? 1 : -1
-        startOffsetAttr.array[idx] = goingOut ? 0 : SPREAD * (0.4 + Math.random() * 0.6)
       }
 
       spawnTimeAttr.needsUpdate = true
       lifetimeAttr.needsUpdate = true
-      modeAttr.needsUpdate = true
-      startOffsetAttr.needsUpdate = true
-
-      dissolvedCountRef.current += goingOut ? toSpawn : -toSpawn
     }
 
     particleMaterial.uniforms.uTime.value = now
