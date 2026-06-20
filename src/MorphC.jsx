@@ -333,11 +333,9 @@ float dissolveHash(vec3 p) {
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
-    material.emissiveIntensity = rv < 0.85
-      ? THREE.MathUtils.lerp(2, 1, rv / 0.85)
-      : THREE.MathUtils.lerp(1, 3, (rv - 0.85) / 0.15)
+    material.emissiveIntensity = THREE.MathUtils.lerp(1, 0, rv)
     material.roughness = THREE.MathUtils.lerp(0.3, 1, rv)
-    fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.2, 1.5, lv)
+    fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.0, 0.2, lv)
 
     // Mesh dissolves into grain across the entire slider travel -- solid and
     // smooth at full inhale (rv=0), fully gone at full exhale (rv=1) -- instead
