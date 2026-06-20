@@ -74,8 +74,9 @@ void main() {
   float pull = exp(-uPullRate * lifeT);
 
   // Particles spawned while sucked in (slider moving toward inhale) get a
-  // small upward drift on top of the pull, so they swoop up into the mesh
-  // as it grows tall instead of sliding flat into the center line.
+  // small drift on top of the pull -- sign varies per particle, so some
+  // rise and others dip as they swoop into the mesh as it grows tall,
+  // instead of sliding flat into the center line.
   float swoopY = aMode < 0.0 ? aSwoopSpeed * age : 0.0;
 
   vec3 displaced = vec3(
@@ -355,7 +356,7 @@ float dissolveHash(vec3 p) {
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
-    material.emissiveIntensity = THREE.MathUtils.lerp(1, 0, rv)
+    material.emissiveIntensity = THREE.MathUtils.lerp(1.5, 0, rv)
     material.roughness = THREE.MathUtils.lerp(0.3, 1, rv)
     fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.0, 0.2, lv)
 
@@ -439,8 +440,9 @@ float dissolveHash(vec3 p) {
         modeAttr.array[idx] = goingOut ? 1 : -1
         startOffsetAttr.array[idx] = goingOut ? 0 : SPREAD_2 * (0.4 + Math.random() * 0.6)
         // Only particles spawned while moving toward inhale (sucked in) get
-        // an upward swoop; blown-away particles get none.
-        swoopSpeedAttr.array[idx] = goingOut ? 0 : 0.15 + Math.random() * 0.4
+        // a swoop; blown-away particles get none. Sign is randomized so some
+        // particles rise and others dip as they're drawn into the growing mesh.
+        swoopSpeedAttr.array[idx] = goingOut ? 0 : (0.15 + Math.random() * 0.4) * (Math.random() < 0.5 ? -1 : 1)
       }
       positionAttr.needsUpdate = true
       spawnTimeAttr.needsUpdate = true
