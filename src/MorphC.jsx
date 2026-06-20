@@ -79,8 +79,15 @@ void main() {
   // instead of sliding flat into the center line.
   float swoopY = aMode < 0.0 ? aSwoopSpeed * age : 0.0;
 
+  // Sucked-in particles are also slowly pulled in toward X=0 (in addition to
+  // shrinking back to the surface via extraX), using the same exponential
+  // decay as the Y/Z pull so they're drawn toward the mesh without
+  // overshooting past its center.
+  float xBase = position.x + dirX * extraX;
+  float xFinal = aMode < 0.0 ? xBase * pull : xBase;
+
   vec3 displaced = vec3(
-    position.x + dirX * extraX,
+    xFinal,
     position.y * pull + swoopY,
     position.z * pull
   );
