@@ -43,6 +43,7 @@ attribute float aSpeed;
 attribute float aMode;
 attribute float aStartOffset;
 attribute float aSeed;
+attribute float aSwoopSpeed;
 uniform float uTime;
 uniform float uSpread;
 uniform float uSize;
@@ -58,7 +59,9 @@ void main() {
   float envelope = fadeIn * fadeOut;
 
   // X-only travel, replacing the old radial XZ motion -- the random aSpeed
-  // range still applies, just along a single axis now.
+  // range still applies, just along a single axis now. Some particles get a
+  // speed near 0, so they barely drift in X and are mostly just drawn toward
+  // the center line.
   float dirX = position.x >= 0.0 ? 1.0 : -1.0;
   float travel = aSpeed * age;
   float extraX = aMode > 0.0
@@ -70,9 +73,14 @@ void main() {
   // particles can't overshoot past the center line.
   float pull = exp(-uPullRate * lifeT);
 
+  // Particles spawned while sucked in (slider moving toward inhale) get a
+  // small upward drift on top of the pull, so they swoop up into the mesh
+  // as it grows tall instead of sliding flat into the center line.
+  float swoopY = aMode < 0.0 ? aSwoopSpeed * age : 0.0;
+
   vec3 displaced = vec3(
     position.x + dirX * extraX,
-    position.y * pull,
+    position.y * pull + swoopY,
     position.z * pull
   );
 
@@ -267,14 +275,18 @@ float dissolveHash(vec3 p) {
     const speeds = new Float32Array(PARTICLE_COUNT_2)
     const modes = new Float32Array(PARTICLE_COUNT_2)
     const startOffsets = new Float32Array(PARTICLE_COUNT_2)
+    const swoopSpeeds = new Float32Array(PARTICLE_COUNT_2)
 
     for (let i = 0; i < PARTICLE_COUNT_2; i++) {
       seeds[i] = Math.random()
       spawnTimes[i] = SPAWN_SENTINEL
       lifetimes[i] = 1
-      speeds[i] = 0.25 + Math.random() * 0.4
+      // Lerp down to 0 so some particles get ~no X velocity and just drift
+      // toward the center line instead of spreading outward.
+      speeds[i] = THREE.MathUtils.lerp(0, 0.65, Math.random())
       modes[i] = 1
       startOffsets[i] = 0
+      swoopSpeeds[i] = 0
     }
 
     const geometry = new THREE.BufferGeometry()
@@ -286,12 +298,14 @@ float dissolveHash(vec3 p) {
     const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
     const modeAttr = new THREE.BufferAttribute(modes, 1).setUsage(THREE.DynamicDrawUsage)
     const startOffsetAttr = new THREE.BufferAttribute(startOffsets, 1).setUsage(THREE.DynamicDrawUsage)
+    const swoopSpeedAttr = new THREE.BufferAttribute(swoopSpeeds, 1).setUsage(THREE.DynamicDrawUsage)
     geometry.setAttribute('aSpawnTime', spawnTimeAttr)
     geometry.setAttribute('aLifetime', lifetimeAttr)
     geometry.setAttribute('aMode', modeAttr)
     geometry.setAttribute('aStartOffset', startOffsetAttr)
+    geometry.setAttribute('aSwoopSpeed', swoopSpeedAttr)
 
-    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr, basePositions }
+    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr, swoopSpeedAttr, basePositions }
   }, [])
 
   const sparkleMaterial = useMemo(() => {
@@ -336,7 +350,7 @@ float dissolveHash(vec3 p) {
     const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
     const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
-    const xScale = THREE.MathUtils.lerp(3, 2, lv)
+    const xScale = THREE.MathUtils.lerp(4, 2.5, lv)
     const zScale = THREE.MathUtils.lerp(0.2, 1.5, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
@@ -408,7 +422,7 @@ float dissolveHash(vec3 p) {
       flowAccumulatorRef.current -= toSpawnFlow
       toSpawnFlow = Math.min(toSpawnFlow, MAX_SPAWN_PER_FRAME)
 
-      const { positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr, basePositions } = flowAttrs
+      const { positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr, startOffsetAttr, swoopSpeedAttr, basePositions } = flowAttrs
       const goingOut = flowDirRef.current > 0
       for (let k = 0; k < toSpawnFlow; k++) {
         const idx = flowCursorRef.current % PARTICLE_COUNT_2
@@ -424,12 +438,16 @@ float dissolveHash(vec3 p) {
         lifetimeAttr.array[idx] = 1 + Math.random()
         modeAttr.array[idx] = goingOut ? 1 : -1
         startOffsetAttr.array[idx] = goingOut ? 0 : SPREAD_2 * (0.4 + Math.random() * 0.6)
+        // Only particles spawned while moving toward inhale (sucked in) get
+        // an upward swoop; blown-away particles get none.
+        swoopSpeedAttr.array[idx] = goingOut ? 0 : 0.05 + Math.random() * 0.25
       }
       positionAttr.needsUpdate = true
       spawnTimeAttr.needsUpdate = true
       lifetimeAttr.needsUpdate = true
       modeAttr.needsUpdate = true
       startOffsetAttr.needsUpdate = true
+      swoopSpeedAttr.needsUpdate = true
     }
     flowMaterial.uniforms.uTime.value = now
   })
