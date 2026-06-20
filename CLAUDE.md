@@ -5,7 +5,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 ## Vocabulary
 
-**Morph** — the central animated form, fixed at position [0, 0.25, 0]. Currently a sphere (Shape Option A) or rounded box (Shape Option B). Driven by both sliders — Y scale from the right slider, X/Z scale + Fresnel from the left slider.
+**Morph** — the central animated form, fixed at position [0, 0.25, 0]. Currently a sphere (Shape Option A), rounded box (Shape Option B), dissolving sphere (Shape Option C), or dissolving rounded box (Shape Option D). Driven by both sliders — Y scale from the right slider, X/Z scale + Fresnel from the left slider.
 
 **Inhale State** — left slider at top (lv=1), right slider at bottom (rv=0). Morph is tall and narrow with strong Fresnel inner glow.
 
@@ -60,6 +60,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - Gate color: `palette.gateColor` (Palette A: `#9955dd` purple)
 - Gate position Y: 0.25 (matches Morph)
 - **Shape Option C is the exception**: it has no Exhale Gate at all. A single Inhale-style torus spawns at z=-20, self-triggers the next spawn when it passes z=0 (same self-perpetuating mechanism Gate A uses elsewhere), and uses the same emissive ramp/fade-out/color rules above. See `GatesC.jsx`.
+- **Shape Option D is the same exception**: no Exhale Gate. A single Inhale-style pair of cubes (left/right, copied from GatesB's inhale gate) spawns at z=-20 and self-triggers the next spawn, same mechanism as Option C. See `GatesD.jsx`.
 
 ## Gate geometry (Shape Option A — GatesA.jsx)
 - Base torus: radius=1.0, tube=0.06, scaled non-uniformly to match morph shape
@@ -76,6 +77,12 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - No Exhale Gate — only a single recurring Inhale-style torus.
 - Base torus: radius=1.0, tube=0.06, sized to clear MorphC's Inhale-state half-extents (X=2.25, Y=3.5 scale → half-extents 1.125 × 1.75 on a radius-0.5 sphere)
 - Gate scale: `[1.376, 1.955, 1]` — narrow tall ellipse, same clearance ratios as GatesA's Inhale Gate
+- Pool: 3 slots, single type
+
+## Gate geometry (Shape Option D — GatesD.jsx)
+- No Exhale Gate — only a single recurring Inhale-style pair of cubes (left/right), copied from GatesB's inhale gate.
+- Cubes: RoundedBox args [0.5, 0.5, 0.5], radius 0.1, at X=±0.9, Y=0.25
+- MorphD reuses MorphB's scale curve, so its Inhale-state X half-extent (0.6) matches MorphB's exactly — the X=0.9 clearance carries over unchanged from GatesB's inhale gate
 - Pool: 3 slots, single type
 
 ## Modes
@@ -109,6 +116,7 @@ Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
 - **Option A** (default): sphere Morph + torus Gates (GatesA)
 - **Option B**: rounded-box Morph + cube-style Gates (GatesB)
 - **Option C**: "Disappearing Morph" — sphere Morph that dissolves into a particle cloud (MorphC) + a single recurring Inhale-style torus Gate, no Exhale Gate (GatesC)
+- **Option D**: "Disappearing Cube Morph" — rounded-box Morph that dissolves into a particle cloud (MorphD, same particle/dissolve mechanics as MorphC but box-shaped and using MorphB's scale curve) + a single recurring Inhale-style cube-pair Gate, no Exhale Gate (GatesD)
 
 **Color Palettes:**
 - **Palette A** (default): morphBase=#0a0a6e, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
@@ -135,9 +143,11 @@ src/
   MorphA.jsx                — Shape A: sphere, Fresnel inner glow via onBeforeCompile
   MorphB.jsx                — Shape B: RoundedBox, same Fresnel approach
   MorphC.jsx                — Shape C: sphere that dissolves into a particle cloud (metaball-style dissolve shader + two particle systems)
+  MorphD.jsx                — Shape D: rounded box that dissolves into a particle cloud (same shaders as MorphC, box-sampled particles, MorphB's scale curve)
   GatesA.jsx                — Shape A: torus exhale/inhale gates with emissive ramp
   GatesB.jsx                — Shape B: cube-style gates with same emissive ramp logic
   GatesC.jsx                — Shape C: single recurring torus gate (no exhale gate), sized for MorphC's Inhale scale
+  GatesD.jsx                — Shape D: single recurring cube-pair gate (no exhale gate), copied from GatesB's inhale gate
   Sliders.jsx               — DOM overlay sliders (top 63% to 16px from bottom), fill indicator
   useTouchSlider.js         — touch hook with identifier tracking (multi-touch)
   HomeScreen.jsx            — mode selection + Personalize button (top left)

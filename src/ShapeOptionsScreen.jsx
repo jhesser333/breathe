@@ -55,6 +55,10 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
         <div style={{ fontSize: 17, fontWeight: 500 }}>Option C {selected === 'c' && '✓'}</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
       </button>
+      <button style={optionBtn(selected === 'd')} onClick={() => onSelect('d')}>
+        <div style={{ fontSize: 17, fontWeight: 500 }}>Option D {selected === 'd' && '✓'}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Cube Morph</div>
+      </button>
       <button style={continueBtnStyle} onClick={onContinue}>Continue Playing</button>
     </div>
   )
