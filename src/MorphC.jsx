@@ -328,8 +328,8 @@ float dissolveHash(vec3 p) {
     const lv = leftVal.current
     const rv = rightVal.current
 
-    const xScale = THREE.MathUtils.lerp(2.8, 1.5, lv)
-    const zScale = THREE.MathUtils.lerp(0.5, 1.5, lv)
+    const xScale = THREE.MathUtils.lerp(3, 2, lv)
+    const zScale = THREE.MathUtils.lerp(0.2, 1.5, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
@@ -341,11 +341,11 @@ float dissolveHash(vec3 p) {
 
     // Mesh dissolves into grain across the entire slider travel -- solid and
     // smooth at full inhale (rv=0), fully gone at full exhale (rv=1) -- instead
-    // of fading alpha uniformly. Base opacity is capped at 0.75 even on inhale
-    // (the surface stays somewhat transparent); the dissolve uniform controls
-    // how much of the surface has "burned away" into dots.
+    // of fading alpha uniformly. The dissolve uniform controls how much of the
+    // surface has "burned away" into dots; material.opacity is a separate
+    // overall alpha multiplied on top, ramping 0.75 (inhale) -> 0 (exhale).
     const fadeProgress = rv
-    material.opacity = 0.75
+    material.opacity = THREE.MathUtils.lerp(0.75, 0, rv)
     // Push the mapped range past the noise's [0,1) span by a safety margin so
     // every cell is fully solid at fadeProgress=0 (no holes at rest) and fully
     // gone at fadeProgress=1, instead of some cells already being mid-fade.
