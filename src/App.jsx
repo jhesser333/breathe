@@ -5,6 +5,7 @@ import MorphB from './MorphB'
 import MorphC from './MorphC'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
+import GatesC from './GatesC'
 import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import PersonalizeScreen from './PersonalizeScreen'
@@ -261,7 +262,7 @@ export default function App() {
 
   const hasGates = mode === 'timed' || mode === 'slowing'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : MorphA
-  const GatesComponent = shapeOption === 'b' ? GatesB : GatesA
+  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : GatesA
 
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>

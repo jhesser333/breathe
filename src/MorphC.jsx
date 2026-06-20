@@ -350,7 +350,7 @@ float dissolveHash(vec3 p) {
     const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
     const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
-    const xScale = THREE.MathUtils.lerp(4, 2.5, lv)
+    const xScale = THREE.MathUtils.lerp(4, 2.25, lv)
     const zScale = THREE.MathUtils.lerp(0.2, 1.5, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
@@ -440,7 +440,7 @@ float dissolveHash(vec3 p) {
         startOffsetAttr.array[idx] = goingOut ? 0 : SPREAD_2 * (0.4 + Math.random() * 0.6)
         // Only particles spawned while moving toward inhale (sucked in) get
         // an upward swoop; blown-away particles get none.
-        swoopSpeedAttr.array[idx] = goingOut ? 0 : 0.05 + Math.random() * 0.25
+        swoopSpeedAttr.array[idx] = goingOut ? 0 : 0.15 + Math.random() * 0.4
       }
       positionAttr.needsUpdate = true
       spawnTimeAttr.needsUpdate = true
