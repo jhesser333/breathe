@@ -52,8 +52,11 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
 
   useFrame(() => {
     if (!groupRef.current) return
-    const lv = leftVal.current
-    const rv = rightVal.current
+    // Ease slider input in/out (default convention -- see CLAUDE.md) so
+    // every value derived below moves smoothly rather than tracking the
+    // thumb's raw position 1:1.
+    const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
+    const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
     const xScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
     const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)

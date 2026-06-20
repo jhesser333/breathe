@@ -46,6 +46,7 @@ attribute float aSeed;
 uniform float uTime;
 uniform float uSpread;
 uniform float uSize;
+uniform float uPullRate;
 varying float vAlpha;
 varying float vSeed;
 
@@ -56,20 +57,23 @@ void main() {
   float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
   float envelope = fadeIn * fadeOut;
 
-  // Radial direction in the XZ plane only -- Y never moves.
-  vec2 xz = position.xz;
-  float len = length(xz);
-  vec2 dirXZ = len > 0.0001 ? xz / len : vec2(1.0, 0.0);
-
+  // X-only travel, replacing the old radial XZ motion -- the random aSpeed
+  // range still applies, just along a single axis now.
+  float dirX = position.x >= 0.0 ? 1.0 : -1.0;
   float travel = aSpeed * age;
-  float extraRadius = aMode > 0.0
+  float extraX = aMode > 0.0
     ? min(travel, uSpread)                  // blown away: grows outward from the surface
     : max(aStartOffset - travel, 0.0);       // sucked in: shrinks back toward the surface
 
+  // Y and Z are slowly pulled toward the horizontal center line (Y=0, Z=0).
+  // Exponential decay approaches but mathematically never crosses zero, so
+  // particles can't overshoot past the center line.
+  float pull = exp(-uPullRate * lifeT);
+
   vec3 displaced = vec3(
-    position.x + dirXZ.x * extraRadius,
-    position.y,
-    position.z + dirXZ.y * extraRadius
+    position.x + dirX * extraX,
+    position.y * pull,
+    position.z * pull
   );
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
@@ -215,7 +219,7 @@ float dissolveHash(vec3 p) {
                 float dNoise = dissolveHash(dNeighbor);
                 float dProgress = smoothstep(dissolveProgress - dissolveEdge, dissolveProgress + dissolveEdge, dNoise);
                 float dDist = length(dScaled - (dNeighbor + 0.5));
-                float dFalloff = 1.0 - smoothstep(0.8, 1.0, dDist);
+                float dFalloff = 1.0 - smoothstep(0.8, 1.3, dDist);
                 dCoverage = max(dCoverage, dFalloff * dProgress);
               }
             }
@@ -313,6 +317,7 @@ float dissolveHash(vec3 p) {
         uColor:  { value: new THREE.Color(palette.morphEmissive) },
         uTime:   { value: 0 },
         uSpread: { value: SPREAD_2 },
+        uPullRate: { value: 1.2 },
       },
       vertexShader: FLOW_VERTEX_SHADER,
       fragmentShader: PARTICLE_FRAGMENT_SHADER,
@@ -325,8 +330,11 @@ float dissolveHash(vec3 p) {
 
   useFrame((state, delta) => {
     if (!groupRef.current) return
-    const lv = leftVal.current
-    const rv = rightVal.current
+    // Ease slider input in/out (default convention -- see CLAUDE.md) so
+    // every value derived below moves smoothly rather than tracking the
+    // thumb's raw position 1:1.
+    const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
+    const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
     const xScale = THREE.MathUtils.lerp(3, 2, lv)
     const zScale = THREE.MathUtils.lerp(0.2, 1.5, lv)
