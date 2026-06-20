@@ -5,20 +5,23 @@
 ### Home Screen
 - Three mode buttons: Basic, Paced Breathing, Slowing Down
 - **Personalize** button (top left) → navigates to personalization screens
-- Dark desaturated purple background (`#1a1028`)
+- Background uses `palette.background` (Palette A: dark desaturated purple `#1a1028`)
 
 ### Personalization System
-- **Personalize → Shape Options**: Option A (sphere) / Option B (rounded box). Option A default.
-- **Personalize → Color Options**: Palette A (teal/pink/purple) / Palette B (orange/blue/yellow). Palette A default.
+- **Personalize → Shape Options**: Option A (sphere) / Option B (rounded box) / Option C (disappearing sphere) / Option D (disappearing rounded box). Option A default.
+- **Personalize → Color Options**: Palette A (blue base/pink emissive/purple gates, bg `#1a1028`) / Palette B (teal base/cyan emissive/muted purple gates, bg `#002748`). Palette A default.
 - Selections persisted to localStorage. Back button goes one level up. Shape/Color screens also have a "Home" button (top right).
+- All screens (Home, Personalize, Shape Options, Color Options) use `palette.background` so the active palette's background is consistent everywhere.
 
 ### Morph
 - **Shape A**: sphere (radius 0.5), positioned at [0, 0.25, 0]
 - **Shape B**: RoundedBox (args=[1,1,1], radius=0.15)
-- Scaled via group: X = lerp(2.2, 1.2, lv), Y = lerp(3.5, 0.4, rv), Z = lerp(0.5, 1.2, lv)
+- **Shape C**: "Disappearing Morph" — sphere that dissolves into a particle cloud toward exhale and reforms solid toward inhale (metaball-style dissolve shader + two particle systems: static surface sparkle, and blown-away/sucked-in flow driven by the left slider). Wider/flatter scale curve than A/B (X: lerp(4, 2.25, lv), Z: lerp(0.2, 1.5, lv)) to leave room for the particle spread.
+- **Shape D**: "Disappearing Cube Morph" — same dissolve/particle mechanics as Shape C, but RoundedBox-shaped with particles sampled on the box's 6 faces instead of a sphere surface, reusing Shape B's scale curve exactly (its inhale half-extents match Shape B's, so Shape D's inhale gate spacing carries over from GatesB unchanged).
+- Shape A/B scaled via group: X = lerp(2.2, 1.2, lv), Y = lerp(3.5, 0.4, rv), Z = lerp(0.5, 1.2, lv)
 - **Inhale State** (lv=1, rv=0): tall, narrow, bright inner glow
 - **Exhale State** (lv=0, rv=1): wide, flat, dim emissive
-- Emissive intensity: lerp(1, 0.2, rv) — right slider drives brightness
+- Emissive intensity: piecewise on rv — 2 at inhale (rv=0), dips to 1 at rv=0.85 (15% of the way from exhale to inhale), rises to 3 at exhale (rv=1)
 - **Fresnel inner glow**: custom GLSL via `onBeforeCompile` masks `totalEmissiveRadiance` by inverse Fresnel factor. Intensity: lerp(0.3, 1.0, lv). Power: 4.0. Creates center-bright, edge-dark glow.
 - Colors from active palette: morphBase + morphEmissive
 - Bloom via `@react-three/postprocessing` (threshold 0.2, intensity 1.5)
@@ -44,8 +47,17 @@
 
 ### Gates (Shape Option B — GatesB)
 - Same spawning/timing logic as GatesA
-- Different mesh: Gate A = two RoundedBox bars at X=0 (one above morph at Y=0.65, one below at Y=-0.15); Gate B = two RoundedBox pillars at Y=0.25 (one left at X=-0.9, one right at X=0.9)
+- Different mesh: Gate A = two small RoundedBox cubes at X=0 (one above morph at Y=0.65, one below at Y=-0.15); Gate B = two small RoundedBox cubes at Y=0.25 (one left at X=-0.9, one right at X=0.9)
 - Same emissive ramp and alpha fade rules
+
+### Gates (Shape Option C — GatesC)
+- No Exhale Gate — only a single recurring Inhale-style torus, self-triggering the next spawn when it passes z=0 (same mechanism Gate A uses elsewhere)
+- Sized to clear MorphC's Inhale-state half-extents
+- Same emissive ramp and alpha fade rules
+
+### Gates (Shape Option D — GatesD)
+- No Exhale Gate — only a single recurring Inhale-style pair of cubes (left/right), copied from GatesB's inhale cubes, same self-triggering mechanism as GatesC
+- Spacing (X=±0.9) carries over unchanged from GatesB since MorphD's inhale half-extent matches MorphB's
 
 ### Modes
 
@@ -67,7 +79,7 @@
 
 ### Scene
 - Camera at [0, 3.5, 5], ~35° down, fov 50
-- Background from palette (Palette A: `#1a1028` dark purple)
+- Background from `palette.background` (Palette A: `#1a1028` dark purple, Palette B: `#002748` deep blue)
 - Ambient 0.4 + directional [5,5,5] intensity 1
 
 **Axis orientation**
@@ -78,29 +90,21 @@
 
 ---
 
-## Known open issue
-- Screen goes black at full Exhale on phone — addressed by changing exhale scale from [2.2, 0.25, 0.5] to [2.2, 0.4, 0.5] and raising the morph base color visibility (Palette A morphBase now `#2266cc` blue). Pending phone verification.
-
----
-
 ## Ideas / next iterations
 
 ### Morph
-- Verify black-screen-at-exhale fix on phone
 - Investigate Fresnel `onBeforeCompile` reliability on all mobile devices
 - Add smooth easing/lerp to slider response
 - Morph reacts on gate pass-through (flash, pulse)
-- Particle-based Morph option
 
 ### Gates
 - Animate gates on pass-through
 - Vary gate size per mode or breath quality
 - Gate patterns / rhythm variations
-- More Shape Options (Option C, D, etc.)
 
 ### Personalization
 - More Color Palettes
-- More Shape Options
+- More Shape Options (beyond A/B/C/D)
 - Preview swatches on palette buttons
 
 ### Environment
