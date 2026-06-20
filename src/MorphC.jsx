@@ -339,11 +339,12 @@ float dissolveHash(vec3 p) {
     material.roughness = THREE.MathUtils.lerp(0.3, 1, rv)
     fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.2, 1.5, lv)
 
-    // Mesh dissolves into grain starting halfway to exhale, fully gone at exhale,
-    // instead of fading alpha uniformly. Base opacity is capped at 0.75 even on
-    // inhale (the surface stays somewhat transparent); the dissolve uniform
-    // controls how much of the surface has "burned away" into dots.
-    const fadeProgress = THREE.MathUtils.smoothstep(rv, 0.5, 1.0)
+    // Mesh dissolves into grain across the entire slider travel -- solid and
+    // smooth at full inhale (rv=0), fully gone at full exhale (rv=1) -- instead
+    // of fading alpha uniformly. Base opacity is capped at 0.75 even on inhale
+    // (the surface stays somewhat transparent); the dissolve uniform controls
+    // how much of the surface has "burned away" into dots.
+    const fadeProgress = rv
     material.opacity = 0.75
     // Push the mapped range past the noise's [0,1) span by a safety margin so
     // every cell is fully solid at fadeProgress=0 (no holes at rest) and fully
