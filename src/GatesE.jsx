@@ -1,7 +1,10 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 
 const POOL = 3
+const ROAD_POOL = 2          // max simultaneous gaps between active gates
+const ROAD_ALPHA = 0.25
 const SPAWN_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
@@ -22,6 +25,10 @@ const INHALE_Y = 0.5 * 3.5    // 1.75
 // Non-uniform scale to stretch the circular torus into the inhale ellipse,
 // same clearance ratios used by GatesA's inhale gate.
 const GATE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER, 1]
+
+// Road mesh: a horizontal floor plane filling the gap between consecutive
+// gates, width matching the gate's interior (inner-hole) opening in X.
+const ROAD_WIDTH = 2 * BASE_INNER * GATE_SCALE[0]
 
 const EMISSIVE_START_Z = -3   // begin ramp: 0 → 1
 const EMISSIVE_MID_Z = -0.5  // steeper ramp: 1 → 2
@@ -44,13 +51,60 @@ function calcEmissive(z) {
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, opacity: 0 }
+}
+
+// Road material: plane lies flat (rotated -90deg about X), local Y of the
+// unrotated geometry maps to world Z (the stretch/depth direction) -- used
+// here to build a V-shaped alpha gradient that's full at each gate end and
+// zero at the midpoint between them.
+function createRoadMaterial(color) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color),
+    emissive: new THREE.Color(color),
+    emissiveIntensity: 0.5,
+    roughness: 0.5,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+
+  mat.customProgramCacheKey = () => `road-gates-e-${color}`
+
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = 'varying float vRoadY;\n' + shader.vertexShader
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      vRoadY = position.y;`
+    )
+
+    shader.fragmentShader = 'varying float vRoadY;\n' + shader.fragmentShader
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <output_fragment>',
+      `{
+        float roadMask = clamp(abs(vRoadY) * 2.0, 0.0, 1.0);
+        diffuseColor.a *= roadMask;
+      }
+      #include <output_fragment>`
+    )
+  }
+
+  return mat
 }
 
 export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
+
+  const roadMaterials = useMemo(
+    () => Array.from({ length: ROAD_POOL }, () => createRoadMaterial(gateColor)),
+    [gateColor]
+  )
+  const roadMeshRefs = useRef(Array.from({ length: ROAD_POOL }, () => null))
 
   const wasEnabled = useRef(false)
 
@@ -81,6 +135,7 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
       const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      slot.opacity = opacity
       if (matRefs.current[i]) {
         matRefs.current[i].opacity = opacity
         matRefs.current[i].emissiveIntensity = emissive
@@ -98,6 +153,23 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       group.position.z = slot.z
       group.visible = true
     })
+
+    const activeSlots = slots.current.filter(s => s.active).sort((a, b) => a.z - b.z)
+
+    for (let r = 0; r < ROAD_POOL; r++) {
+      const mesh = roadMeshRefs.current[r]
+      if (!mesh) continue
+
+      const a = activeSlots[r]
+      const b = activeSlots[r + 1]
+      if (!a || !b) { mesh.visible = false; continue }
+
+      const depth = b.z - a.z
+      mesh.position.set(0, GATE_Y, (a.z + b.z) / 2)
+      mesh.scale.set(ROAD_WIDTH, depth, 1)
+      mesh.visible = depth > 0.001
+      roadMaterials[r].opacity = ROAD_ALPHA * Math.min(a.opacity, b.opacity)
+    }
   })
 
   return (
@@ -111,6 +183,13 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
         </group>
+      ))}
+      {Array.from({ length: ROAD_POOL }, (_, i) => (
+        <mesh key={`road-${i}`} ref={el => { roadMeshRefs.current[i] = el }}
+          rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+          <planeGeometry args={[1, 1]} />
+          <primitive object={roadMaterials[i]} attach="material" />
+        </mesh>
       ))}
     </>
   )

@@ -89,6 +89,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 ## Gate geometry (Shape Option E — GatesE.jsx)
 - Identical to Shape Option C's gate geometry — exact duplicate, no Exhale Gate, same torus sized for MorphE's (= MorphC's) Inhale scale.
 - Pool: 3 slots, single type
+- **Road mesh** (Option E only, not C): a horizontal floor plane fills the gap between each pair of consecutive active gates. Width (X) = the gate's interior opening (2 × inner-hole radius × `GATE_SCALE[0]`); position Y = `GATE_Y` (matches the Gates); length (Z) stretches dynamically so each end is pinned to the Z of the gate it borders. Pool of 2 (covers up to 3 simultaneously active gate slots → 2 gaps). Material: `color`/`emissive` = `gateColor`, `emissiveIntensity` 0.5, base opacity 0.25 multiplied by a V-shaped alpha gradient (full at each gate end, 0 at the midpoint) via `onBeforeCompile`, further multiplied by the min fade-opacity of its two bounding gates so the road never looks more solid than the gates it connects to.
 
 ## Modes
 
