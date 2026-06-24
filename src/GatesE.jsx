@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 const POOL = 3
-const ROAD_POOL = 2          // max simultaneous gaps between active gates
+const ROAD_POOL = 3          // max simultaneous road segments (checkpoints + trailing anchor)
 const ROAD_ALPHA = 0.25
 const SPAWN_Z = -20
 const DESPAWN_Z = 6
@@ -51,7 +51,7 @@ function calcEmissive(z) {
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, opacity: 0, fadeIn: 0 }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, opacity: 0 }
 }
 
 // Road material: plane lies flat (rotated -90deg about X), local Y of the
@@ -106,15 +106,24 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   )
   const roadMeshRefs = useRef(Array.from({ length: ROAD_POOL }, () => null))
 
+  // Road checkpoints track every gate spawn independently of the gate-mesh
+  // pool above, so the road's continuity isn't tied to when a gate slot
+  // gets recycled -- a checkpoint lives until it scrolls past DESPAWN_Z
+  // (the same z used to despawn gates, i.e. "off the bottom of the screen").
+  const checkpoints = useRef([])
+
   const wasEnabled = useRef(false)
 
   useFrame((_, delta) => {
     const spawn = () => {
+      const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+      checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
+
       const slot = slots.current.find(s => !s.active)
       if (!slot) return
       Object.assign(slot, makeSlot())
       slot.z = SPAWN_Z
-      slot.speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+      slot.speed = speed
       slot.active = true
     }
 
@@ -137,7 +146,6 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         : 1
       const opacity = fadeIn * fadeOut
       slot.opacity = opacity
-      slot.fadeIn = fadeIn
       if (matRefs.current[i]) {
         matRefs.current[i].opacity = opacity
         matRefs.current[i].emissiveIntensity = emissive
@@ -156,14 +164,33 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       group.visible = true
     })
 
-    const activeSlots = slots.current.filter(s => s.active).sort((a, b) => a.z - b.z)
+    // Advance every checkpoint and drop any that have scrolled past the
+    // screen-bottom cutoff (DESPAWN_Z) -- this is what lets the road persist
+    // continuously instead of popping based on the gate pool's own lifecycle.
+    checkpoints.current.forEach(cp => {
+      cp.z += cp.speed * delta
+      cp.fadeElapsed += delta
+    })
+    checkpoints.current = checkpoints.current.filter(cp => cp.z <= DESPAWN_Z)
+    checkpoints.current.sort((a, b) => a.z - b.z)
+
+    // Boundaries = every live checkpoint (ascending z) plus a virtual
+    // anchor pinned at the screen-bottom cutoff, so the trailing-most real
+    // checkpoint always has somewhere to road-connect to -- this is what
+    // makes the road follow the very first gate immediately and never
+    // leave a gap near the camera.
+    const boundaries = checkpoints.current.map(cp => ({
+      z: cp.z,
+      fadeIn: smoothstep(Math.min(cp.fadeElapsed / FADE_DURATION, 1)),
+    }))
+    if (boundaries.length > 0) boundaries.push({ z: DESPAWN_Z, fadeIn: 1 })
 
     for (let r = 0; r < ROAD_POOL; r++) {
       const mesh = roadMeshRefs.current[r]
       if (!mesh) continue
 
-      const a = activeSlots[r]
-      const b = activeSlots[r + 1]
+      const a = boundaries[r]
+      const b = boundaries[r + 1]
       if (!a || !b) { mesh.visible = false; continue }
 
       const depth = b.z - a.z
