@@ -51,7 +51,7 @@ function calcEmissive(z) {
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, opacity: 0 }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, opacity: 0, fadeIn: 0 }
 }
 
 // Road material: plane lies flat (rotated -90deg about X), local Y of the
@@ -131,11 +131,13 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       slot.fadeElapsed += delta
       const emissive = calcEmissive(slot.z)
+      const fadeIn = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
       const fadeOut = slot.z > FADE_OUT_START
         ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
-      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      const opacity = fadeIn * fadeOut
       slot.opacity = opacity
+      slot.fadeIn = fadeIn
       if (matRefs.current[i]) {
         matRefs.current[i].opacity = opacity
         matRefs.current[i].emissiveIntensity = emissive
@@ -168,7 +170,7 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       mesh.position.set(0, GATE_Y, (a.z + b.z) / 2)
       mesh.scale.set(ROAD_WIDTH, depth, 1)
       mesh.visible = depth > 0.001
-      roadMaterials[r].opacity = ROAD_ALPHA * Math.min(a.opacity, b.opacity)
+      roadMaterials[r].opacity = ROAD_ALPHA * Math.min(a.fadeIn, b.fadeIn)
     }
   })
 
