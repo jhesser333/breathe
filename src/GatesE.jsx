@@ -187,11 +187,10 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
         const frac = i / TIES_PER_SEGMENT
         const z = a.z + frac * depth
-        const tieMask = clamp01(Math.abs(frac - 0.5) * 2)
 
         mesh.position.z = z
         mesh.visible = true
-        mat.opacity = TIE_ALPHA * tieMask * segFade
+        mat.opacity = TIE_ALPHA * segFade
       }
     }
   })
@@ -218,8 +217,4 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       ))}
     </>
   )
-}
-
-function clamp01(v) {
-  return Math.max(0, Math.min(1, v))
 }
