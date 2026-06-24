@@ -1,12 +1,16 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
 const POOL = 3
-const ROAD_POOL = 3          // max simultaneous rail segments (leading preview + current + trailing)
-const RAIL_ALPHA = 0.2
-const RAIL_RADIUS = 0.05
-const RAIL_GAP = 0.1         // inset from the gate's interior edge so rails don't touch it
+const ROAD_POOL = 3          // max simultaneous track segments (leading preview + current + trailing)
+const TIES_PER_SEGMENT = 6   // 1 tie at the segment's leading gate + 5 equally spaced before the next gate
+const TIE_ALPHA = 0.2
+const TIE_GAP = 0.1          // inset so the ties' X width would just touch (not overlap) imaginary rails
+const TIE_HEIGHT_Y = 0.08
+const TIE_DEPTH_Z = 0.15
+const TIE_RADIUS = 0.02
 const SPAWN_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
@@ -28,10 +32,12 @@ const INHALE_Y = 0.5 * 3.5    // 1.75
 // same clearance ratios used by GatesA's inhale gate.
 const GATE_SCALE = [INHALE_X * 1.15 / BASE_INNER, INHALE_Y * 1.05 / BASE_INNER, 1]
 
-// Rails: two thin cylinders ("train tracks") inset from the gate's interior
-// (inner-hole) edge at the gate's vertical center, one on each side of X=0.
+// Ties span the full track width -- the gate's interior (inner-hole) half-width
+// at its vertical center, minus TIE_GAP so they'd just touch (not overlap)
+// imaginary rails at that inset.
 const GATE_INNER_HALF_X = BASE_INNER * GATE_SCALE[0]
-const RAIL_X = GATE_INNER_HALF_X - RAIL_GAP
+const TIE_WIDTH_X = 2 * (GATE_INNER_HALF_X - TIE_GAP)
+const TIE_ARGS = [TIE_WIDTH_X, TIE_HEIGHT_Y, TIE_DEPTH_Z]
 
 const EMISSIVE_START_Z = -3   // begin ramp: 0 → 1
 const EMISSIVE_MID_Z = -0.5  // steeper ramp: 1 → 2
@@ -57,12 +63,8 @@ function makeSlot() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, opacity: 0 }
 }
 
-// Rail material: cylinder lies flat (rotated -90deg about X), local Y of the
-// unrotated geometry maps to world Z (the stretch/depth direction) -- used
-// here to build a V-shaped alpha gradient that's at RAIL_ALPHA at each gate
-// end and zero at the midpoint between them.
-function createRailMaterial(color) {
-  const mat = new THREE.MeshStandardMaterial({
+function createTieMaterial(color) {
+  return new THREE.MeshStandardMaterial({
     color: new THREE.Color(color),
     emissive: new THREE.Color(color),
     emissiveIntensity: 0.5,
@@ -71,31 +73,7 @@ function createRailMaterial(color) {
     transparent: true,
     opacity: 0,
     depthWrite: false,
-    side: THREE.DoubleSide,
   })
-
-  mat.customProgramCacheKey = () => `rail-gates-e-${color}`
-
-  mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = 'varying float vRailY;\n' + shader.vertexShader
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      `#include <begin_vertex>
-      vRailY = position.y;`
-    )
-
-    shader.fragmentShader = 'varying float vRailY;\n' + shader.fragmentShader
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <output_fragment>',
-      `{
-        float railMask = clamp(abs(vRailY) * 2.0, 0.0, 1.0);
-        diffuseColor.a *= railMask;
-      }
-      #include <output_fragment>`
-    )
-  }
-
-  return mat
 }
 
 export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
@@ -103,15 +81,15 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
 
-  const railMaterials = useMemo(
-    () => Array.from({ length: ROAD_POOL }, () => createRailMaterial(gateColor)),
+  // Ties laid out as ROAD_POOL segments x TIES_PER_SEGMENT ties each, flattened.
+  const tieMaterials = useMemo(
+    () => Array.from({ length: ROAD_POOL * TIES_PER_SEGMENT }, () => createTieMaterial(gateColor)),
     [gateColor]
   )
-  const leftRailRefs = useRef(Array.from({ length: ROAD_POOL }, () => null))
-  const rightRailRefs = useRef(Array.from({ length: ROAD_POOL }, () => null))
+  const tieMeshRefs = useRef(Array.from({ length: ROAD_POOL * TIES_PER_SEGMENT }, () => null))
 
   // Checkpoints track every gate spawn independently of the gate-mesh pool
-  // above, so rail continuity isn't tied to when a gate slot gets recycled --
+  // above, so track continuity isn't tied to when a gate slot gets recycled --
   // a checkpoint lives until it scrolls past DESPAWN_Z (the same z used to
   // despawn gates, i.e. "off the bottom of the screen").
   const checkpoints = useRef([])
@@ -178,12 +156,12 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
     checkpoints.current.sort((a, b) => a.z - b.z)
 
     // Boundaries = a virtual leading anchor pinned at SPAWN_Z (a preview of
-    // where the *next* gate will spawn, so the segment beyond the upcoming
-    // gate is visible in advance instead of only appearing once the Morph
-    // passes through the current gate) + every live checkpoint (ascending z)
-    // + a virtual trailing anchor pinned at DESPAWN_Z (so the most recently
-    // passed checkpoint always has somewhere to connect to, keeping the
-    // rails continuous all the way to the screen-bottom cutoff).
+    // where the *next* gate will spawn, so its ties are visible in advance
+    // instead of only appearing once the Morph passes through the current
+    // gate) + every live checkpoint (ascending z) + a virtual trailing
+    // anchor pinned at DESPAWN_Z (so the most recently passed checkpoint
+    // always has somewhere to connect to, keeping ties continuous all the
+    // way to the screen-bottom cutoff).
     const boundaries = []
     if (checkpoints.current.length > 0) {
       boundaries.push({ z: SPAWN_Z, fadeIn: 1 })
@@ -195,24 +173,26 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
     }
 
     for (let r = 0; r < ROAD_POOL; r++) {
-      const left = leftRailRefs.current[r]
-      const right = rightRailRefs.current[r]
-      if (!left || !right) continue
-
       const a = boundaries[r]
       const b = boundaries[r + 1]
-      if (!a || !b) { left.visible = false; right.visible = false; continue }
+      const segFade = a && b ? Math.min(a.fadeIn, b.fadeIn) : 0
+      const depth = a && b ? b.z - a.z : 0
 
-      const depth = b.z - a.z
-      const midZ = (a.z + b.z) / 2
-      const visible = depth > 0.001
-      left.position.set(-RAIL_X, GATE_Y, midZ)
-      right.position.set(RAIL_X, GATE_Y, midZ)
-      left.scale.set(1, depth, 1)
-      right.scale.set(1, depth, 1)
-      left.visible = visible
-      right.visible = visible
-      railMaterials[r].opacity = RAIL_ALPHA * Math.min(a.fadeIn, b.fadeIn)
+      for (let i = 0; i < TIES_PER_SEGMENT; i++) {
+        const mesh = tieMeshRefs.current[r * TIES_PER_SEGMENT + i]
+        const mat = tieMaterials[r * TIES_PER_SEGMENT + i]
+        if (!mesh) continue
+
+        if (!a || !b) { mesh.visible = false; continue }
+
+        const frac = i / TIES_PER_SEGMENT
+        const z = a.z + frac * depth
+        const tieMask = clamp01(Math.abs(frac - 0.5) * 2)
+
+        mesh.position.z = z
+        mesh.visible = true
+        mat.opacity = TIE_ALPHA * tieMask * segFade
+      }
     }
   })
 
@@ -228,20 +208,18 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
           </mesh>
         </group>
       ))}
-      {Array.from({ length: ROAD_POOL }, (_, i) => (
-        <group key={`rail-${i}`}>
-          <mesh ref={el => { leftRailRefs.current[i] = el }}
-            rotation={[-Math.PI / 2, 0, 0]} visible={false}>
-            <cylinderGeometry args={[RAIL_RADIUS, RAIL_RADIUS, 1, 12]} />
-            <primitive object={railMaterials[i]} attach="material" />
-          </mesh>
-          <mesh ref={el => { rightRailRefs.current[i] = el }}
-            rotation={[-Math.PI / 2, 0, 0]} visible={false}>
-            <cylinderGeometry args={[RAIL_RADIUS, RAIL_RADIUS, 1, 12]} />
-            <primitive object={railMaterials[i]} attach="material" />
-          </mesh>
-        </group>
+      {Array.from({ length: ROAD_POOL * TIES_PER_SEGMENT }, (_, idx) => (
+        <RoundedBox key={`tie-${idx}`}
+          ref={el => { tieMeshRefs.current[idx] = el }}
+          position={[0, GATE_Y, 0]} args={TIE_ARGS} radius={TIE_RADIUS} smoothness={2}
+          visible={false}>
+          <primitive object={tieMaterials[idx]} attach="material" />
+        </RoundedBox>
       ))}
     </>
   )
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, v))
 }
