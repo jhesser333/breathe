@@ -6,7 +6,7 @@ import * as THREE from 'three'
 const POOL = 3
 const TIES_PER_SEGMENT = 6   // 1 tie at the segment's leading gate + 5 equally spaced before the next gate
 const LERP_SEGMENTS_MAX = 2  // max simultaneous real-gate-to-real-gate intervals (normally 1, with headroom)
-const TIE_ALPHA = 0.2
+const TIE_ALPHA = 0.15
 const TIE_GAP = 0.1          // inset so the ties' X width would just touch (not overlap) imaginary rails
 const TIE_HEIGHT_Y = 0.02
 const TIE_DEPTH_Z = 0.03

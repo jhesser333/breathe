@@ -63,38 +63,45 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - **Shape Option D is the same exception**: no Exhale Gate. A single Inhale-style pair of cubes (left/right, copied from GatesB's inhale gate) spawns at z=-20 and self-triggers the next spawn, same mechanism as Option C. See `GatesD.jsx`.
 - **Shape Option E is an exact duplicate of Option C** (`MorphE.jsx` / `GatesE.jsx`, copied verbatim from `MorphC.jsx` / `GatesC.jsx` with only the component names and `customProgramCacheKey` renamed). Same no-Exhale-Gate exception applies.
 
+## Road mesh (ties) — all Shape Options (A–E)
+Every shape option scrolls thin railroad-tie markers along the track: `RoundedBox`, line-thin (`TIE_HEIGHT_Y`/`TIE_DEPTH_Z`/`TIE_RADIUS` all small so each tie reads as a line, not a block), at `GATE_Y`. Material: `color` = `gateColor`, no emissive, opacity = `TIE_ALPHA` (0.15) × fade-*in* only (not fade-out, so ties don't dim when a gate fades out passing the Morph) — flat, no per-position gradient. Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spawn — both types, for the two-gate-type options — sorted by z regardless of type, decoupled from the gate-mesh pool's own recycling) and renders three tie groups from it:
+  - **Real-to-real** (`lerpRefs`/`lerpMaterials`, up to `LERP_SEGMENTS_MAX` segments × `TIES_PER_SEGMENT` (6) ties): between two consecutive real checkpoints — 1 tie at the leading gate + 5 more evenly filling the gap (frac = i/6). Both ends are real and move at their own checkpoint speed, so as gate spacing changes (e.g. Slowing Down's ramp) the tie *count* stays fixed at 6 while spacing stretches/shrinks, with no anchor-swap discontinuity.
+  - **Preview** (`previewRefs`/`previewMaterials`, `TIES_PER_SEGMENT` ties): owned by the frontmost (no real gate yet ahead of it) checkpoint. Fixed offsets *ahead* of it (`frontmost.z - i * TIE_SPACING`, i=0..5), so every tie scrolls at exactly that checkpoint's own speed — no stretching toward a fixed point, hence no speed-up/jerk when the next real gate eventually spawns there and this same stretch hands off to a real-to-real segment (positions and velocities already match at that instant).
+  - **Trailing filler** (`trailingRefs`/`trailingMaterials`, `TIES_PER_SEGMENT` ties): owned by the backmost (no real gate yet behind it) checkpoint. Fixed offsets *behind* it (`backmost.z + i * TIE_SPACING`); ties past `DESPAWN_Z` are hidden (so typically only 1-2 are ever visible). Skips its own i=0 (at-gate) tie when the backmost checkpoint is also the frontmost (only one real gate alive), since Preview already drew it.
+
+  `TIE_SPACING` = the option's standard real-gate-to-real-gate distance ÷ `TIES_PER_SEGMENT`: **20/6** for the single-gate-type options (C, D, E — one spawn point at `SPAWN_Z`), **10/6** for the dual-gate-type options (A, B — Exhale+Inhale spawn together 10 units apart, at `SPAWN_Z`/`GATE_B_Z`, and alternate at that steady spacing thereafter). `TIE_WIDTH_X` is sized per option below to clear the narrowest gate opening ties must pass through, inset by `TIE_GAP` so they just touch (not overlap) that edge.
+
 ## Gate geometry (Shape Option A — GatesA.jsx)
 - Base torus: radius=1.0, tube=0.06, scaled non-uniformly to match morph shape
 - Exhale Gate scale: [1.229, 0.245, 1] — wide flat ellipse
 - Inhale Gate scale: [0.734, 1.954, 1] — narrow tall ellipse
 - Pool: 3 slots each for Gate A and Gate B
+- Ties: width sized to the narrower Inhale gate's interior inner-hole half-width (`BASE_INNER * INHALE_SCALE[0]` ≈ 0.69), since the wider Exhale opening isn't the binding constraint
 
 ## Gate geometry (Shape Option B — GatesB.jsx)
 - **Exhale Gate (A)**: two RoundedBox bars at X=0, args [2.8, 0.25, 0.5] — one above the morph (Y=0.65), one below (Y=-0.15)
 - **Inhale Gate (B)**: two RoundedBox pillars at Y=0.25, args [0.4, 4.5, 0.5] — one left (X=-0.9), one right (X=0.9)
 - Pool: 3 slots each for Gate A and Gate B
+- Ties: width sized to the Inhale pillars' inner-facing edges (`GATE_B_X - CUBE_ARGS[0]/2` = 0.65) — the Exhale bars span the full X width so they don't constrain it
 
 ## Gate geometry (Shape Option C — GatesC.jsx)
 - No Exhale Gate — only a single recurring Inhale-style torus.
 - Base torus: radius=1.0, tube=0.06, sized to clear MorphC's Inhale-state half-extents (X=2.25, Y=3.5 scale → half-extents 1.125 × 1.75 on a radius-0.5 sphere)
 - Gate scale: `[1.376, 1.955, 1]` — narrow tall ellipse, same clearance ratios as GatesA's Inhale Gate
 - Pool: 3 slots, single type
+- Ties: width sized to the gate's interior inner-hole half-width (`BASE_INNER * GATE_SCALE[0]`)
 
 ## Gate geometry (Shape Option D — GatesD.jsx)
 - No Exhale Gate — only a single recurring Inhale-style pair of cubes (left/right), copied from GatesB's inhale gate.
 - Cubes: RoundedBox args [0.5, 0.5, 0.5], radius 0.1, at X=±0.9, Y=0.25
 - MorphD reuses MorphB's scale curve, so its Inhale-state X half-extent (0.6) matches MorphB's exactly — the X=0.9 clearance carries over unchanged from GatesB's inhale gate
 - Pool: 3 slots, single type
+- Ties: width sized to the cubes' inner-facing edges (`GATE_X - CUBE_ARGS[0]/2` = 0.65)
 
 ## Gate geometry (Shape Option E — GatesE.jsx)
 - Identical to Shape Option C's gate geometry — exact duplicate, no Exhale Gate, same torus sized for MorphE's (= MorphC's) Inhale scale.
 - Pool: 3 slots, single type
-- **Road mesh** (Option E only, not C): railroad ties (`RoundedBox`, args `TIE_ARGS`, radius `TIE_RADIUS`), not rails or a plane. Each tie spans the full track width in X (`TIE_WIDTH_X` = 2 × (gate's interior inner-hole half-width − `TIE_GAP`), i.e. just touching where rails would sit if they existed) and is thin enough in Y/Z (`TIE_HEIGHT_Y`/`TIE_DEPTH_Z`) to read as a line rather than a block; position Y = `GATE_Y` (matches the Gates). Three independent tie groups, split by whether their motion is anchored to one or two *real* (already-spawned) gates:
-  - **Real-to-real** (`lerpRefs`/`lerpMaterials`, up to `LERP_SEGMENTS_MAX` segments × `TIES_PER_SEGMENT` ties): between two consecutive real checkpoints — the dynamic "1 tie at the leading gate + 5 more evenly filling the gap" behavior the spacing was requested for. Both ends are real and move at their own checkpoint speed, so as gate spacing changes (e.g. Slowing Down's ramp) the tie *count* stays fixed at 6 while spacing stretches/shrinks, with no anchor-swap discontinuity.
-  - **Preview** (`previewRefs`/`previewMaterials`, `TIES_PER_SEGMENT` ties): owned by the frontmost (most recently spawned, no real gate yet ahead of it) checkpoint. Positioned at fixed offsets *ahead* of it (`frontmost.z - i * TIE_SPACING`, i=0..5, `TIE_SPACING` = `SPAWN_Z`'s distance ÷ `TIES_PER_SEGMENT`), so every tie scrolls at exactly that checkpoint's own speed — no stretching toward a fixed point, hence no speed-up/jerk when the next real gate eventually spawns there and this same stretch hands off to a real-to-real segment (positions and velocities already match at that instant).
-  - **Trailing filler** (`trailingRefs`/`trailingMaterials`, `TIES_PER_SEGMENT` ties): owned by the backmost (most recently passed, no real gate yet behind it) checkpoint. Positioned at fixed offsets *behind* it (`backmost.z + i * TIE_SPACING`), scrolling at its speed; ties past `DESPAWN_Z` are hidden (so typically only 1-2 are ever visible, since the gap to the cutoff is small). Skips its own i=0 (at-gate) tie when the backmost checkpoint is also the frontmost (only one real gate alive), since Preview already drew it.
-  
-  Every tie's opacity = `TIE_ALPHA` (0.2) × its owning checkpoint's (or checkpoints', via `Math.min`) own fade-*in* only (not fade-out, so ties don't dim when a gate fades out passing the Morph) — flat, no per-position gradient. Material: `color` = `gateColor`, no emissive.
+- Ties: identical to Option C's (same torus geometry, same `TIE_WIDTH_X`/`TIE_SPACING`)
 
 ## Modes
 
