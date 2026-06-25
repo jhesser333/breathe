@@ -94,7 +94,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
   - **Preview** (`previewRefs`/`previewMaterials`, `TIES_PER_SEGMENT` ties): owned by the frontmost (most recently spawned, no real gate yet ahead of it) checkpoint. Positioned at fixed offsets *ahead* of it (`frontmost.z - i * TIE_SPACING`, i=0..5, `TIE_SPACING` = `SPAWN_Z`'s distance ÷ `TIES_PER_SEGMENT`), so every tie scrolls at exactly that checkpoint's own speed — no stretching toward a fixed point, hence no speed-up/jerk when the next real gate eventually spawns there and this same stretch hands off to a real-to-real segment (positions and velocities already match at that instant).
   - **Trailing filler** (`trailingRefs`/`trailingMaterials`, `TIES_PER_SEGMENT` ties): owned by the backmost (most recently passed, no real gate yet behind it) checkpoint. Positioned at fixed offsets *behind* it (`backmost.z + i * TIE_SPACING`), scrolling at its speed; ties past `DESPAWN_Z` are hidden (so typically only 1-2 are ever visible, since the gap to the cutoff is small). Skips its own i=0 (at-gate) tie when the backmost checkpoint is also the frontmost (only one real gate alive), since Preview already drew it.
   
-  Every tie's opacity = `TIE_ALPHA` (0.1) × its owning checkpoint's (or checkpoints', via `Math.min`) own fade-*in* only (not fade-out, so ties don't dim when a gate fades out passing the Morph) — flat, no per-position gradient. Material: `color` = `gateColor`, no emissive.
+  Every tie's opacity = `TIE_ALPHA` (0.2) × its owning checkpoint's (or checkpoints', via `Math.min`) own fade-*in* only (not fade-out, so ties don't dim when a gate fades out passing the Morph) — flat, no per-position gradient. Material: `color` = `gateColor`, no emissive.
 
 ## Modes
 
