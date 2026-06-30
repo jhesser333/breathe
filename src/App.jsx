@@ -380,8 +380,8 @@ export default function App() {
             fontFamily: 'sans-serif', letterSpacing: '0.03em',
           }}
         >
-          ← Home
-        </button>
+          Select Mode
+</button>
         <button
           onClick={handleRestart}
           style={{

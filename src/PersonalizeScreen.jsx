@@ -36,19 +36,19 @@ export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <button style={backBtnStyle} onClick={onBack}>← Home</button>
+      <button style={backBtnStyle} onClick={onBack}>Select Mode</button>
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Personalize
       </h1>
       <button style={btnStyle} onClick={onShape}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Shape Options</div>
+        <div style={{ fontSize: 17, fontWeight: 500 }}>Shapes</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Choose the shape of the Morph and Gates</div>
       </button>
       <button style={btnStyle} onClick={onColor}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Color Options</div>
+        <div style={{ fontSize: 17, fontWeight: 500 }}>Colors</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Choose a color palette</div>
       </button>
-      <button style={continueBtnStyle} onClick={onContinue}>Continue Playing</button>
+      <button style={continueBtnStyle} onClick={onContinue}>Resume Breathing</button>
     </div>
   )
 }

@@ -38,8 +38,8 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <button style={backBtnStyle} onClick={onBack}>← Personalize</button>
-      <button style={{ ...backBtnStyle, left: 'auto', right: 16 }} onClick={onHome}>Home</button>
+      <button style={backBtnStyle} onClick={onBack}>Personalize</button>
+      <button style={{ ...backBtnStyle, left: 'auto', right: 16 }} onClick={onHome}>Select Mode</button>
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Shape Options
       </h1>
@@ -63,7 +63,7 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
         <div style={{ fontSize: 17, fontWeight: 500 }}>Option E {selected === 'e' && '✓'}</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
       </button>
-      <button style={continueBtnStyle} onClick={onContinue}>Continue Playing</button>
+      <button style={continueBtnStyle} onClick={onContinue}>Resume Breathing</button>
     </div>
   )
 }

@@ -43,7 +43,7 @@ export default function HomeScreen({ onSelect, onPersonalize, palette }) {
         color: '#ffffff', fontSize: 28, fontWeight: 300,
         marginBottom: 16, letterSpacing: '0.12em', margin: '0 0 24px',
       }}>
-        Breathe
+        Modes
       </h1>
       {OPTIONS.map(opt => (
         <button
