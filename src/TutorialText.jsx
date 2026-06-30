@@ -2,7 +2,7 @@ export default function TutorialText({ text, visible }) {
   return (
     <div style={{
       position: 'absolute',
-      top: '50%', left: 0, right: 0,
+      top: '38%', left: 0, right: 0,
       transform: 'translateY(-50%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
