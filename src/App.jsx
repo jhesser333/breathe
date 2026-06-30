@@ -16,6 +16,7 @@ import PersonalizeScreen from './PersonalizeScreen'
 import ShapeOptionsScreen from './ShapeOptionsScreen'
 import ColorOptionsScreen from './ColorOptionsScreen'
 import TutorialText from './TutorialText'
+import InhaleExhaleText from './InhaleExhaleText'
 import SlowingDownController from './SlowingDownController'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
@@ -26,8 +27,9 @@ const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
 const RIGHT_DEADBAND = 0.08
-const TARGET_STROKES_A = 4  // 2 full up+down oscillations
-const TARGET_STROKES_B = 6  // 3 full up+down oscillations
+const TARGET_STROKES_A = 4   // 2 full up+down oscillations
+const TARGET_STROKES_B = 6   // 3 full up+down oscillations
+const TARGET_STROKES_POST = 6 // 3 full oscillations after Text B fades out
 
 export default function App() {
   const leftVal = useRef(0)
@@ -38,6 +40,7 @@ export default function App() {
   const [modeKey, setModeKey] = useState(0)
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
+  const [inhaleExhaleShowing, setInhaleExhaleShowing] = useState(false)
   const [shapeOption, setShapeOptionState] = useState(() => localStorage.getItem('shapeOption') || 'a')
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
 
@@ -69,6 +72,12 @@ export default function App() {
   const rightExtremeRef = useRef(null)
   const textAFadeStartedRef = useRef(false)
   const textBFadeStartedRef = useRef(false)
+
+  // Post-B phase: inhale/exhale text stays on for 3 more oscillations
+  const postBActiveRef = useRef(false)
+  const postBStrokeCountRef = useRef(0)
+  const postBDirectionRef = useRef(0)
+  const postBExtremeRef = useRef(null)
 
   // Raw (unclamped) left-slider position, tracks thumb movement past the
   // slider's visual bounds. Used by SlowingDownController for breath timing.
@@ -133,6 +142,7 @@ export default function App() {
     rightDirectionRef.current = 0
     rightExtremeRef.current = null
     textBFadeStartedRef.current = false
+    setInhaleExhaleShowing(true)
   }, [])
 
   const triggerTextAFade = useCallback(() => {
@@ -152,6 +162,10 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       stageRef.current = 'done'
+      postBActiveRef.current = true
+      postBStrokeCountRef.current = 0
+      postBDirectionRef.current = 0
+      postBExtremeRef.current = null
       if (pendingGatesTextRef.current) {
         pendingGatesTextRef.current = false
         showGatesText()
@@ -230,6 +244,36 @@ export default function App() {
       }
     }
 
+    // Post-B: count 6 more reversals then hide inhale/exhale text
+    if (postBActiveRef.current) {
+      if (postBExtremeRef.current === null) {
+        postBExtremeRef.current = v
+      } else {
+        const delta = v - postBExtremeRef.current
+        if (postBDirectionRef.current === 0) {
+          if (delta < -RIGHT_DEADBAND) {
+            postBDirectionRef.current = -1; postBExtremeRef.current = v; postBStrokeCountRef.current = 1
+          } else if (delta > RIGHT_DEADBAND) {
+            postBDirectionRef.current = 1; postBExtremeRef.current = v; postBStrokeCountRef.current = 1
+          }
+        } else {
+          if (postBDirectionRef.current === 1 && delta < -RIGHT_DEADBAND) {
+            postBDirectionRef.current = -1; postBExtremeRef.current = v; postBStrokeCountRef.current++
+          } else if (postBDirectionRef.current === -1 && delta > RIGHT_DEADBAND) {
+            postBDirectionRef.current = 1; postBExtremeRef.current = v; postBStrokeCountRef.current++
+          } else if (postBDirectionRef.current === 1 && v > postBExtremeRef.current) {
+            postBExtremeRef.current = v
+          } else if (postBDirectionRef.current === -1 && v < postBExtremeRef.current) {
+            postBExtremeRef.current = v
+          }
+          if (postBStrokeCountRef.current >= TARGET_STROKES_POST) {
+            postBActiveRef.current = false
+            setInhaleExhaleShowing(false)
+          }
+        }
+      }
+    }
+
     handleMovement()
   }, [handleMovement, triggerTextAFade, triggerTextBFade])
 
@@ -248,6 +292,11 @@ export default function App() {
     rightExtremeRef.current = null
     textAFadeStartedRef.current = false
     textBFadeStartedRef.current = false
+    postBActiveRef.current = false
+    postBStrokeCountRef.current = 0
+    postBDirectionRef.current = 0
+    postBExtremeRef.current = null
+    setInhaleExhaleShowing(false)
     currentMainTextRef.current = TEXT_B
     setTutorialText(TEXT_A)
     setTutorialVisible(true)
@@ -276,6 +325,8 @@ export default function App() {
     clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
+    postBActiveRef.current = false
+    setInhaleExhaleShowing(false)
     setMode(null)
     setScreen('home')
   }, [])
@@ -368,6 +419,7 @@ export default function App() {
           <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
+        <InhaleExhaleText rightVal={rightVal} showing={inhaleExhaleShowing} />
         <button
           onClick={handleBackFromExperience}
           style={{
