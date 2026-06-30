@@ -23,11 +23,11 @@ import { TEXT_A, TEXT_B, TEXTS } from './copy'
 
 const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
-const TEXT_B_DISPLAY_MS = 3000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
 const RIGHT_DEADBAND = 0.08
-const TARGET_STROKES = 6  // 3 full up+down oscillations
+const TARGET_STROKES_A = 4  // 2 full up+down oscillations
+const TARGET_STROKES_B = 6  // 3 full up+down oscillations
 
 export default function App() {
   const leftVal = useRef(0)
@@ -68,6 +68,7 @@ export default function App() {
   const rightDirectionRef = useRef(0)   // 0=unset, 1=up, -1=down
   const rightExtremeRef = useRef(null)
   const textAFadeStartedRef = useRef(false)
+  const textBFadeStartedRef = useRef(false)
 
   // Raw (unclamped) left-slider position, tracks thumb movement past the
   // slider's visual bounds. Used by SlowingDownController for breath timing.
@@ -128,18 +129,11 @@ export default function App() {
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
-    tutorialTimerRef.current = setTimeout(() => {
-      setTutorialVisible(false)
-      tutorialVisibleRef.current = false
-      tutorialTimerRef.current = setTimeout(() => {
-        stageRef.current = 'done'
-        if (pendingGatesTextRef.current) {
-          pendingGatesTextRef.current = false
-          showGatesText()
-        }
-      }, FADE_TRANSITION_MS)
-    }, TEXT_B_DISPLAY_MS)
-  }, [showGatesText])
+    rightStrokeCountRef.current = 0
+    rightDirectionRef.current = 0
+    rightExtremeRef.current = null
+    textBFadeStartedRef.current = false
+  }, [])
 
   const triggerTextAFade = useCallback(() => {
     if (stageRef.current !== 'A') return
@@ -150,6 +144,20 @@ export default function App() {
       advanceSequence()
     }, FADE_TRANSITION_MS)
   }, [advanceSequence])
+
+  const triggerTextBFade = useCallback(() => {
+    if (stageRef.current !== 'B') return
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      stageRef.current = 'done'
+      if (pendingGatesTextRef.current) {
+        pendingGatesTextRef.current = false
+        showGatesText()
+      }
+    }, FADE_TRANSITION_MS)
+  }, [showGatesText])
 
   const handleMovement = useCallback(() => {
     if (!awaitingMovementRef.current) return
@@ -188,7 +196,9 @@ export default function App() {
   const setRight = useCallback((v) => {
     rightVal.current = v
     lastMoveTime.current = Date.now()
-    if (stageRef.current === 'A' && !textAFadeStartedRef.current) {
+
+    const stage = stageRef.current
+    if ((stage === 'A' && !textAFadeStartedRef.current) || (stage === 'B' && !textBFadeStartedRef.current)) {
       if (rightExtremeRef.current === null) {
         rightExtremeRef.current = v
       } else {
@@ -209,15 +219,19 @@ export default function App() {
           } else if (rightDirectionRef.current === -1 && v < rightExtremeRef.current) {
             rightExtremeRef.current = v
           }
-          if (rightStrokeCountRef.current >= TARGET_STROKES) {
+          if (stage === 'A' && rightStrokeCountRef.current >= TARGET_STROKES_A) {
             textAFadeStartedRef.current = true
             triggerTextAFade()
+          } else if (stage === 'B' && rightStrokeCountRef.current >= TARGET_STROKES_B) {
+            textBFadeStartedRef.current = true
+            triggerTextBFade()
           }
         }
       }
     }
+
     handleMovement()
-  }, [handleMovement, triggerTextAFade])
+  }, [handleMovement, triggerTextAFade, triggerTextBFade])
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = m === 'timed'
@@ -233,6 +247,7 @@ export default function App() {
     rightDirectionRef.current = 0
     rightExtremeRef.current = null
     textAFadeStartedRef.current = false
+    textBFadeStartedRef.current = false
     currentMainTextRef.current = TEXT_B
     setTutorialText(TEXT_A)
     setTutorialVisible(true)
