@@ -25,7 +25,9 @@ const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_B_DISPLAY_MS = 3000
 const TEXT_C_DISPLAY_MS = 5000
-const FADE_TRANSITION_MS = 1500
+const FADE_TRANSITION_MS = 2000
+const RIGHT_DEADBAND = 0.08
+const TARGET_STROKES = 6  // 3 full up+down oscillations
 
 export default function App() {
   const leftVal = useRef(0)
@@ -55,12 +57,17 @@ export default function App() {
   const tutorialVisibleRef = useRef(false)
   const tutorialTimerRef = useRef(null)
   const awaitingMovementRef = useRef(false)
-  const skipMovementRef = useRef(0)
   const stageRef = useRef('done')
   const pendingGatesTextRef = useRef(false)
   const currentMainTextRef = useRef('')
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
+
+  // Right-slider stroke counting for Text A trigger
+  const rightStrokeCountRef = useRef(0)
+  const rightDirectionRef = useRef(0)   // 0=unset, 1=up, -1=down
+  const rightExtremeRef = useRef(null)
+  const textAFadeStartedRef = useRef(false)
 
   // Raw (unclamped) left-slider position, tracks thumb movement past the
   // slider's visual bounds. Used by SlowingDownController for breath timing.
@@ -134,6 +141,16 @@ export default function App() {
     }, TEXT_B_DISPLAY_MS)
   }, [showGatesText])
 
+  const triggerTextAFade = useCallback(() => {
+    if (stageRef.current !== 'A') return
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      advanceSequence()
+    }, FADE_TRANSITION_MS)
+  }, [advanceSequence])
+
   const handleMovement = useCallback(() => {
     if (!awaitingMovementRef.current) return
     awaitingMovementRef.current = false
@@ -165,22 +182,42 @@ export default function App() {
   const setLeft = useCallback((v) => {
     leftVal.current = v
     lastMoveTime.current = Date.now()
-    if (skipMovementRef.current > 0) {
-      skipMovementRef.current -= 1
-    } else {
-      handleMovement()
-    }
+    handleMovement()
   }, [handleMovement])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
     lastMoveTime.current = Date.now()
-    if (skipMovementRef.current > 0) {
-      skipMovementRef.current -= 1
-    } else {
-      handleMovement()
+    if (stageRef.current === 'A' && !textAFadeStartedRef.current) {
+      if (rightExtremeRef.current === null) {
+        rightExtremeRef.current = v
+      } else {
+        const delta = v - rightExtremeRef.current
+        if (rightDirectionRef.current === 0) {
+          if (delta < -RIGHT_DEADBAND) {
+            rightDirectionRef.current = -1; rightExtremeRef.current = v; rightStrokeCountRef.current = 1
+          } else if (delta > RIGHT_DEADBAND) {
+            rightDirectionRef.current = 1; rightExtremeRef.current = v; rightStrokeCountRef.current = 1
+          }
+        } else {
+          if (rightDirectionRef.current === 1 && delta < -RIGHT_DEADBAND) {
+            rightDirectionRef.current = -1; rightExtremeRef.current = v; rightStrokeCountRef.current++
+          } else if (rightDirectionRef.current === -1 && delta > RIGHT_DEADBAND) {
+            rightDirectionRef.current = 1; rightExtremeRef.current = v; rightStrokeCountRef.current++
+          } else if (rightDirectionRef.current === 1 && v > rightExtremeRef.current) {
+            rightExtremeRef.current = v
+          } else if (rightDirectionRef.current === -1 && v < rightExtremeRef.current) {
+            rightExtremeRef.current = v
+          }
+          if (rightStrokeCountRef.current >= TARGET_STROKES) {
+            textAFadeStartedRef.current = true
+            triggerTextAFade()
+          }
+        }
+      }
     }
-  }, [handleMovement])
+    handleMovement()
+  }, [handleMovement, triggerTextAFade])
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = m === 'timed'
@@ -191,8 +228,11 @@ export default function App() {
     clearTimeout(tutorialTimerRef.current)
     stageRef.current = 'A'
     pendingGatesTextRef.current = false
-    awaitingMovementRef.current = true
-    skipMovementRef.current = 2
+    awaitingMovementRef.current = false
+    rightStrokeCountRef.current = 0
+    rightDirectionRef.current = 0
+    rightExtremeRef.current = null
+    textAFadeStartedRef.current = false
     currentMainTextRef.current = TEXT_B
     setTutorialText(TEXT_A)
     setTutorialVisible(true)
