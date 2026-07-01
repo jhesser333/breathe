@@ -59,7 +59,7 @@ export default function App() {
   const tutorialTimerRef = useRef(null)
   const awaitingMovementRef = useRef(false)
   const stageRef = useRef('done')
-  const pendingGatesTextRef = useRef(false)
+  const pendingGatesFnRef = useRef(null) // null = not pending; thunk = fn to call when Text B finishes
   const currentMainTextRef = useRef('')
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
@@ -87,9 +87,10 @@ export default function App() {
   const lastMinTimeRef = useRef(null)
   const hadMaxRef = useRef(false)
   const breathsRef = useRef([])
-  const phaseRef = useRef('learning')
+  const phaseRef = useRef('idle')
   const avgBreathRef = useRef(0)
   const phase2StartRef = useRef(0)
+  const recordingEnabledRef = useRef(false)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -99,34 +100,67 @@ export default function App() {
     lastMinTimeRef.current = null
     hadMaxRef.current = false
     breathsRef.current = []
-    phaseRef.current = 'learning'
+    phaseRef.current = 'idle'
     avgBreathRef.current = 0
     phase2StartRef.current = 0
+    recordingEnabledRef.current = false
   }, [])
 
-  const showGatesText = useCallback(() => {
-    gatesEnabledRef.current = true
-    clearTimeout(breathControlTimerRef.current)
-    breathControlTimerRef.current = setTimeout(() => setBreathControlVisible(true), 2000)
+  const showTimedText = useCallback((text, duration = TEXT_C_DISPLAY_MS) => {
+    if (!text) return
     clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.gates
-    setTutorialText(TEXTS.gates)
+    currentMainTextRef.current = text
+    setTutorialText(text)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
-    }, TEXT_C_DISPLAY_MS)
+    }, duration)
   }, [])
 
-  const requestGatesText = useCallback(() => {
-    if (stageRef.current === 'done') {
-      showGatesText()
-    } else {
-      pendingGatesTextRef.current = true
-    }
-  }, [showGatesText])
+  const showGatesText = useCallback((text = TEXTS.gatesTimed) => {
+    gatesEnabledRef.current = true
+    clearTimeout(breathControlTimerRef.current)
+    breathControlTimerRef.current = setTimeout(() => setBreathControlVisible(true), 2000)
+    showTimedText(text)
+  }, [showTimedText])
+
+  const showSlowingTextC = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = TEXTS.gatesSlowing
+    setTutorialText(TEXTS.gatesSlowing)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+    recordingEnabledRef.current = true
+  }, [])
+
+  const showSlowingTextD = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = TEXTS.slowingTextD
+    setTutorialText(TEXTS.slowingTextD)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+  }, [])
+
+  const handleSlowingRecordingDone = useCallback(() => {
+    gatesEnabledRef.current = true
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      showSlowingTextD()
+    }, FADE_TRANSITION_MS)
+  }, [showSlowingTextD])
+
+  const handleSlowingTextDDone = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+  }, [])
 
   const advanceSequence = useCallback(() => {
     if (stageRef.current !== 'A') return
@@ -159,12 +193,13 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       stageRef.current = 'done'
-      if (pendingGatesTextRef.current) {
-        pendingGatesTextRef.current = false
-        showGatesText()
+      if (pendingGatesFnRef.current !== null) {
+        const fn = pendingGatesFnRef.current
+        pendingGatesFnRef.current = null
+        fn()
       }
     }, FADE_TRANSITION_MS)
-  }, [showGatesText])
+  }, [])
 
   const handleMovement = useCallback(() => {
     if (!awaitingMovementRef.current) return
@@ -257,7 +292,7 @@ export default function App() {
 
     clearTimeout(tutorialTimerRef.current)
     stageRef.current = 'A'
-    pendingGatesTextRef.current = false
+    pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
     rightStrokeCountRef.current = 0
     rightDirectionRef.current = 0
@@ -268,12 +303,13 @@ export default function App() {
     setTutorialText(TEXT_A)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
-    if (m === 'timed') pendingGatesTextRef.current = true
+    if (m === 'timed') pendingGatesFnRef.current = () => showGatesText(TEXTS.gatesTimed)
+    if (m === 'slowing') pendingGatesFnRef.current = showSlowingTextC
 
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState])
+  }, [resetSlowingState, showGatesText, showSlowingTextC])
 
   const handleContinue = useCallback(() => {
     if (!mode) {
@@ -363,9 +399,10 @@ export default function App() {
         {mode === 'slowing' && (
           <SlowingDownController
             leftRawRef={leftRawRef}
-            gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
-            onGatesReady={requestGatesText}
+            recordingEnabledRef={recordingEnabledRef}
+            onGatesReady={handleSlowingRecordingDone}
+            onTextDone={handleSlowingTextDDone}
             prevRawRef={prevRawRef}
             directionRef={directionRef}
             extremeValueRef={extremeValueRef}
