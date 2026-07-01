@@ -193,12 +193,8 @@ export default function App() {
     spawnIntervalRef.current = breathLength
   }, [breathLength])
 
-  const handleBreathIncrease = useCallback(() => {
-    setBreathLength(v => Math.min(30, parseFloat((v + 0.5).toFixed(1))))
-  }, [])
-
-  const handleBreathDecrease = useCallback(() => {
-    setBreathLength(v => Math.max(4, parseFloat((v - 0.5).toFixed(1))))
+  const handleBreathChange = useCallback((v) => {
+    setBreathLength(v)
   }, [])
 
   const setLeft = useCallback((v) => {
@@ -386,8 +382,7 @@ export default function App() {
         {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}
-            onIncrease={handleBreathIncrease}
-            onDecrease={handleBreathDecrease}
+            onChange={handleBreathChange}
           />
         )}
         <div style={{
