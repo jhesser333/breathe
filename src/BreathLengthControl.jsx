@@ -3,8 +3,8 @@ import { useRef, useEffect, useCallback } from 'react'
 const MIN_S = 5
 const MAX_S = 24
 const STEP = 0.5
-const THUMB_SIZE = 34
-const TRACK_WIDTH = 40
+const THUMB_SIZE = 20
+const TRACK_WIDTH = 20
 const TRACK_HEIGHT = 220
 
 function snap(seconds) {
@@ -75,25 +75,27 @@ export default function BreathLengthControl({ breathLength, onChange }) {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'flex-start',
-      gap: 6,
       pointerEvents: 'auto',
     }}>
-      <span style={{
+      <div style={{
         color: 'rgba(255,255,255,0.55)',
         fontFamily: 'sans-serif',
         fontSize: 14,
         letterSpacing: '0.03em',
         userSelect: 'none',
-        whiteSpace: 'nowrap',
+        lineHeight: 1.3,
+        marginBottom: 6,
       }}>
-        Adjust Breath Length
-      </span>
+        <div>Adjust Breath</div>
+        <div>Length</div>
+      </div>
       <span style={{
         color: 'rgba(255,255,255,0.75)',
         fontFamily: 'sans-serif',
         fontSize: 20,
         letterSpacing: '0.03em',
         userSelect: 'none',
+        marginBottom: 24,
       }}>
         {breathLength.toFixed(1)}s
       </span>
@@ -116,16 +118,6 @@ export default function BreathLengthControl({ breathLength, onChange }) {
           border: '1px solid rgba(255,255,255,0.15)',
           position: 'relative',
         }}>
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: `${ratio * 100}%`,
-            background: 'rgba(255,255,255,0.35)',
-            borderRadius: 20,
-            pointerEvents: 'none',
-          }} />
           <div style={{
             position: 'absolute',
             left: '50%',
