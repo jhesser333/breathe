@@ -17,6 +17,7 @@ import ShapeOptionsScreen from './ShapeOptionsScreen'
 import ColorOptionsScreen from './ColorOptionsScreen'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
+import BreathLengthControl from './BreathLengthControl'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { TEXT_A, TEXT_B, TEXTS } from './copy'
@@ -62,6 +63,7 @@ export default function App() {
   const currentMainTextRef = useRef('')
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
+  const [breathLength, setBreathLength] = useState(12)
 
   // Right-slider stroke counting for Text A trigger
   const rightStrokeCountRef = useRef(0)
@@ -187,6 +189,18 @@ export default function App() {
 
   useEffect(() => () => clearTimeout(tutorialTimerRef.current), [])
 
+  useEffect(() => {
+    spawnIntervalRef.current = breathLength
+  }, [breathLength])
+
+  const handleBreathIncrease = useCallback(() => {
+    setBreathLength(v => Math.min(30, parseFloat((v + 0.5).toFixed(1))))
+  }, [])
+
+  const handleBreathDecrease = useCallback(() => {
+    setBreathLength(v => Math.max(4, parseFloat((v - 0.5).toFixed(1))))
+  }, [])
+
   const setLeft = useCallback((v) => {
     leftVal.current = v
     lastMoveTime.current = Date.now()
@@ -236,6 +250,7 @@ export default function App() {
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = m === 'timed'
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
+    if (m === 'timed') setBreathLength(12)
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     if (m === 'slowing') resetSlowingState()
 
@@ -368,6 +383,13 @@ export default function App() {
           <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
+        {mode === 'timed' && (
+          <BreathLengthControl
+            breathLength={breathLength}
+            onIncrease={handleBreathIncrease}
+            onDecrease={handleBreathDecrease}
+          />
+        )}
         <div style={{
           position: 'absolute', bottom: 16, left: '50%',
           transform: 'translateX(-50%)',
