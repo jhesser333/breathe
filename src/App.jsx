@@ -64,6 +64,7 @@ export default function App() {
   const gatesEnabledRef = useRef(false)
   const spawnIntervalRef = useRef(12)
   const [breathLength, setBreathLength] = useState(12)
+  const [breathControlVisible, setBreathControlVisible] = useState(false)
 
   // Right-slider stroke counting for Text A trigger
   const rightStrokeCountRef = useRef(0)
@@ -103,6 +104,8 @@ export default function App() {
   }, [])
 
   const showGatesText = useCallback(() => {
+    gatesEnabledRef.current = true
+    setBreathControlVisible(true)
     clearTimeout(tutorialTimerRef.current)
     currentMainTextRef.current = TEXTS.gates
     setTutorialText(TEXTS.gates)
@@ -244,9 +247,9 @@ export default function App() {
   }, [handleMovement, triggerTextAFade, triggerTextBFade])
 
   const handleSelectMode = useCallback((m) => {
-    gatesEnabledRef.current = m === 'timed'
+    gatesEnabledRef.current = false
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
-    if (m === 'timed') setBreathLength(12)
+    if (m === 'timed') { setBreathLength(12); setBreathControlVisible(false) }
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     if (m === 'slowing') resetSlowingState()
 
@@ -383,6 +386,7 @@ export default function App() {
           <BreathLengthControl
             breathLength={breathLength}
             onChange={handleBreathChange}
+            visible={breathControlVisible}
           />
         )}
         <div style={{

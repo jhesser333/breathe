@@ -11,7 +11,7 @@ function snap(seconds) {
   return Math.min(MAX_S, Math.max(MIN_S, Math.round(seconds / STEP) * STEP))
 }
 
-export default function BreathLengthControl({ breathLength, onChange }) {
+export default function BreathLengthControl({ breathLength, onChange, visible = false }) {
   const trackRef = useRef(null)
   const touchIdRef = useRef(null)
   const draggingRef = useRef(false)
@@ -76,6 +76,8 @@ export default function BreathLengthControl({ breathLength, onChange }) {
       flexDirection: 'column',
       alignItems: 'flex-start',
       pointerEvents: 'auto',
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 2s',
     }}>
       <div style={{
         color: 'rgba(255,255,255,0.55)',
