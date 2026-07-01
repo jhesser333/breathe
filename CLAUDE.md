@@ -128,7 +128,11 @@ Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
 ## Personalization system
 - **Personalize** button on Home screen (bottom center)
 - Navigation: Home → Personalize → Shapes or Colors
-- Back navigation goes one level up (button labeled with the parent screen name, no arrow); Shape/Color screens also have a **"Select Mode"** button (top right) to jump back to the Home screen
+- All nav buttons are consolidated into stacked bottom-center groups — no top-corner buttons on any screen. Gap between buttons: 20px. Positioned at `bottom: 16, left: '50%', transform: 'translateX(-50%)'`.
+  - **Experience/breathing screen** (App.jsx overlay): **Personalize** / **Select Mode** / **Restart**
+  - **Personalize screen**: **Select Mode** / **Resume Breathing**
+  - **Shape Options / Color Options screens**: **Personalize** / **Select Mode** / **Resume Breathing**
+- Shape/Color Options screens use a scrollable cards container (`height: 380, overflowY: 'auto'`) — shows ~4 cards at a time; scroll to reveal more. Layout is `justifyContent: 'flex-start'` with `paddingTop: 60, paddingBottom: 150` so cards don't slide under the bottom button group.
 - Selections persisted to localStorage
 
 **Shape Options:**
@@ -174,8 +178,8 @@ src/
   useTouchSlider.js         — touch hook with identifier tracking (multi-touch)
   HomeScreen.jsx            — mode selection ("Modes" heading) + Personalize button (bottom center)
   PersonalizeScreen.jsx     — hub: Shapes + Colors
-  ShapeOptionsScreen.jsx    — A/B shape selection, selected state indicated
-  ColorOptionsScreen.jsx    — Palette A/B selection, selected state indicated
+  ShapeOptionsScreen.jsx    — shape selection (A–E), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
+  ColorOptionsScreen.jsx    — palette selection (A–B), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
   TutorialText.jsx          — fade-in/out tutorial overlay (top of screen)
   SlowingDownController.jsx — breath cycle detection + dynamic gate interval
   palettes.js               — PALETTES object: morphBase, morphEmissive, gateColor, background
