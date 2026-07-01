@@ -118,16 +118,17 @@ Every shape option scrolls thin railroad-tie markers along the track: `RoundedBo
 ## Tutorial text rules
 Universal A/B/C sequence, the same across every mode (defined in `src/copy.js`):
 
-- **Text A** — "Move the sliders in opposite directions." Shown at mode start. Stays visible until the sliders start moving, then waits 2 seconds before fading out. If the user never moves the sliders, Text A stays up indefinitely (no movement → no timer starts).
-- **Text B** — "Move the sliders with your breath." Fades in once Text A fades out. Stays visible for 3 seconds, then fades out.
+- **Text A** — "Move the sliders in opposite directions with your thumbs" Shown at mode start. Stays visible until the **right slider** has completed **2 full up+down oscillations** (4 direction reversals detected with an 8% deadband, tracked in `rightStrokeCountRef`), then fades out over 2 seconds. If the user never moves the right slider, Text A stays up indefinitely.
+- **Text B** — "Sync your breathing to the morphing object" Fades in once Text A fades out. Stays visible until the right slider completes **3 more full oscillations** (6 reversals, same deadband logic, counters reset when B begins), then fades out over 2 seconds.
 - **Text C** — "Time your breath with the gates." Fades in whenever gates are about to start spawning (immediately at mode start for Paced Breathing; at the start of Phase 2 for Slowing Down). If Text A/B is still showing when gates are about to spawn, Text C waits until the A/B sequence finishes, then fades in. Stays visible for 5 seconds, then fades out.
 - **Idle re-show**: if the sliders are still for 10 seconds, the most recently shown text (A, B, or C — whichever was last) reappears and stays until 2 seconds after the sliders start moving again, then fades out (does not restart the A/B/C sequence).
-- Fade transitions take 1.5 seconds (`FADE_TRANSITION_MS` in `App.jsx`, must match the CSS transition in `TutorialText.jsx`).
+- Fade transitions take 2 seconds (`FADE_TRANSITION_MS = 2000` in `App.jsx`, must match the CSS transition in `TutorialText.jsx`).
+- `TutorialText.jsx` is positioned at `top: '38%'` with `transform: 'translateY(-50%)'` — centered in front of the Morph.
 
 ## Personalization system
-- **Personalize** button on Home screen (top left)
-- Navigation: Home → Personalize → Shape Options or Color Options
-- Back navigation goes one level up; Shape/Color screens also have a "Home" button (top right) to jump to root
+- **Personalize** button on Home screen (bottom center)
+- Navigation: Home → Personalize → Shapes or Colors
+- Back navigation goes one level up (button labeled with the parent screen name, no arrow); Shape/Color screens also have a **"Select Mode"** button (top right) to jump back to the Home screen
 - Selections persisted to localStorage
 
 **Shape Options:**
@@ -171,8 +172,8 @@ src/
   GatesE.jsx                — Shape E: exact duplicate of GatesC
   Sliders.jsx               — DOM overlay sliders (top 63% to 16px from bottom), fill indicator
   useTouchSlider.js         — touch hook with identifier tracking (multi-touch)
-  HomeScreen.jsx            — mode selection + Personalize button (top left)
-  PersonalizeScreen.jsx     — hub: Shape Options + Color Options
+  HomeScreen.jsx            — mode selection ("Modes" heading) + Personalize button (bottom center)
+  PersonalizeScreen.jsx     — hub: Shapes + Colors
   ShapeOptionsScreen.jsx    — A/B shape selection, selected state indicated
   ColorOptionsScreen.jsx    — Palette A/B selection, selected state indicated
   TutorialText.jsx          — fade-in/out tutorial overlay (top of screen)
