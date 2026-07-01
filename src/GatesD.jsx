@@ -122,6 +122,7 @@ export default function GatesD({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const checkpoints = useRef([])
 
   const wasEnabled = useRef(false)
+  const preSeedRef = useRef({ elapsed: 0, needsInitial: true })
 
   useFrame((_, delta) => {
     const spawn = () => {
@@ -136,8 +137,25 @@ export default function GatesD({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       slot.active = true
     }
 
+    if (!wasEnabled.current) {
+      const pre = preSeedRef.current
+      if (pre.needsInitial) {
+        pre.needsInitial = false
+        const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+        checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
+      } else {
+        pre.elapsed += delta
+        if (pre.elapsed >= spawnIntervalRef.current) {
+          pre.elapsed -= spawnIntervalRef.current
+          const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+          checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
+        }
+      }
+    }
+
     if (gatesEnabledRef.current && !wasEnabled.current) {
       wasEnabled.current = true
+      checkpoints.current = []
       spawn()
     }
     if (!gatesEnabledRef.current) wasEnabled.current = false
