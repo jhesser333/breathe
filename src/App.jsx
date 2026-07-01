@@ -369,10 +369,10 @@ export default function App() {
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
         <div style={{
-          position: 'absolute', top: '65%', left: '50%',
+          position: 'absolute', bottom: 16, left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex', flexDirection: 'column',
-          gap: 10, alignItems: 'center',
+          gap: 20, alignItems: 'center',
           pointerEvents: 'auto',
         }}>
           {[

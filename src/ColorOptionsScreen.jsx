@@ -60,7 +60,7 @@ export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome,
         position: 'absolute', bottom: 16, left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex', flexDirection: 'column',
-        gap: 10, alignItems: 'center',
+        gap: 20, alignItems: 'center',
       }}>
         {[
           { label: 'Personalize', onClick: onBack },
