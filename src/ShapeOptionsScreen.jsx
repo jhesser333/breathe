@@ -34,12 +34,10 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
       position: 'fixed', inset: 0,
       background: palette.background,
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: 16, padding: 32,
+      alignItems: 'center', justifyContent: 'flex-start',
+      gap: 16, padding: 32, paddingTop: 60, paddingBottom: 150,
       fontFamily: 'sans-serif',
     }}>
-      <button style={backBtnStyle} onClick={onBack}>Personalize</button>
-      <button style={{ ...backBtnStyle, left: 'auto', right: 16 }} onClick={onHome}>Select Mode</button>
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Shape Options
       </h1>
@@ -70,7 +68,27 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
         </button>
       </div>
-      <button style={continueBtnStyle} onClick={onContinue}>Resume Breathing</button>
+      <div style={{
+        position: 'absolute', bottom: 16, left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex', flexDirection: 'column',
+        gap: 10, alignItems: 'center',
+      }}>
+        {[
+          { label: 'Personalize', onClick: onBack },
+          { label: 'Select Mode', onClick: onHome },
+          { label: 'Resume Breathing', onClick: onContinue },
+        ].map(({ label, onClick }) => (
+          <button key={label} onClick={onClick} style={{
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+            padding: '8px 14px', fontSize: 13,
+            cursor: 'pointer', fontFamily: 'sans-serif',
+            whiteSpace: 'nowrap',
+          }}>{label}</button>
+        ))}
+      </div>
     </div>
   )
 }

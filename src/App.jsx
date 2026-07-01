@@ -368,48 +368,30 @@ export default function App() {
           <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
-        <button
-          onClick={handleBackFromExperience}
-          style={{
-            position: 'absolute', top: 16, left: 16,
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-            padding: '8px 14px', fontSize: 13,
-            cursor: 'pointer', pointerEvents: 'auto',
-            fontFamily: 'sans-serif', letterSpacing: '0.03em',
-          }}
-        >
-          Select Mode
-</button>
-        <button
-          onClick={handleRestart}
-          style={{
-            position: 'absolute', top: 16, right: 16,
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-            padding: '8px 14px', fontSize: 13,
-            cursor: 'pointer', pointerEvents: 'auto',
-            fontFamily: 'sans-serif', letterSpacing: '0.03em',
-          }}
-        >
-          Restart
-        </button>
-        <button
-          onClick={() => setScreen('personalize')}
-          style={{
-            position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-            padding: '8px 14px', fontSize: 13,
-            cursor: 'pointer', pointerEvents: 'auto',
-            fontFamily: 'sans-serif', letterSpacing: '0.03em',
-          }}
-        >
-          Personalize
-        </button>
+        <div style={{
+          position: 'absolute', top: '65%', left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex', flexDirection: 'column',
+          gap: 10, alignItems: 'center',
+          pointerEvents: 'auto',
+        }}>
+          {[
+            { label: 'Personalize', onClick: () => setScreen('personalize') },
+            { label: 'Select Mode', onClick: handleBackFromExperience },
+            { label: 'Restart', onClick: handleRestart },
+          ].map(({ label, onClick }) => (
+            <button key={label} onClick={onClick} style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+              padding: '8px 14px', fontSize: 13,
+              cursor: 'pointer', fontFamily: 'sans-serif',
+              letterSpacing: '0.03em', whiteSpace: 'nowrap',
+            }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

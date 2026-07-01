@@ -36,7 +36,6 @@ export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <button style={backBtnStyle} onClick={onBack}>Select Mode</button>
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Personalize
       </h1>
@@ -48,7 +47,26 @@ export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue
         <div style={{ fontSize: 17, fontWeight: 500 }}>Colors</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Choose a color palette</div>
       </button>
-      <button style={continueBtnStyle} onClick={onContinue}>Resume Breathing</button>
+      <div style={{
+        position: 'absolute', bottom: 16, left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex', flexDirection: 'column',
+        gap: 10, alignItems: 'center',
+      }}>
+        {[
+          { label: 'Select Mode', onClick: onBack },
+          { label: 'Resume Breathing', onClick: onContinue },
+        ].map(({ label, onClick }) => (
+          <button key={label} onClick={onClick} style={{
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+            padding: '8px 14px', fontSize: 13,
+            cursor: 'pointer', fontFamily: 'sans-serif',
+            whiteSpace: 'nowrap',
+          }}>{label}</button>
+        ))}
+      </div>
     </div>
   )
 }
