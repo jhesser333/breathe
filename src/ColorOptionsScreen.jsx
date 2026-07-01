@@ -43,14 +43,21 @@ export default function ColorOptionsScreen({ selected, onSelect, onBack, onHome,
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Color Options
       </h1>
-      <button style={optionBtn(selected === 'a')} onClick={() => onSelect('a')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Palette A {selected === 'a' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Teal · Pink glow · Warm orange gates</div>
-      </button>
-      <button style={optionBtn(selected === 'b')} onClick={() => onSelect('b')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Palette B {selected === 'b' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Deep blue · Teal glow · Purple gates</div>
-      </button>
+      <div style={{
+        width: '100%', maxWidth: 320,
+        height: 380,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        <button style={optionBtn(selected === 'a')} onClick={() => onSelect('a')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Palette A {selected === 'a' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Teal · Pink glow · Warm orange gates</div>
+        </button>
+        <button style={optionBtn(selected === 'b')} onClick={() => onSelect('b')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Palette B {selected === 'b' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Deep blue · Teal glow · Purple gates</div>
+        </button>
+      </div>
       <button style={continueBtnStyle} onClick={onContinue}>Resume Breathing</button>
     </div>
   )

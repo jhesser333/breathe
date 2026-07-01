@@ -43,26 +43,33 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Shape Options
       </h1>
-      <button style={optionBtn(selected === 'a')} onClick={() => onSelect('a')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Option A {selected === 'a' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Sphere Morph</div>
-      </button>
-      <button style={optionBtn(selected === 'b')} onClick={() => onSelect('b')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Option B {selected === 'b' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Rounded cube Morph</div>
-      </button>
-      <button style={optionBtn(selected === 'c')} onClick={() => onSelect('c')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Option C {selected === 'c' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
-      </button>
-      <button style={optionBtn(selected === 'd')} onClick={() => onSelect('d')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Option D {selected === 'd' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Cube Morph</div>
-      </button>
-      <button style={optionBtn(selected === 'e')} onClick={() => onSelect('e')}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Option E {selected === 'e' && '✓'}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
-      </button>
+      <div style={{
+        width: '100%', maxWidth: 320,
+        height: 380,
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        <button style={optionBtn(selected === 'a')} onClick={() => onSelect('a')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Option A {selected === 'a' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Sphere Morph</div>
+        </button>
+        <button style={optionBtn(selected === 'b')} onClick={() => onSelect('b')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Option B {selected === 'b' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Rounded cube Morph</div>
+        </button>
+        <button style={optionBtn(selected === 'c')} onClick={() => onSelect('c')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Option C {selected === 'c' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
+        </button>
+        <button style={optionBtn(selected === 'd')} onClick={() => onSelect('d')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Option D {selected === 'd' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Cube Morph</div>
+        </button>
+        <button style={optionBtn(selected === 'e')} onClick={() => onSelect('e')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Option E {selected === 'e' && '✓'}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
+        </button>
+      </div>
       <button style={continueBtnStyle} onClick={onContinue}>Resume Breathing</button>
     </div>
   )
