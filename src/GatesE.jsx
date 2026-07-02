@@ -238,7 +238,7 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
       if (matSphereRefs.current[i]) {
         matSphereRefs.current[i].opacity = opacity * 0.25
-        matSphereRefs.current[i].emissiveIntensity = calcEmissive(slot.z) * 0.375
+        matSphereRefs.current[i].emissiveIntensity = calcEmissive(slot.z) * 0.75
       }
       group.visible = true
     })
