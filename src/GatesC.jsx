@@ -14,6 +14,7 @@ const TIE_RADIUS = 0.005
 const SPAWN_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
+const SPHERE_RADIUS = 0.25   // diameter = 0.5, matching Option B's cube block width
 // Fixed real-world tie spacing, matching the standard 20-unit gate-to-gate
 // distance divided into TIES_PER_SEGMENT equal steps. Ties in the preview
 // (ahead of the next gate) and trailing (behind the last passed gate) zones
@@ -91,6 +92,7 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
+  const matSphereRefs = useRef(Array.from({ length: POOL }, () => null))
 
   // Preview ties: the 6 ties (including the at-gate tie) ahead of the
   // frontmost real checkpoint, toward where the next gate will eventually
@@ -180,6 +182,9 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         matRefs.current[i].opacity = opacity
         matRefs.current[i].emissiveIntensity = emissive
       }
+      if (matSphereRefs.current[i]) {
+        matSphereRefs.current[i].opacity = opacity * 0.25
+      }
 
       slot.z += slot.speed * delta
 
@@ -264,6 +269,12 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
             <meshStandardMaterial ref={el => { matRefs.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
+          </mesh>
+          <mesh position={[0, GATE_Y, 0]}>
+            <sphereGeometry args={[SPHERE_RADIUS, 16, 16]} />
+            <meshStandardMaterial ref={el => { matSphereRefs.current[i] = el }}
+              color={gateColor} roughness={0.5} metalness={0.1}
+              transparent opacity={0} depthWrite={false} />
           </mesh>
         </group>
       ))}
