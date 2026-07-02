@@ -238,6 +238,7 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
       if (matSphereRefs.current[i]) {
         matSphereRefs.current[i].opacity = opacity * 0.25
+        matSphereRefs.current[i].emissiveIntensity = calcEmissive(slot.z) * 0.1
       }
       group.visible = true
     })
@@ -320,7 +321,8 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
           <mesh position={[0, GATE_Y, 0]}>
             <sphereGeometry args={[SPHERE_RADIUS, 16, 16]} />
             <meshStandardMaterial ref={el => { matSphereRefs.current[i] = el }}
-              color={gateColor} roughness={0.5} metalness={0.1}
+              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
+              roughness={0.5} metalness={0.1}
               transparent opacity={0} depthWrite={false} />
           </mesh>
         </group>
