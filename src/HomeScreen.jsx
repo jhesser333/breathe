@@ -14,6 +14,11 @@ const OPTIONS = [
     label: 'Slowing Down',
     desc: 'The app times your breathing then gently helps you slow down',
   },
+  {
+    id: 'box',
+    label: 'Box Breathing',
+    desc: 'Inhale, hold, exhale, hold — equal phases guided by the gates',
+  },
 ]
 
 export default function HomeScreen({ onSelect, onPersonalize, palette }) {

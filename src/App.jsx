@@ -10,6 +10,7 @@ import GatesB from './GatesB'
 import GatesC from './GatesC'
 import GatesD from './GatesD'
 import GatesE from './GatesE'
+import GatesBoxBreathing from './GatesBoxBreathing'
 import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import PersonalizeScreen from './PersonalizeScreen'
@@ -391,8 +392,8 @@ export default function App() {
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
-    spawnIntervalRef.current = m === 'timed' ? 12 : 8
-    if (m === 'timed' || m === 'slowing') { clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
+    spawnIntervalRef.current = m === 'timed' ? 12 : m === 'box' ? 4 : 8
+    if (m === 'timed' || m === 'slowing' || m === 'box') { clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
     if (m === 'timed') setBreathLength(12)
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     if (m === 'slowing') resetSlowingState()
@@ -412,6 +413,7 @@ export default function App() {
     tutorialVisibleRef.current = true
     if (m === 'timed') pendingGatesFnRef.current = showGatesText
     if (m === 'slowing') pendingGatesFnRef.current = showSlowingTextC
+    if (m === 'box') pendingGatesFnRef.current = () => { gatesEnabledRef.current = true }
 
     setMode(m)
     setModeKey(k => k + 1)
@@ -479,7 +481,7 @@ export default function App() {
     )
   }
 
-  const hasGates = mode === 'timed' || mode === 'slowing'
+  const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : shapeOption === 'd' ? MorphD : shapeOption === 'e' ? MorphE : MorphA
   const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesD : shapeOption === 'e' ? GatesE : GatesA
 
@@ -496,8 +498,16 @@ export default function App() {
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
-        {hasGates && (
+        {hasGates && mode !== 'box' && (
           <GatesComponent
+            gatesEnabledRef={gatesEnabledRef}
+            spawnIntervalRef={spawnIntervalRef}
+            gateColor={palette.gateColor}
+            emissiveColor={palette.morphEmissive}
+          />
+        )}
+        {mode === 'box' && hasGates && (
+          <GatesBoxBreathing
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.gateColor}
