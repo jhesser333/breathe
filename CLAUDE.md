@@ -133,7 +133,7 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 - **Text D** fades in 2 seconds after Text C fades. Copy: "Good Job! The oncoming targets will begin at your pace and slow down over the next minute." No auto-dismiss — stays until user completes `TEXT_D_CYCLES = 5` post-gate breath cycles, then fades. `SlowingDownController` calls `onTextDone()` callback.
 - **Text E** fades in 2 seconds after Text D fades. Copy: "Keep Morph aligned with the targets to slow down your breathing." No auto-dismiss — stays until user completes `TEXT_E_CYCLES = 5` additional post-gate breath cycles, then fades. `SlowingDownController` calls `onTextEDone()` callback.
 - **Ramp**: spawn interval increases linearly from Initial Pace → 2× Initial Pace over 60 seconds, then holds at 2×. Formula: `spawnInterval = avg * (1 + t)` where `t ∈ [0,1]` over `RAMP_SECONDS`.
-- Constants in `SlowingDownController.jsx`: `DEADBAND=0.08`, `MIN_BREATH_SECONDS=1.5`, `WARMUP_CYCLES=3`, `RECORD_CYCLES=2`, `TEXT_D_CYCLES=3`, `TEXT_E_CYCLES=4`, `RAMP_SECONDS=60`
+- Constants in `SlowingDownController.jsx`: `DEADBAND=0.08`, `MIN_BREATH_SECONDS=1.5`, `WARMUP_CYCLES=3`, `RECORD_CYCLES=2`, `SLACK_FACTOR=1.15`, `TEXT_D_CYCLES=3`, `TEXT_E_CYCLES=4`, `RAMP_SECONDS=60`
 
 ## Tutorial text rules
 Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):

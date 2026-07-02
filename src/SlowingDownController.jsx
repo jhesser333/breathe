@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 
 const DEADBAND           = 0.08
 const MIN_BREATH_SECONDS = 1.5
+const SLACK_FACTOR       = 1.15  // start gates 15% slower than recorded pace
 const WARMUP_CYCLES      = 3   // skip first N cycles after Text C appears
 const RECORD_CYCLES      = 2   // record next N cycles to compute Initial Pace
 const TEXT_D_CYCLES      = 3   // dismiss Text D after N post-gate cycles
@@ -94,8 +95,8 @@ export default function SlowingDownController({
             breathsRef.current.push(duration)
             if (breathsRef.current.length >= RECORD_CYCLES) {
               const avg = breathsRef.current.reduce((a, b) => a + b, 0) / breathsRef.current.length
-              avgBreathRef.current = avg
-              spawnIntervalRef.current = avg
+              avgBreathRef.current = avg * SLACK_FACTOR
+              spawnIntervalRef.current = avg * SLACK_FACTOR
               phaseRef.current = 'gates'
               onGatesReadyRef.current()
             }
