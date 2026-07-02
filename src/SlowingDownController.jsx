@@ -5,11 +5,12 @@ const DEADBAND           = 0.08
 const MIN_BREATH_SECONDS = 1.5
 const WARMUP_CYCLES      = 3   // skip first N cycles after Text C appears
 const RECORD_CYCLES      = 2   // record next N cycles to compute Initial Pace
-const TEXT_D_CYCLES      = 5   // dismiss Text D after N cycles in gates phase
+const TEXT_D_CYCLES      = 5   // dismiss Text D after N post-gate cycles
+const TEXT_E_CYCLES      = 5   // dismiss Text E after N more post-gate cycles
 const RAMP_SECONDS       = 60
 
 export default function SlowingDownController({
-  leftRawRef, spawnIntervalRef, recordingEnabledRef, lastMaxTimeRef, onGatesReady, onTextDone,
+  leftRawRef, spawnIntervalRef, recordingEnabledRef, lastMaxTimeRef, onGatesReady, onTextDone, onTextEDone,
   prevRawRef, directionRef, extremeValueRef, extremeTimeRef,
   lastMinTimeRef, hadMaxRef, breathsRef, phaseRef, avgBreathRef, phase2StartRef,
 }) {
@@ -17,11 +18,14 @@ export default function SlowingDownController({
   onGatesReadyRef.current = onGatesReady
   const onTextDoneRef = useRef(onTextDone)
   onTextDoneRef.current = onTextDone
+  const onTextEDoneRef = useRef(onTextEDone)
+  onTextEDoneRef.current = onTextEDone
 
   // Local refs — reset each time the component mounts (Personalize navigation)
   const warmupCountRef    = useRef(0)
   const postGateCyclesRef = useRef(0)
   const textDFiredRef     = useRef(false)
+  const textEFiredRef     = useRef(false)
 
   useFrame(() => {
     const now = Date.now() / 1000
@@ -95,11 +99,14 @@ export default function SlowingDownController({
               phaseRef.current = 'gates'
               onGatesReadyRef.current()
             }
-          } else if (phaseRef.current === 'gates' && !textDFiredRef.current) {
+          } else if (phaseRef.current === 'gates') {
             postGateCyclesRef.current++
-            if (postGateCyclesRef.current >= TEXT_D_CYCLES) {
+            if (!textDFiredRef.current && postGateCyclesRef.current >= TEXT_D_CYCLES) {
               textDFiredRef.current = true
               onTextDoneRef.current()
+            } else if (textDFiredRef.current && !textEFiredRef.current && postGateCyclesRef.current >= TEXT_D_CYCLES + TEXT_E_CYCLES) {
+              textEFiredRef.current = true
+              onTextEDoneRef.current()
             }
           }
         }

@@ -151,6 +151,15 @@ export default function App() {
     awaitingMovementRef.current = false
   }, [])
 
+  const showSlowingTextE = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = TEXTS.slowingTextE
+    setTutorialText(TEXTS.slowingTextE)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+  }, [])
+
   const handleSlowingRecordingDone = useCallback(() => {
     const t_done = Date.now() / 1000
     const P = avgBreathRef.current
@@ -177,6 +186,15 @@ export default function App() {
   }, [showSlowingTextD])
 
   const handleSlowingTextDDone = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      showSlowingTextE()
+    }, FADE_TRANSITION_MS)
+  }, [showSlowingTextE])
+
+  const handleSlowingTextEDone = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
@@ -426,6 +444,7 @@ export default function App() {
             lastMaxTimeRef={lastMaxTimeRef}
             onGatesReady={handleSlowingRecordingDone}
             onTextDone={handleSlowingTextDDone}
+            onTextEDone={handleSlowingTextEDone}
             prevRawRef={prevRawRef}
             directionRef={directionRef}
             extremeValueRef={extremeValueRef}
