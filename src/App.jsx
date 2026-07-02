@@ -200,6 +200,50 @@ export default function App() {
     tutorialVisibleRef.current = false
   }, [])
 
+  const showSlowingTextF = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = TEXTS.slowingTextF
+    setTutorialText(TEXTS.slowingTextF)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+  }, [])
+
+  const showSlowingTextG = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = TEXTS.slowingTextG
+    setTutorialText(TEXTS.slowingTextG)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+  }, [])
+
+  const handleSlowingRampDone = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => showSlowingTextF(), FADE_TRANSITION_MS)
+  }, [showSlowingTextF])
+
+  const handleSlowingTextFDone = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => showSlowingTextG(), FADE_TRANSITION_MS)
+  }, [showSlowingTextG])
+
+  const handleSlowingShowSlider = useCallback(() => {
+    const rounded = Math.round(avgBreathRef.current * 2 / 0.5) * 0.5
+    setBreathLength(rounded)
+    setBreathControlVisible(true)
+  }, [])
+
+  const handleSlowingTextGDone = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+  }, [])
+
   const advanceSequence = useCallback(() => {
     if (stageRef.current !== 'A') return
     stageRef.current = 'B'
@@ -325,7 +369,8 @@ export default function App() {
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
-    if (m === 'timed') { setBreathLength(12); clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
+    if (m === 'timed' || m === 'slowing') { clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
+    if (m === 'timed') setBreathLength(12)
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     if (m === 'slowing') resetSlowingState()
 
@@ -445,6 +490,10 @@ export default function App() {
             onGatesReady={handleSlowingRecordingDone}
             onTextDone={handleSlowingTextDDone}
             onTextEDone={handleSlowingTextEDone}
+            onRampDone={handleSlowingRampDone}
+            onTextFDone={handleSlowingTextFDone}
+            onShowSlider={handleSlowingShowSlider}
+            onTextGDone={handleSlowingTextGDone}
             prevRawRef={prevRawRef}
             directionRef={directionRef}
             extremeValueRef={extremeValueRef}
@@ -463,7 +512,7 @@ export default function App() {
           <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
-        {mode === 'timed' && (
+        {(mode === 'timed' || mode === 'slowing') && (
           <BreathLengthControl
             breathLength={breathLength}
             onChange={handleBreathChange}

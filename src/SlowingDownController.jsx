@@ -6,12 +6,16 @@ const MIN_BREATH_SECONDS = 1.5
 const SLACK_FACTOR       = 1.15  // start gates 15% slower than recorded pace
 const WARMUP_CYCLES      = 3   // skip first N cycles after Text C appears
 const RECORD_CYCLES      = 2   // record next N cycles to compute Initial Pace
-const TEXT_D_CYCLES      = 3   // dismiss Text D after N post-gate cycles
-const TEXT_E_CYCLES      = 4   // dismiss Text E after N more post-gate cycles
-const RAMP_SECONDS       = 60
+const TEXT_D_CYCLES       = 3   // dismiss Text D after N post-gate cycles
+const TEXT_E_CYCLES       = 4   // dismiss Text E after N more post-gate cycles
+const TEXT_F_CYCLES       = 2   // dismiss Text F after N post-ramp cycles
+const TEXT_G_CYCLES       = 2   // dismiss Text G after N cycles (after Text F)
+const TEXT_G_SLIDER_CYCLE = 1   // show slider after N cycles into Text G period
+const RAMP_SECONDS        = 60
 
 export default function SlowingDownController({
-  leftRawRef, spawnIntervalRef, recordingEnabledRef, lastMaxTimeRef, onGatesReady, onTextDone, onTextEDone,
+  leftRawRef, spawnIntervalRef, recordingEnabledRef, lastMaxTimeRef,
+  onGatesReady, onTextDone, onTextEDone, onRampDone, onTextFDone, onShowSlider, onTextGDone,
   prevRawRef, directionRef, extremeValueRef, extremeTimeRef,
   lastMinTimeRef, hadMaxRef, breathsRef, phaseRef, avgBreathRef, phase2StartRef,
 }) {
@@ -21,12 +25,25 @@ export default function SlowingDownController({
   onTextDoneRef.current = onTextDone
   const onTextEDoneRef = useRef(onTextEDone)
   onTextEDoneRef.current = onTextEDone
+  const onRampDoneRef = useRef(onRampDone)
+  onRampDoneRef.current = onRampDone
+  const onTextFDoneRef = useRef(onTextFDone)
+  onTextFDoneRef.current = onTextFDone
+  const onShowSliderRef = useRef(onShowSlider)
+  onShowSliderRef.current = onShowSlider
+  const onTextGDoneRef = useRef(onTextGDone)
+  onTextGDoneRef.current = onTextGDone
 
   // Local refs — reset each time the component mounts (Personalize navigation)
   const warmupCountRef    = useRef(0)
   const postGateCyclesRef = useRef(0)
   const textDFiredRef     = useRef(false)
   const textEFiredRef     = useRef(false)
+  const rampDoneFiredRef  = useRef(false)
+  const postRampCyclesRef = useRef(0)
+  const textFFiredRef     = useRef(false)
+  const sliderShownRef    = useRef(false)
+  const textGFiredRef     = useRef(false)
 
   useFrame(() => {
     const now = Date.now() / 1000
@@ -109,6 +126,24 @@ export default function SlowingDownController({
               textEFiredRef.current = true
               onTextEDoneRef.current()
             }
+
+            if (rampDoneFiredRef.current) {
+              postRampCyclesRef.current++
+              if (!textFFiredRef.current && postRampCyclesRef.current >= TEXT_F_CYCLES) {
+                textFFiredRef.current = true
+                onTextFDoneRef.current()
+              }
+              if (textFFiredRef.current && !sliderShownRef.current &&
+                  postRampCyclesRef.current >= TEXT_F_CYCLES + TEXT_G_SLIDER_CYCLE) {
+                sliderShownRef.current = true
+                onShowSliderRef.current()
+              }
+              if (textFFiredRef.current && !textGFiredRef.current &&
+                  postRampCyclesRef.current >= TEXT_F_CYCLES + TEXT_G_CYCLES) {
+                textGFiredRef.current = true
+                onTextGDoneRef.current()
+              }
+            }
           }
         }
 
@@ -120,9 +155,13 @@ export default function SlowingDownController({
       }
     }
 
-    if (phaseRef.current === 'gates') {
+    if (phaseRef.current === 'gates' && !rampDoneFiredRef.current) {
       const t = Math.min(Math.max((now - phase2StartRef.current) / RAMP_SECONDS, 0), 1)
       spawnIntervalRef.current = avgBreathRef.current * (1 + t)
+      if (t >= 1) {
+        rampDoneFiredRef.current = true
+        onRampDoneRef.current()
+      }
     }
   })
 
