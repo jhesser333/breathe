@@ -72,6 +72,12 @@ function calcEmissive(z) {
   return 0
 }
 
+function calcEmissiveExhale(z) {
+  if (z >= 0) return MAX_EMISSIVE
+  if (z >= -1.0) return MAX_EMISSIVE * smoothstep((z + 1.0) / 1.0)
+  return 0
+}
+
 function makeSlot() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
@@ -235,7 +241,7 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
       if (matSphereRefs.current[i]) {
         matSphereRefs.current[i].opacity = opacity * 0.25
-        matSphereRefs.current[i].emissiveIntensity = calcEmissive(slot.z) * 0.75
+        matSphereRefs.current[i].emissiveIntensity = calcEmissiveExhale(slot.z) * 0.75
       }
       group.visible = true
     })
