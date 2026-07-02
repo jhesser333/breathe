@@ -9,7 +9,7 @@ const TEXT_D_CYCLES      = 5   // dismiss Text D after N cycles in gates phase
 const RAMP_SECONDS       = 60
 
 export default function SlowingDownController({
-  leftRawRef, spawnIntervalRef, recordingEnabledRef, onGatesReady, onTextDone,
+  leftRawRef, spawnIntervalRef, recordingEnabledRef, lastMaxTimeRef, onGatesReady, onTextDone,
   prevRawRef, directionRef, extremeValueRef, extremeTimeRef,
   lastMinTimeRef, hadMaxRef, breathsRef, phaseRef, avgBreathRef, phase2StartRef,
 }) {
@@ -68,6 +68,7 @@ export default function SlowingDownController({
         extremeTimeRef.current = now
       } else if (raw <= extremeValueRef.current - DEADBAND) {
         hadMaxRef.current = true
+        lastMaxTimeRef.current = extremeTimeRef.current  // save inhale peak time before overwrite
         extremeValueRef.current = raw
         extremeTimeRef.current = now
         directionRef.current = -1
@@ -91,7 +92,6 @@ export default function SlowingDownController({
               const avg = breathsRef.current.reduce((a, b) => a + b, 0) / breathsRef.current.length
               avgBreathRef.current = avg
               spawnIntervalRef.current = avg
-              phase2StartRef.current = now
               phaseRef.current = 'gates'
               onGatesReadyRef.current()
             }

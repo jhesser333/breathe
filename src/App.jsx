@@ -53,6 +53,8 @@ export default function App() {
   }, [])
 
   const palette = PALETTES[colorPalette]
+  const shapeRef = useRef(shapeOption)
+  shapeRef.current = shapeOption
 
   const lastMoveTime = useRef(0)
   const tutorialVisibleRef = useRef(false)
@@ -91,6 +93,8 @@ export default function App() {
   const avgBreathRef = useRef(0)
   const phase2StartRef = useRef(0)
   const recordingEnabledRef = useRef(false)
+  const lastMaxTimeRef = useRef(0)
+  const gateEnableTimerRef = useRef(null)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -104,6 +108,7 @@ export default function App() {
     avgBreathRef.current = 0
     phase2StartRef.current = 0
     recordingEnabledRef.current = false
+    lastMaxTimeRef.current = 0
   }, [])
 
   const showTimedText = useCallback((text, duration = TEXT_C_DISPLAY_MS) => {
@@ -147,13 +152,28 @@ export default function App() {
   }, [])
 
   const handleSlowingRecordingDone = useCallback(() => {
-    gatesEnabledRef.current = true
+    const t_done = Date.now() / 1000
+    const P = avgBreathRef.current
+    let d = 0
+    if (lastMaxTimeRef.current > 0) {
+      const T_travel = ['a', 'b'].includes(shapeRef.current) ? 1.5 * P : P
+      const elapsed = t_done - lastMaxTimeRef.current
+      const k = Math.ceil((elapsed + T_travel) / P)
+      d = Math.max(0, k * P - T_travel - elapsed)
+    }
+    phase2StartRef.current = t_done + d
+
     clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       showSlowingTextD()
     }, FADE_TRANSITION_MS)
+
+    clearTimeout(gateEnableTimerRef.current)
+    gateEnableTimerRef.current = setTimeout(() => {
+      gatesEnabledRef.current = true
+    }, d * 1000)
   }, [showSlowingTextD])
 
   const handleSlowingTextDDone = useCallback(() => {
@@ -285,6 +305,7 @@ export default function App() {
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = false
+    clearTimeout(gateEnableTimerRef.current)
     spawnIntervalRef.current = m === 'timed' ? 12 : 8
     if (m === 'timed') { setBreathLength(12); clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
@@ -326,6 +347,7 @@ export default function App() {
   const handleBackFromExperience = useCallback(() => {
     gatesEnabledRef.current = false
     clearTimeout(tutorialTimerRef.current)
+    clearTimeout(gateEnableTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
     setMode(null)
@@ -401,6 +423,7 @@ export default function App() {
             leftRawRef={leftRawRef}
             spawnIntervalRef={spawnIntervalRef}
             recordingEnabledRef={recordingEnabledRef}
+            lastMaxTimeRef={lastMaxTimeRef}
             onGatesReady={handleSlowingRecordingDone}
             onTextDone={handleSlowingTextDDone}
             prevRawRef={prevRawRef}
