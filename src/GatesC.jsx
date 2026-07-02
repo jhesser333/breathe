@@ -15,6 +15,9 @@ const SPAWN_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
 const SPHERE_RADIUS = 0.25   // diameter = 0.5, matching Option B's cube block width
+const POOL_EXHALE = 3
+const EXHALE_SPAWN_Z = -30
+const EXHALE_FADE_Z = -20
 // Fixed real-world tie spacing, matching the standard 20-unit gate-to-gate
 // distance divided into TIES_PER_SEGMENT equal steps. Ties in the preview
 // (ahead of the next gate) and trailing (behind the last passed gate) zones
@@ -73,6 +76,10 @@ function makeSlot() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
 
+function makeSlotExhale() {
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0 }
+}
+
 function createTieMaterial(color) {
   return new THREE.MeshStandardMaterial({
     color: new THREE.Color(color),
@@ -92,7 +99,9 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
-  const matSphereRefs = useRef(Array.from({ length: POOL }, () => null))
+  const slotsExhale = useRef(Array.from({ length: POOL_EXHALE }, makeSlotExhale))
+  const groupRefsExhale = useRef(Array.from({ length: POOL_EXHALE }, () => null))
+  const matSphereRefs = useRef(Array.from({ length: POOL_EXHALE }, () => null))
 
   // Preview ties: the 6 ties (including the at-gate tie) ahead of the
   // frontmost real checkpoint, toward where the next gate will eventually
@@ -132,6 +141,15 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const preSeedRef = useRef({ elapsed: 0, needsInitial: true })
 
   useFrame((_, delta) => {
+    const spawnExhale = (speed) => {
+      const slot = slotsExhale.current.find(s => !s.active)
+      if (!slot) return
+      Object.assign(slot, makeSlotExhale())
+      slot.z = EXHALE_SPAWN_Z
+      slot.speed = speed
+      slot.active = true
+    }
+
     const spawn = () => {
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
       checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
@@ -142,6 +160,7 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       slot.z = SPAWN_Z
       slot.speed = speed
       slot.active = true
+      spawnExhale(speed)
     }
 
     if (!wasEnabled.current) {
@@ -182,9 +201,6 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         matRefs.current[i].opacity = opacity
         matRefs.current[i].emissiveIntensity = emissive
       }
-      if (matSphereRefs.current[i]) {
-        matSphereRefs.current[i].opacity = opacity * 0.25
-      }
 
       slot.z += slot.speed * delta
 
@@ -196,6 +212,30 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (slot.z > DESPAWN_Z) { slot.active = false; group.visible = false; return }
 
       group.position.z = slot.z
+      group.visible = true
+    })
+
+    slotsExhale.current.forEach((slot, i) => {
+      const group = groupRefsExhale.current[i]
+      if (!group) return
+      if (!slot.active) { group.visible = false; return }
+
+      slot.z += slot.speed * delta
+
+      if (slot.z > DESPAWN_Z) { slot.active = false; group.visible = false; return }
+
+      group.position.z = slot.z
+
+      if (slot.z < EXHALE_FADE_Z) { group.visible = false; return }
+
+      slot.fadeElapsed += delta
+      const fadeOut = slot.z > FADE_OUT_START
+        ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
+        : 1
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      if (matSphereRefs.current[i]) {
+        matSphereRefs.current[i].opacity = opacity * 0.25
+      }
       group.visible = true
     })
 
@@ -270,6 +310,10 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </mesh>
+        </group>
+      ))}
+      {Array.from({ length: POOL_EXHALE }, (_, i) => (
+        <group key={`exhale-${i}`} ref={el => { groupRefsExhale.current[i] = el }} visible={false}>
           <mesh position={[0, GATE_Y, 0]}>
             <sphereGeometry args={[SPHERE_RADIUS, 16, 16]} />
             <meshStandardMaterial ref={el => { matSphereRefs.current[i] = el }}
