@@ -5,8 +5,8 @@ const DEADBAND           = 0.08
 const MIN_BREATH_SECONDS = 1.5
 const WARMUP_CYCLES      = 3   // skip first N cycles after Text C appears
 const RECORD_CYCLES      = 2   // record next N cycles to compute Initial Pace
-const TEXT_D_CYCLES      = 5   // dismiss Text D after N post-gate cycles
-const TEXT_E_CYCLES      = 5   // dismiss Text E after N more post-gate cycles
+const TEXT_D_CYCLES      = 3   // dismiss Text D after N post-gate cycles
+const TEXT_E_CYCLES      = 4   // dismiss Text E after N more post-gate cycles
 const RAMP_SECONDS       = 60
 
 export default function SlowingDownController({
