@@ -114,7 +114,7 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 
 ### Paced Breathing
 - Full experience with Gates at a fixed 12-second interval.
-- **BreathLengthControl**: a small slider + value + label at top-left (`BreathLengthControl.jsx`) that lets the user adjust the breath interval. Hidden (opacity 0) until 2 seconds after Text C fades in, then fades in over 2 seconds. Resets to 12s and hides again when the user returns to this mode. (Also used in Slowing Down post-ramp — see that section.)
+- **BreathLengthControl**: a small slider + value + label at top-left (`BreathLengthControl.jsx`) that lets the user adjust the breath interval. Hidden (opacity 0) until 2 seconds after Text D fades in, then fades in over 2 seconds. Resets to 12s and hides again when the user returns to this mode. (Also used in Slowing Down post-ramp — see that section.)
 - **Gate spawn timing**: gates start disabled (`gatesEnabledRef.current = false`). They enable only when `showGatesText` fires (i.e., when Text C appears — after Text A and B complete, or immediately if the user skips past them). This means the road shows ties but no gate rings until Text C.
 
 ### Slowing Down
@@ -143,7 +143,8 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 
 - **Text A** — "Move the sliders in opposite directions with your thumbs" Shown at mode start. Stays visible until the **right slider** has completed **2 full up+down oscillations** (4 direction reversals detected with an 8% deadband, tracked in `rightStrokeCountRef`), then fades out over 2 seconds. If the user never moves the right slider, Text A stays up indefinitely.
 - **Text B** — "The transforming object is named Morph. Sync your breathing to Morph." Fades in once Text A fades out. Stays visible until the right slider completes **3 more full oscillations** (6 reversals, same deadband logic, counters reset when B begins), then fades out over 2 seconds.
-- **Text C (Paced Breathing)** — "Use the oncoming targets to pace your breath. Adjust the pace with the slider on the left." Queued via `pendingGatesFnRef` thunk when Paced Breathing mode starts. Fires after Text B finishes (or immediately if A/B already done). Enables gates and starts the 5-second display timer; fades out after 5 seconds. `BreathLengthControl` fades in 2 seconds after Text C appears.
+- **Text C (Paced Breathing)** — "Fit Morph through the oncoming targets to pace your breath." Queued via `pendingGatesFnRef` thunk when Paced Breathing mode starts. Fires after Text B finishes (or immediately if A/B already done). Enables gates. Fades out after **2 breath cycles** (`spawnIntervalRef × 2` seconds, captured at Text C fire time).
+- **Text D (Paced Breathing)** — "Adjust the pace of the targets with the slider on the left." Fades in 2 seconds after Text C fades (FADE_TRANSITION_MS gap). `BreathLengthControl` fades in 2 seconds after Text D appears. Fades out after **3 breath cycles** (`spawnIntervalRef × 3` seconds).
 - **Text C (Slowing Down)** — "Breathe at your own pace for 5 breaths" Queued via `pendingGatesFnRef` thunk when Slowing Down mode starts. Fires after Text B finishes. Sets `recordingEnabledRef.current = true` to start the warmup/recording flow in `SlowingDownController`. No auto-dismiss timer — stays until `SlowingDownController` calls `onGatesReady()` (recording complete), which triggers Text C fade-out.
 - **Text D (Slowing Down only)** — "Good Job! The oncoming targets will begin at your pace and slow down over the next minute." Shown 2 seconds after Text C fades out (after FADE_TRANSITION_MS gap). No auto-dismiss timer — stays until `SlowingDownController` calls `onTextDone()` after 3 post-gate breath cycles, then fades.
 - **Text E (Slowing Down only)** — "Keep Morph aligned with the targets to slow down your breathing." Shown 2 seconds after Text D fades. No auto-dismiss timer — stays until `SlowingDownController` calls `onTextEDone()` after 4 more post-gate breath cycles, then fades.
@@ -209,10 +210,10 @@ src/
   ShapeOptionsScreen.jsx    — shape selection (A–E), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
   ColorOptionsScreen.jsx    — palette selection (A–B), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
   TutorialText.jsx          — fade-in/out tutorial overlay (top of screen)
-  BreathLengthControl.jsx   — top-left slider + value + label for adjusting breath interval in Paced Breathing; fades in 2s after Text C
+  BreathLengthControl.jsx   — top-left slider + value + label for adjusting breath interval in Paced Breathing; fades in 2s after Text D (Paced Breathing) or Text F (Slowing Down)
   SlowingDownController.jsx — breath cycle detection + dynamic gate interval; phases: idle→warmup(3)→recording(2)→gates; captures lastMaxTimeRef (inhale peak time) for gate phase-locking; calls onGatesReady when Initial Pace is set, onTextDone/EFDone/GDone after respective post-gate/post-ramp cycle counts, onRampDone when 60s ramp t=1, onShowSlider 1 cycle into Text G period
   palettes.js               — PALETTES object: morphBase, morphEmissive, gateColor, background
-  copy.js                   — tutorial text strings (TEXT_A, TEXT_B, TEXTS.gatesTimed / TEXTS.gatesSlowing / TEXTS.slowingTextD–G — edit here to change wording)
+  copy.js                   — tutorial text strings (TEXT_A, TEXT_B, TEXTS.gatesTimed / TEXTS.gatesTimedD / TEXTS.gatesSlowing / TEXTS.slowingTextD–G — edit here to change wording)
   Track.jsx                 — wave track lines (not currently rendered, kept for reference)
   Morph.jsx                 — legacy, superseded by MorphA/MorphB
   Gates.jsx                 — legacy, superseded by GatesA/GatesB
