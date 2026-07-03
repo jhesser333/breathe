@@ -1,5 +1,7 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBox } from '@react-three/drei'
+import * as THREE from 'three'
 
 const POOL_SIZE = 6
 const TUNNEL_POOL_SIZE = 4
@@ -11,11 +13,24 @@ const FADE_DURATION = 1.0
 const TUNNEL_FADE_OUT_DURATION = 2.0
 
 const TORUS_ARGS = [1.0, 0.06, 16, 64]
-const GATE_SCALE = [1.376, 1.955, 1]   // inhale torus (phases 0,1), from GatesC
-const SPHERE_RADIUS = 0.25             // exhale sphere (phases 2,3)
+const GATE_SCALE = [1.376, 1.955, 1]
+const SPHERE_RADIUS = 0.25
 const SPHERE_ARGS = [SPHERE_RADIUS, 16, 8]
-const TUNNEL_Z_SCALE = 20 / (2 * 0.06)             // ≈ 166.67 — torus inhale tunnel
-const EXHALE_TUNNEL_Z_SCALE = 20 / (2 * SPHERE_RADIUS)  // = 40 — sphere ellipsoid tunnel
+const TUNNEL_Z_SCALE = 20 / (2 * 0.06)
+const EXHALE_TUNNEL_Z_SCALE = 20 / (2 * SPHERE_RADIUS)
+
+const TIES_PER_SEGMENT = 6
+const LERP_SEGMENTS_MAX = 2
+const TIE_ALPHA = 0.15
+const TIE_GAP = 0.1
+const TIE_HEIGHT_Y = 0.02
+const TIE_DEPTH_Z = 0.03
+const TIE_RADIUS = 0.005
+const TIE_SPACING = Math.abs(SPAWN_Z) / TIES_PER_SEGMENT
+const BASE_INNER = 1.0 - 0.06
+const GATE_INNER_HALF_X = BASE_INNER * GATE_SCALE[0]
+const TIE_WIDTH_X = 2 * (GATE_INNER_HALF_X - TIE_GAP)
+const TIE_ARGS = [TIE_WIDTH_X, TIE_HEIGHT_Y, TIE_DEPTH_Z]
 
 // phase 0: I1 (inhale)  phase 1: I2 (inhale)
 // phase 2: E1 (exhale)  phase 3: E2 (exhale)
@@ -38,6 +53,16 @@ function makeSlot() {
 function makeTunnelSlot() {
   return { z: 0, speed: 0, active: false, type: 'inhale', fadeElapsed: 0, fadeOutDelay: 0 }
 }
+function createTieMaterial(color) {
+  return new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color),
+    roughness: 0.5, metalness: 0.1,
+    transparent: true, opacity: 0, depthWrite: false,
+  })
+}
+function makeTieRefArray() {
+  return Array.from({ length: TIES_PER_SEGMENT }, () => null)
+}
 
 export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
@@ -51,6 +76,15 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
   const tunnelGroupRefs = useRef([])
   const tunnelTorusRefs = useRef([]);  const tunnelTorusMatRefs = useRef([])
   const tunnelSphereRefs = useRef([]); const tunnelSphereMatRefs = useRef([])
+
+  const previewMaterials = useMemo(() => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor)), [gateColor])
+  const previewRefs = useRef(makeTieRefArray())
+  const trailingMaterials = useMemo(() => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor)), [gateColor])
+  const trailingRefs = useRef(makeTieRefArray())
+  const lerpMaterials = useMemo(() => Array.from({ length: LERP_SEGMENTS_MAX }, () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor))), [gateColor])
+  const lerpRefs = useRef(Array.from({ length: LERP_SEGMENTS_MAX }, makeTieRefArray))
+  const checkpoints = useRef([])
+  const preSeedRef = useRef({ elapsed: 0, needsInitial: true })
 
   useFrame((_, delta) => {
     const ss = slots.current
@@ -70,11 +104,14 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
     }
 
     function spawn(phase) {
+      const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+      checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
+
       const idx = ss.findIndex(s => !s.active)
       if (idx === -1) return
       const s = ss[idx]
       s.z = SPAWN_Z
-      s.speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+      s.speed = speed
       s.active = true
       s.phase = phase
       s.fadeElapsed = 0
@@ -83,83 +120,150 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
       if (phase === 2) spawnTunnel('exhale')
     }
 
-    if (!enabled) { wasEnabled.current = false; return }
-    if (!wasEnabled.current) spawn(0)
-    wasEnabled.current = true
+    if (!enabled) {
+      const pre = preSeedRef.current
+      if (pre.needsInitial) {
+        pre.needsInitial = false
+        const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+        checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
+      } else {
+        pre.elapsed += delta
+        if (pre.elapsed >= spawnIntervalRef.current) {
+          pre.elapsed -= spawnIntervalRef.current
+          const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
+          checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
+        }
+      }
+      wasEnabled.current = false
+    }
 
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const s = ss[i]
-      const g = gateGroupRefs.current[i]
-      if (!g) continue
+    if (enabled) {
+      if (!wasEnabled.current) {
+        checkpoints.current = []
+        spawn(0)
+      }
+      wasEnabled.current = true
 
-      if (!s.active) { g.position.z = 1000; continue }
+      for (let i = 0; i < POOL_SIZE; i++) {
+        const s = ss[i]
+        const g = gateGroupRefs.current[i]
+        if (!g) continue
 
-      s.z += s.speed * delta
-      s.fadeElapsed += delta
+        if (!s.active) { g.position.z = 1000; continue }
 
-      if (s.z > DESPAWN_Z) { s.active = false; g.position.z = 1000; continue }
+        s.z += s.speed * delta
+        s.fadeElapsed += delta
 
-      if (s.z >= 0 && !s.hasTriggeredNext) {
-        s.hasTriggeredNext = true
-        spawn((s.phase + 1) % 4)
+        if (s.z > DESPAWN_Z) { s.active = false; g.position.z = 1000; continue }
+
+        if (s.z >= 0 && !s.hasTriggeredNext) {
+          s.hasTriggeredNext = true
+          spawn((s.phase + 1) % 4)
+        }
+
+        const fadeIn = smoothstep(Math.min(s.fadeElapsed / FADE_DURATION, 1))
+        const fadeOut = s.z > 0 ? 1 - smoothstep(Math.min(s.z / 2, 1)) : 1
+        const opacity = fadeIn * fadeOut
+        const emissive = calcEmissive(s.z)
+        const isInhale = s.phase < 2
+
+        g.position.z = s.z
+
+        const tm = torusMeshRefs.current[i], tmat = torusMatRefs.current[i]
+        const sm = sphereMeshRefs.current[i], smat = sphereMatRefs.current[i]
+
+        if (tm) tm.visible = isInhale
+        if (sm) sm.visible = !isInhale
+
+        if (isInhale) {
+          if (tmat) { tmat.opacity = opacity; tmat.emissiveIntensity = emissive }
+        } else {
+          if (smat) { smat.opacity = opacity; smat.emissiveIntensity = emissive }
+        }
       }
 
-      const fadeIn = smoothstep(Math.min(s.fadeElapsed / FADE_DURATION, 1))
-      const fadeOut = s.z > 0 ? 1 - smoothstep(Math.min(s.z / 2, 1)) : 1
-      const opacity = fadeIn * fadeOut
-      const emissive = calcEmissive(s.z)
-      const isInhale = s.phase < 2
+      for (let i = 0; i < TUNNEL_POOL_SIZE; i++) {
+        const t = ts[i]
+        const tg = tunnelGroupRefs.current[i]
+        if (!tg) continue
 
-      g.position.z = s.z
+        if (!t.active) { tg.position.z = 1000; continue }
 
-      const tm = torusMeshRefs.current[i], tmat = torusMatRefs.current[i]
-      const sm = sphereMeshRefs.current[i], smat = sphereMatRefs.current[i]
+        t.z += t.speed * delta
+        t.fadeElapsed += delta
 
-      if (tm) tm.visible = isInhale
-      if (sm) sm.visible = !isInhale
+        if (t.fadeElapsed > t.fadeOutDelay + 2.5) {
+          t.active = false; tg.position.z = 1000; continue
+        }
 
-      if (isInhale) {
-        if (tmat) { tmat.opacity = opacity; tmat.emissiveIntensity = emissive }
-      } else {
-        if (smat) { smat.opacity = opacity; smat.emissiveIntensity = emissive }
+        const fadeIn = smoothstep(Math.min(t.fadeElapsed / FADE_DURATION, 1))
+        const fadeOut = t.fadeElapsed < t.fadeOutDelay
+          ? 1
+          : 1 - smoothstep(Math.min((t.fadeElapsed - t.fadeOutDelay) / TUNNEL_FADE_OUT_DURATION, 1))
+        const tunnelOpacity = fadeIn * fadeOut * 0.9
+        const isInhale = t.type === 'inhale'
+
+        tg.position.z = t.z
+
+        const ttr = tunnelTorusRefs.current[i], ttrm = tunnelTorusMatRefs.current[i]
+        const tsr = tunnelSphereRefs.current[i], tsrm = tunnelSphereMatRefs.current[i]
+
+        if (ttr) ttr.visible = isInhale
+        if (tsr) tsr.visible = !isInhale
+
+        if (isInhale) {
+          if (ttr) ttr.scale.set(GATE_SCALE[0], GATE_SCALE[1], TUNNEL_Z_SCALE)
+          if (ttrm) ttrm.opacity = tunnelOpacity
+        } else {
+          if (tsr) tsr.scale.set(1, 1, EXHALE_TUNNEL_Z_SCALE)
+          if (tsrm) tsrm.opacity = tunnelOpacity
+        }
       }
     }
 
-    for (let i = 0; i < TUNNEL_POOL_SIZE; i++) {
-      const t = ts[i]
-      const tg = tunnelGroupRefs.current[i]
-      if (!tg) continue
+    // Ties — run regardless of enabled state
+    checkpoints.current.forEach(cp => { cp.z += cp.speed * delta; cp.fadeElapsed += delta })
+    checkpoints.current = checkpoints.current.filter(cp => cp.z <= DESPAWN_Z)
+    checkpoints.current.sort((a, b) => a.z - b.z)
 
-      if (!t.active) { tg.position.z = 1000; continue }
+    const cps = checkpoints.current
+    const frontmost = cps[0]
+    const backmost = cps[cps.length - 1]
 
-      t.z += t.speed * delta
-      t.fadeElapsed += delta
+    for (let i = 0; i < TIES_PER_SEGMENT; i++) {
+      const mesh = previewRefs.current[i]
+      if (!mesh) continue
+      if (!frontmost) { mesh.visible = false; continue }
+      mesh.position.z = frontmost.z - i * TIE_SPACING
+      mesh.visible = true
+      previewMaterials[i].opacity = TIE_ALPHA * smoothstep(Math.min(frontmost.fadeElapsed / FADE_DURATION, 1))
+    }
 
-      if (t.fadeElapsed > t.fadeOutDelay + 2.5) {
-        t.active = false; tg.position.z = 1000; continue
-      }
+    const trailingStart = cps.length <= 1 ? 1 : 0
+    for (let i = 0; i < TIES_PER_SEGMENT; i++) {
+      const mesh = trailingRefs.current[i]
+      if (!mesh) continue
+      const z = backmost ? backmost.z + i * TIE_SPACING : 0
+      if (!backmost || i < trailingStart || z > DESPAWN_Z) { mesh.visible = false; continue }
+      mesh.position.z = z
+      mesh.visible = true
+      trailingMaterials[i].opacity = TIE_ALPHA * smoothstep(Math.min(backmost.fadeElapsed / FADE_DURATION, 1))
+    }
 
-      const fadeIn = smoothstep(Math.min(t.fadeElapsed / FADE_DURATION, 1))
-      const fadeOut = t.fadeElapsed < t.fadeOutDelay
-        ? 1
-        : 1 - smoothstep(Math.min((t.fadeElapsed - t.fadeOutDelay) / TUNNEL_FADE_OUT_DURATION, 1))
-      const tunnelOpacity = fadeIn * fadeOut * 0.25
-      const isInhale = t.type === 'inhale'
-
-      tg.position.z = t.z
-
-      const ttr = tunnelTorusRefs.current[i], ttrm = tunnelTorusMatRefs.current[i]
-      const tsr = tunnelSphereRefs.current[i], tsrm = tunnelSphereMatRefs.current[i]
-
-      if (ttr) ttr.visible = isInhale
-      if (tsr) tsr.visible = !isInhale
-
-      if (isInhale) {
-        if (ttr) ttr.scale.set(GATE_SCALE[0], GATE_SCALE[1], TUNNEL_Z_SCALE)
-        if (ttrm) ttrm.opacity = tunnelOpacity
-      } else {
-        if (tsr) tsr.scale.set(1, 1, EXHALE_TUNNEL_Z_SCALE)
-        if (tsrm) tsrm.opacity = tunnelOpacity
+    for (let s = 0; s < LERP_SEGMENTS_MAX; s++) {
+      const a = cps[s], b = cps[s + 1]
+      const depth = a && b ? b.z - a.z : 0
+      const fadeIn = a && b ? Math.min(
+        smoothstep(Math.min(a.fadeElapsed / FADE_DURATION, 1)),
+        smoothstep(Math.min(b.fadeElapsed / FADE_DURATION, 1))
+      ) : 0
+      for (let i = 0; i < TIES_PER_SEGMENT; i++) {
+        const mesh = lerpRefs.current[s][i]
+        if (!mesh) continue
+        if (!a || !b) { mesh.visible = false; continue }
+        mesh.position.z = a.z + (i / TIES_PER_SEGMENT) * depth
+        mesh.visible = true
+        lerpMaterials[s][i].opacity = TIE_ALPHA * fadeIn
       }
     }
   })
@@ -195,6 +299,26 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
           </mesh>
         </group>
       ))}
+      {Array.from({ length: TIES_PER_SEGMENT }, (_, i) => (
+        <RoundedBox key={`preview-${i}`} ref={el => { previewRefs.current[i] = el }}
+          position={[0, GATE_Y, 0]} args={TIE_ARGS} radius={TIE_RADIUS} smoothness={2} visible={false}>
+          <primitive object={previewMaterials[i]} attach="material" />
+        </RoundedBox>
+      ))}
+      {Array.from({ length: TIES_PER_SEGMENT }, (_, i) => (
+        <RoundedBox key={`trailing-${i}`} ref={el => { trailingRefs.current[i] = el }}
+          position={[0, GATE_Y, 0]} args={TIE_ARGS} radius={TIE_RADIUS} smoothness={2} visible={false}>
+          <primitive object={trailingMaterials[i]} attach="material" />
+        </RoundedBox>
+      ))}
+      {Array.from({ length: LERP_SEGMENTS_MAX }, (_, s) =>
+        Array.from({ length: TIES_PER_SEGMENT }, (_, i) => (
+          <RoundedBox key={`lerp-${s}-${i}`} ref={el => { lerpRefs.current[s][i] = el }}
+            position={[0, GATE_Y, 0]} args={TIE_ARGS} radius={TIE_RADIUS} smoothness={2} visible={false}>
+            <primitive object={lerpMaterials[s][i]} attach="material" />
+          </RoundedBox>
+        ))
+      )}
     </>
   )
 }
