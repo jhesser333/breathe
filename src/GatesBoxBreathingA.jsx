@@ -3,21 +3,17 @@ import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
-const POOL_SIZE = 6
-const TUNNEL_POOL_SIZE = 4
+const POOL_SIZE = 28
 const SPAWN_Z = -20
-const TUNNEL_SPAWN_Z = -30
 const DESPAWN_Z = 6
 const GATE_Y = 0.25
 const FADE_DURATION = 1.0
-const TUNNEL_FADE_OUT_DURATION = 2.0
 const TORUS_ARGS = [1.0, 0.06, 16, 64]
 const INHALE_SCALE = [0.734, 1.954, 1]
 const EXHALE_SCALE = [1.229, 0.245, 1]
-const TUNNEL_Z_SCALE = 20 / (2 * 0.06)  // ≈ 166.67
 
 const TIES_PER_SEGMENT = 6
-const LERP_SEGMENTS_MAX = 2
+const LERP_SEGMENTS_MAX = 14
 const TIE_ALPHA = 0.15
 const TIE_GAP = 0.1
 const TIE_HEIGHT_Y = 0.02
@@ -28,9 +24,6 @@ const BASE_INNER = 1.0 - 0.06
 const GATE_INNER_HALF_X = BASE_INNER * INHALE_SCALE[0]
 const TIE_WIDTH_X = 2 * (GATE_INNER_HALF_X - TIE_GAP)
 const TIE_ARGS = [TIE_WIDTH_X, TIE_HEIGHT_Y, TIE_DEPTH_Z]
-
-// phase 0: I1 (inhale)  phase 1: I2 (inhale)
-// phase 2: E1 (exhale)  phase 3: E2 (exhale)
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -45,10 +38,7 @@ function calcEmissive(z) {
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, phase: 0, fadeElapsed: 0, hasTriggeredNext: false }
-}
-function makeTunnelSlot() {
-  return { z: 0, speed: 0, active: false, type: 'inhale', fadeElapsed: 0, fadeOutDelay: 0 }
+  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
 function createTieMaterial(color) {
   return new THREE.MeshStandardMaterial({
@@ -63,15 +53,11 @@ function makeTieRefArray() {
 
 export default function GatesBoxBreathingA({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
-  const tunnelSlots = useRef(Array.from({ length: TUNNEL_POOL_SIZE }, makeTunnelSlot))
   const wasEnabled = useRef(false)
 
   const gateGroupRefs = useRef([])
   const gateMeshRefs = useRef([])
   const gateMatRefs = useRef([])
-  const tunnelGroupRefs = useRef([])
-  const tunnelMeshRefs = useRef([])
-  const tunnelMatRefs = useRef([])
 
   const previewMaterials = useMemo(() => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor)), [gateColor])
   const previewRefs = useRef(makeTieRefArray())
@@ -84,36 +70,22 @@ export default function GatesBoxBreathingA({ gatesEnabledRef, spawnIntervalRef, 
 
   useFrame((_, delta) => {
     const ss = slots.current
-    const ts = tunnelSlots.current
     const enabled = gatesEnabledRef.current
 
-    function spawnTunnel(type) {
-      const idx = ts.findIndex(t => !t.active)
-      if (idx === -1) return
-      const t = ts[idx]
-      t.z = TUNNEL_SPAWN_Z
-      t.speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
-      t.active = true
-      t.type = type
-      t.fadeElapsed = 0
-      t.fadeOutDelay = 2 * spawnIntervalRef.current
-    }
-
-    function spawn(phase) {
+    function spawnSeries(type) {
+      const N = Math.max(1, Math.round(spawnIntervalRef.current))
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
-      checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
-
-      const idx = ss.findIndex(s => !s.active)
-      if (idx === -1) return
-      const s = ss[idx]
-      s.z = SPAWN_Z
-      s.speed = speed
-      s.active = true
-      s.phase = phase
-      s.fadeElapsed = 0
-      s.hasTriggeredNext = false
-      if (phase === 0) spawnTunnel('inhale')
-      if (phase === 2) spawnTunnel('exhale')
+      const spacing = N > 1 ? Math.abs(SPAWN_Z) / (N - 1) : 0
+      for (let i = 0; i < N; i++) {
+        const spawnZ = SPAWN_Z - i * spacing
+        checkpoints.current.push({ z: spawnZ, speed, fadeElapsed: 0 })
+        const idx = ss.findIndex(s => !s.active)
+        if (idx === -1) continue
+        const s = ss[idx]
+        s.z = spawnZ; s.speed = speed; s.active = true
+        s.type = type; s.isLast = (i === N - 1)
+        s.fadeElapsed = 0; s.hasTriggeredNext = false
+      }
     }
 
     if (!enabled) {
@@ -136,7 +108,7 @@ export default function GatesBoxBreathingA({ gatesEnabledRef, spawnIntervalRef, 
     if (enabled) {
       if (!wasEnabled.current) {
         checkpoints.current = []
-        spawn(0)
+        spawnSeries('inhale')
       }
       wasEnabled.current = true
 
@@ -154,47 +126,19 @@ export default function GatesBoxBreathingA({ gatesEnabledRef, spawnIntervalRef, 
 
         if (s.z > DESPAWN_Z) { s.active = false; g.position.z = 1000; continue }
 
-        if (s.z >= 0 && !s.hasTriggeredNext) {
+        if (s.z >= 0 && !s.hasTriggeredNext && s.isLast) {
           s.hasTriggeredNext = true
-          spawn((s.phase + 1) % 4)
+          spawnSeries(s.type === 'inhale' ? 'exhale' : 'inhale')
         }
 
         const fadeIn = smoothstep(Math.min(s.fadeElapsed / FADE_DURATION, 1))
         const fadeOut = s.z > 0 ? 1 - smoothstep(Math.min(s.z / 2, 1)) : 1
-        const scale = s.phase < 2 ? INHALE_SCALE : EXHALE_SCALE
+        const scale = s.type === 'inhale' ? INHALE_SCALE : EXHALE_SCALE
 
         g.position.z = s.z
         gm.scale.set(scale[0], scale[1], 1)
         mat.opacity = fadeIn * fadeOut
         mat.emissiveIntensity = calcEmissive(s.z)
-      }
-
-      for (let i = 0; i < TUNNEL_POOL_SIZE; i++) {
-        const t = ts[i]
-        const tg = tunnelGroupRefs.current[i]
-        const tm = tunnelMeshRefs.current[i]
-        const tmat = tunnelMatRefs.current[i]
-        if (!tg || !tm || !tmat) continue
-
-        if (!t.active) { tg.position.z = 1000; tm.visible = false; continue }
-
-        t.z += t.speed * delta
-        t.fadeElapsed += delta
-
-        if (t.fadeElapsed > t.fadeOutDelay + 2.5) {
-          t.active = false; tg.position.z = 1000; tm.visible = false; continue
-        }
-
-        const fadeIn = smoothstep(Math.min(t.fadeElapsed / FADE_DURATION, 1))
-        const fadeOut = t.fadeElapsed < t.fadeOutDelay
-          ? 1
-          : 1 - smoothstep(Math.min((t.fadeElapsed - t.fadeOutDelay) / TUNNEL_FADE_OUT_DURATION, 1))
-        const scale = t.type === 'inhale' ? INHALE_SCALE : EXHALE_SCALE
-
-        tg.position.z = t.z
-        tm.visible = true
-        tm.scale.set(scale[0], scale[1], TUNNEL_Z_SCALE)
-        tmat.opacity = fadeIn * fadeOut * 0.9
       }
     }
 
@@ -253,15 +197,6 @@ export default function GatesBoxBreathingA({ gatesEnabledRef, spawnIntervalRef, 
             <torusGeometry args={TORUS_ARGS} />
             <meshStandardMaterial ref={el => { gateMatRefs.current[i] = el }}
               color={gateColor} emissive={emissiveColor} transparent depthWrite={false} opacity={0} />
-          </mesh>
-        </group>
-      ))}
-      {Array.from({ length: TUNNEL_POOL_SIZE }).map((_, i) => (
-        <group key={`t${i}`} ref={el => { tunnelGroupRefs.current[i] = el }}>
-          <mesh ref={el => { tunnelMeshRefs.current[i] = el }} position={[0, GATE_Y, 0]} visible={false}>
-            <torusGeometry args={TORUS_ARGS} />
-            <meshStandardMaterial ref={el => { tunnelMatRefs.current[i] = el }}
-              color={gateColor} transparent depthWrite={false} emissiveIntensity={0} opacity={0} />
           </mesh>
         </group>
       ))}
