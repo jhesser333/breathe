@@ -462,10 +462,8 @@ export default function App() {
     if (m === 'box') pendingGatesFnRef.current = () => {
       bbCycleRef.current = 0
       bbTutorialActiveRef.current = true
+      gatesEnabledRef.current = true
       showBoxText(TEXTS.boxInhale)
-      tutorialTimerRef.current = setTimeout(() => {
-        gatesEnabledRef.current = true
-      }, FADE_TRANSITION_MS)
     }
 
     setMode(m)
