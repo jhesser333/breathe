@@ -25,6 +25,7 @@ const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
+const BB_TEXT_LEAD_MS = 1600
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
 const TARGET_STROKES_B = 6  // 3 full up+down oscillations
@@ -131,7 +132,7 @@ export default function App() {
     tutorialTimerRef.current = setTimeout(() => {
       if (!bbTutorialActiveRef.current) return
       showBoxText(text)
-    }, FADE_TRANSITION_MS)
+    }, BB_TEXT_LEAD_MS)
   }, [showBoxText])
 
   const handleBBFirstGate = useCallback((type) => {
