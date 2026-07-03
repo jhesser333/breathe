@@ -59,9 +59,9 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - **Gate alpha fade-out**: starts at z=0, complete at z=2. Smoothstepped.
 - Gate color: `palette.gateColor` (Palette A: `#9955dd` purple)
 - Gate position Y: 0.25 (matches Morph)
-- **Shape Option C is the exception**: it has no Exhale Gate at all. A single Inhale-style torus spawns at z=-20, self-triggers the next spawn when it passes z=0 (same self-perpetuating mechanism Gate A uses elsewhere), and uses the same emissive ramp/fade-out/color rules above. See `GatesC.jsx`.
-- **Shape Option D is the same exception**: no Exhale Gate. A single Inhale-style pair of cubes (left/right, copied from GatesB's inhale gate) spawns at z=-20 and self-triggers the next spawn, same mechanism as Option C. See `GatesD.jsx`.
-- **Shape Option E is an exact duplicate of Option C** (`MorphE.jsx` / `GatesE.jsx`, copied verbatim from `MorphC.jsx` / `GatesC.jsx` with only the component names and `customProgramCacheKey` renamed). Same no-Exhale-Gate exception applies.
+- **Shape Option C**: Inhale-style torus spawns at z=-20 (self-perpetuating, same emissive ramp/fade-out as above). Additionally, a small exhale sphere (radius=0.25, diameter=0.5) spawns simultaneously at z=-30 with the same speed, hidden until z=-20 then fading in — arrives at the Morph half an interval after the inhale torus, creating alternating Inhale→Exhale→Inhale→Exhale sequence. Exhale sphere: 0.25 alpha, no persistent emissive; pulses 0→1.5 emissive intensity via `calcEmissiveExhale` (stays 0 until z=−1, single smoothstep pulse at z=0). See `GatesC.jsx`.
+- **Shape Option D is the original exception with no Exhale Gate**: A single Inhale-style pair of cubes (left/right, copied from GatesB's inhale gate) spawns at z=-20 and self-triggers the next spawn. See `GatesD.jsx`.
+- **Shape Option E is an exact duplicate of Option C** (`MorphE.jsx` / `GatesE.jsx`, copied verbatim from `MorphC.jsx` / `GatesC.jsx` with only the component names and `customProgramCacheKey` renamed). Includes the same exhale sphere interleave as Option C.
 
 ## Road mesh (ties) — all Shape Options (A–E)
 Every shape option scrolls thin railroad-tie markers along the track: `RoundedBox`, line-thin (`TIE_HEIGHT_Y`/`TIE_DEPTH_Z`/`TIE_RADIUS` all small so each tie reads as a line, not a block), at `GATE_Y`. Material: `color` = `gateColor`, no emissive, opacity = `TIE_ALPHA` (0.15) × fade-*in* only (not fade-out, so ties don't dim when a gate fades out passing the Morph) — flat, no per-position gradient.
@@ -73,7 +73,7 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
   - **Preview** (`previewRefs`/`previewMaterials`, `TIES_PER_SEGMENT` ties): owned by the frontmost (no real gate yet ahead of it) checkpoint. Fixed offsets *ahead* of it (`frontmost.z - i * TIE_SPACING`, i=0..5), so every tie scrolls at exactly that checkpoint's own speed — no stretching toward a fixed point, hence no speed-up/jerk when the next real gate eventually spawns there and this same stretch hands off to a real-to-real segment (positions and velocities already match at that instant).
   - **Trailing filler** (`trailingRefs`/`trailingMaterials`, `TIES_PER_SEGMENT` ties): owned by the backmost (no real gate yet behind it) checkpoint. Fixed offsets *behind* it (`backmost.z + i * TIE_SPACING`); ties past `DESPAWN_Z` are hidden (so typically only 1-2 are ever visible). Skips its own i=0 (at-gate) tie when the backmost checkpoint is also the frontmost (only one real gate alive), since Preview already drew it.
 
-  `TIE_SPACING` = the option's standard real-gate-to-real-gate distance ÷ `TIES_PER_SEGMENT`: **20/6** for the single-gate-type options (C, D, E — one spawn point at `SPAWN_Z`), **10/6** for the dual-gate-type options (A, B — Exhale+Inhale spawn together 10 units apart, at `SPAWN_Z`/`GATE_B_Z`, and alternate at that steady spacing thereafter). `TIE_WIDTH_X` is sized per option below to clear the narrowest gate opening ties must pass through, inset by `TIE_GAP` so they just touch (not overlap) that edge.
+  `TIE_SPACING` = the option's standard real-gate-to-real-gate distance ÷ `TIES_PER_SEGMENT`: **20/6** for the checkpoint-single options (C, D, E — ties track inhale checkpoints only; exhale spheres in C/E don't push checkpoints), **10/6** for the dual-gate-type options (A, B — Exhale+Inhale spawn together 10 units apart, at `SPAWN_Z`/`GATE_B_Z`, and alternate at that steady spacing thereafter). `TIE_WIDTH_X` is sized per option below to clear the narrowest gate opening ties must pass through, inset by `TIE_GAP` so they just touch (not overlap) that edge.
 
 ## Gate geometry (Shape Option A — GatesA.jsx)
 - Base torus: radius=1.0, tube=0.06, scaled non-uniformly to match morph shape
@@ -89,11 +89,10 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 - Ties: width sized to the Inhale pillars' inner-facing edges (`GATE_B_X - CUBE_ARGS[0]/2` = 0.65) — the Exhale bars span the full X width so they don't constrain it
 
 ## Gate geometry (Shape Option C — GatesC.jsx)
-- No Exhale Gate — only a single recurring Inhale-style torus.
-- Base torus: radius=1.0, tube=0.06, sized to clear MorphC's Inhale-state half-extents (X=2.25, Y=3.5 scale → half-extents 1.125 × 1.75 on a radius-0.5 sphere)
-- Gate scale: `[1.376, 1.955, 1]` — narrow tall ellipse, same clearance ratios as GatesA's Inhale Gate
-- Pool: 3 slots, single type
-- Ties: width sized to the gate's interior inner-hole half-width (`BASE_INNER * GATE_SCALE[0]`)
+- **Inhale Gate (torus)**: base radius=1.0, tube=0.06, scale `[1.376, 1.955, 1]` — narrow tall ellipse sized to clear MorphC's Inhale-state half-extents. Spawns at z=−20, self-triggers next spawn when it passes z=0. Standard emissive ramp (`calcEmissive`): 0→1→2 from z=−3 to z=0.
+- **Exhale Gate (sphere)**: `SPHERE_RADIUS = 0.25` (diameter 0.5, matching Option B cube block width). Spawns at z=−30 simultaneously with each inhale torus, same speed — arrives at Morph half an interval later (alternating Inhale→Exhale pattern). Hidden until z=−20, then fades in. Material: `gateColor`, 0.25 alpha, `depthWrite: false`. Emissive: `calcEmissiveExhale(z)` — stays 0 until z=−1, smoothstep pulse to peak 1.5 at z=0 (×0.75 multiplier applied in loop).
+- Pool: 3 inhale slots + 3 exhale slots (independent pools)
+- Ties: tracks inhale checkpoints only (exhale spheres don't push checkpoints); width sized to torus inner-hole half-width (`BASE_INNER * GATE_SCALE[0]`)
 
 ## Gate geometry (Shape Option D — GatesD.jsx)
 - No Exhale Gate — only a single recurring Inhale-style pair of cubes (left/right), copied from GatesB's inhale gate.
@@ -103,9 +102,9 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 - Ties: width sized to the cubes' inner-facing edges (`GATE_X - CUBE_ARGS[0]/2` = 0.65)
 
 ## Gate geometry (Shape Option E — GatesE.jsx)
-- Identical to Shape Option C's gate geometry — exact duplicate, no Exhale Gate, same torus sized for MorphE's (= MorphC's) Inhale scale.
-- Pool: 3 slots, single type
-- Ties: identical to Option C's (same torus geometry, same `TIE_WIDTH_X`/`TIE_SPACING`)
+- Identical to Shape Option C's gate geometry — exact duplicate including the exhale sphere pool. Same inhale torus, same exhale sphere (`SPHERE_RADIUS = 0.25`), same alternating timing, same emissive curves.
+- Pool: 3 inhale slots + 3 exhale slots (identical to Option C)
+- Ties: identical to Option C's (tracks inhale checkpoints only, same `TIE_WIDTH_X`/`TIE_SPACING`)
 
 ## Modes
 
@@ -167,9 +166,9 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 **Shape Options:**
 - **Option A** (default): sphere Morph + torus Gates (GatesA)
 - **Option B**: rounded-box Morph + cube-style Gates (GatesB)
-- **Option C**: "Disappearing Morph" — sphere Morph that dissolves into a particle cloud (MorphC) + a single recurring Inhale-style torus Gate, no Exhale Gate (GatesC)
+- **Option C**: "Disappearing Morph" — sphere Morph that dissolves into a particle cloud (MorphC) + alternating Inhale torus / Exhale sphere gates (GatesC); exhale sphere pulses emissive as it crosses the Morph
 - **Option D**: "Disappearing Cube Morph" — rounded-box Morph that dissolves into a particle cloud (MorphD, same particle/dissolve mechanics as MorphC but box-shaped and using MorphB's scale curve) + a single recurring Inhale-style cube-pair Gate, no Exhale Gate (GatesD)
-- **Option E**: exact duplicate of Option C — same "Disappearing Morph" sphere + particle cloud (MorphE) and single recurring torus Gate (GatesE)
+- **Option E**: exact duplicate of Option C — same "Disappearing Morph" sphere + particle cloud (MorphE) and same alternating Inhale torus / Exhale sphere gates (GatesE)
 
 **Color Palettes:**
 - **Palette A** (default): morphBase=#0a0a6e, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
@@ -200,9 +199,9 @@ src/
   MorphE.jsx                — Shape E: exact duplicate of MorphC
   GatesA.jsx                — Shape A: torus exhale/inhale gates with emissive ramp
   GatesB.jsx                — Shape B: cube-style gates with same emissive ramp logic
-  GatesC.jsx                — Shape C: single recurring torus gate (no exhale gate), sized for MorphC's Inhale scale
+  GatesC.jsx                — Shape C: alternating inhale torus (z=-20) + exhale sphere (z=-30, r=0.25, 0.25 alpha, emissive pulse at z=0); 3 slots each
   GatesD.jsx                — Shape D: single recurring cube-pair gate (no exhale gate), copied from GatesB's inhale gate
-  GatesE.jsx                — Shape E: exact duplicate of GatesC
+  GatesE.jsx                — Shape E: exact duplicate of GatesC (same alternating torus + sphere pattern)
   Sliders.jsx               — DOM overlay sliders (top 63% to 16px from bottom), fill indicator
   useTouchSlider.js         — touch hook with identifier tracking (multi-touch)
   HomeScreen.jsx            — mode selection ("Modes" heading) + Personalize button (bottom center)
