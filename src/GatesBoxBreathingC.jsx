@@ -4,7 +4,7 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
 const POOL_SIZE = 28
-const SPAWN_Z = -20
+const SPAWN_Z = -10
 const DESPAWN_Z = 6
 const GATE_Y = 0.25
 const FADE_DURATION = 1.0
