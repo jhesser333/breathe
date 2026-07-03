@@ -3,14 +3,12 @@ import { Canvas } from '@react-three/fiber'
 import MorphA from './MorphA'
 import MorphB from './MorphB'
 import MorphC from './MorphC'
-import MorphD from './MorphD'
-import MorphE from './MorphE'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import GatesC from './GatesC'
-import GatesD from './GatesD'
-import GatesE from './GatesE'
-import GatesBoxBreathing from './GatesBoxBreathing'
+import GatesBoxBreathingA from './GatesBoxBreathingA'
+import GatesBoxBreathingB from './GatesBoxBreathingB'
+import GatesBoxBreathingC from './GatesBoxBreathingC'
 import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import PersonalizeScreen from './PersonalizeScreen'
@@ -40,7 +38,10 @@ export default function App() {
   const [modeKey, setModeKey] = useState(0)
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
-  const [shapeOption, setShapeOptionState] = useState(() => localStorage.getItem('shapeOption') || 'a')
+  const [shapeOption, setShapeOptionState] = useState(() => {
+    const saved = localStorage.getItem('shapeOption') || 'a'
+    return ['a', 'b', 'c'].includes(saved) ? saved : 'a'
+  })
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
 
   const setShapeOption = useCallback((v) => {
@@ -482,8 +483,9 @@ export default function App() {
   }
 
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
-  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : shapeOption === 'd' ? MorphD : shapeOption === 'e' ? MorphE : MorphA
-  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesD : shapeOption === 'e' ? GatesE : GatesA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : MorphA
+  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : GatesA
+  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : GatesBoxBreathingA
 
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -507,7 +509,7 @@ export default function App() {
           />
         )}
         {mode === 'box' && hasGates && (
-          <GatesBoxBreathing
+          <BoxGatesComponent
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.gateColor}
