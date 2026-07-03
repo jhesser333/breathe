@@ -97,6 +97,8 @@ export default function App() {
   const recordingEnabledRef = useRef(false)
   const lastMaxTimeRef = useRef(0)
   const gateEnableTimerRef = useRef(null)
+  const bbCycleRef = useRef(0)
+  const bbTutorialActiveRef = useRef(false)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -112,6 +114,47 @@ export default function App() {
     recordingEnabledRef.current = false
     lastMaxTimeRef.current = 0
   }, [])
+
+  const showBoxText = useCallback((text) => {
+    clearTimeout(tutorialTimerRef.current)
+    currentMainTextRef.current = text
+    setTutorialText(text)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    awaitingMovementRef.current = false
+  }, [])
+
+  const transitionBoxText = useCallback((text) => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      if (!bbTutorialActiveRef.current) return
+      showBoxText(text)
+    }, FADE_TRANSITION_MS)
+  }, [showBoxText])
+
+  const handleBBFirstGate = useCallback((type) => {
+    if (!bbTutorialActiveRef.current) return
+    transitionBoxText(TEXTS.boxHold)
+  }, [transitionBoxText])
+
+  const handleBBLastGate = useCallback((type) => {
+    if (!bbTutorialActiveRef.current) return
+    if (type === 'inhale') {
+      transitionBoxText(TEXTS.boxExhale)
+    } else {
+      bbCycleRef.current++
+      if (bbCycleRef.current < 2) {
+        transitionBoxText(TEXTS.boxInhale)
+      } else {
+        bbTutorialActiveRef.current = false
+        clearTimeout(tutorialTimerRef.current)
+        setTutorialVisible(false)
+        tutorialVisibleRef.current = false
+      }
+    }
+  }, [transitionBoxText])
 
   const showTimedText = useCallback((text, duration = TEXT_C_DISPLAY_MS) => {
     if (!text) return
@@ -398,6 +441,8 @@ export default function App() {
     if (m === 'timed') setBreathLength(12)
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
     if (m === 'slowing') resetSlowingState()
+    bbCycleRef.current = 0
+    bbTutorialActiveRef.current = false
 
     clearTimeout(tutorialTimerRef.current)
     stageRef.current = 'A'
@@ -414,12 +459,19 @@ export default function App() {
     tutorialVisibleRef.current = true
     if (m === 'timed') pendingGatesFnRef.current = showGatesText
     if (m === 'slowing') pendingGatesFnRef.current = showSlowingTextC
-    if (m === 'box') pendingGatesFnRef.current = () => { gatesEnabledRef.current = true }
+    if (m === 'box') pendingGatesFnRef.current = () => {
+      bbCycleRef.current = 0
+      bbTutorialActiveRef.current = true
+      showBoxText(TEXTS.boxInhale)
+      tutorialTimerRef.current = setTimeout(() => {
+        gatesEnabledRef.current = true
+      }, FADE_TRANSITION_MS)
+    }
 
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, showSlowingTextC])
+  }, [resetSlowingState, showGatesText, showSlowingTextC, showBoxText])
 
   const handleContinue = useCallback(() => {
     if (!mode) {
@@ -514,6 +566,8 @@ export default function App() {
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.gateColor}
             emissiveColor={palette.morphEmissive}
+            onFirstGate={handleBBFirstGate}
+            onLastGate={handleBBLastGate}
           />
         )}
         {mode === 'slowing' && (

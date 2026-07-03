@@ -25,10 +25,10 @@ function calcEmissive(z) {
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, fadeElapsed: 0, hasTriggeredNext: false }
+  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false }
 }
 
-export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
+export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -50,8 +50,8 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
         if (idx === -1) continue
         const s = ss[idx]
         s.z = spawnZ; s.speed = speed; s.active = true
-        s.type = type; s.isLast = (i === N - 1)
-        s.fadeElapsed = 0; s.hasTriggeredNext = false
+        s.type = type; s.isLast = (i === N - 1); s.isFirst = (i === 0)
+        s.fadeElapsed = 0; s.hasTriggeredNext = false; s.hasTriggeredFirst = false
       }
     }
 
@@ -77,8 +77,13 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
 
         if (s.z > DESPAWN_Z) { s.active = false; g.position.z = 1000; continue }
 
+        if (s.z >= 0 && s.isFirst && !s.hasTriggeredFirst) {
+          s.hasTriggeredFirst = true
+          onFirstGate?.(s.type)
+        }
         if (s.z >= 0 && !s.hasTriggeredNext && s.isLast) {
           s.hasTriggeredNext = true
+          onLastGate?.(s.type)
           spawnSeries(s.type === 'inhale' ? 'exhale' : 'inhale')
         }
 

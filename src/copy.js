@@ -9,4 +9,7 @@ export const TEXTS = {
   slowingTextE: 'Keep Morph aligned with the targets to slow down your breathing.',
   slowingTextF: 'Good job! Your breaths are now twice as long.',
   slowingTextG: 'You can use the slider on the left to slow down further or speed back up.',
+  boxInhale:    'Inhale slowly',
+  boxHold:      'Hold',
+  boxExhale:    'Exhale slowly',
 }
