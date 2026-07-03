@@ -5,7 +5,7 @@ import { RoundedBox } from '@react-three/drei'
 const POOL_SIZE = 6
 const TUNNEL_POOL_SIZE = 4
 const SPAWN_Z = -20
-const TUNNEL_SPAWN_Z = -10
+const TUNNEL_SPAWN_Z = -30
 const DESPAWN_Z = 6
 const GATE_Y = 0.25
 const FADE_DURATION = 1.0

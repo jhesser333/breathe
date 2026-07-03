@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 const POOL_SIZE = 6
 const TUNNEL_POOL_SIZE = 4
 const SPAWN_Z = -20
-const TUNNEL_SPAWN_Z = -10   // center 10 units behind I1; spans SPAWN_Z to z=0
+const TUNNEL_SPAWN_Z = -30   // center 10 units behind I1; spans z=-40 to z=-20 at spawn
 const DESPAWN_Z = 6
 const GATE_Y = 0.25
 const FADE_DURATION = 1.0
