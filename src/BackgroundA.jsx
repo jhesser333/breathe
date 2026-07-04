@@ -7,11 +7,10 @@ export default function BackgroundA({ gateColor }) {
   const positions = useMemo(() => {
     const pts = []
     for (let i = 0; i < COUNT; i++) {
-      const x = Math.random() < 0.5
-        ? Math.random() * 6 - 8
-        : Math.random() * 6 + 2
-      const z = Math.random() * -10
-      pts.push([x, -2, z])
+      const x = Math.random() * 16 - 8
+      const y = Math.random() * -6 - 4
+      const z = Math.random() * -45 - 5
+      pts.push([x, y, z])
     }
     return pts
   }, [])
