@@ -6,7 +6,12 @@ import * as THREE from 'three'
 const COUNT = 30
 const LERP_SPEED = 1.5
 
-export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef }) {
+function smoothstep(t) {
+  t = Math.max(0, Math.min(1, t))
+  return t * t * (3 - 2 * t)
+}
+
+export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef }) {
   const positions = useMemo(() => {
     const pts = []
     for (let i = 0; i < COUNT; i++) {
@@ -23,9 +28,10 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef }
   const progressRef = useRef(0)
 
   useFrame((_, delta) => {
-    const target = breathPhaseRef?.current === 'exhale' ? 1 : 0
+    const gatesActive = gatesEnabledRef?.current ?? false
+    const target = gatesActive && breathPhaseRef?.current === 'exhale' ? 1 : 0
     progressRef.current = THREE.MathUtils.lerp(progressRef.current, target, Math.min(delta * LERP_SPEED, 1))
-    const t = progressRef.current
+    const t = smoothstep(progressRef.current)
 
     for (let i = 0; i < COUNT; i++) {
       const mesh = meshRefs.current[i]
