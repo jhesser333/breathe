@@ -574,7 +574,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
-        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} />}
+        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>

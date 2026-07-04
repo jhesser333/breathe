@@ -4,14 +4,13 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 
 const COUNT = 30
-const LERP_SPEED = 1.5
 
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
   return t * t * (3 - 2 * t)
 }
 
-export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef }) {
+export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef }) {
   const positions = useMemo(() => {
     const pts = []
     for (let i = 0; i < COUNT; i++) {
@@ -30,7 +29,9 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
   useFrame((_, delta) => {
     const gatesActive = gatesEnabledRef?.current ?? false
     const target = gatesActive && breathPhaseRef?.current === 'exhale' ? 1 : 0
-    progressRef.current = THREE.MathUtils.lerp(progressRef.current, target, Math.min(delta * LERP_SPEED, 1))
+    const halfInterval = (spawnIntervalRef?.current ?? 6) / 2
+    const dir = target > progressRef.current ? 1 : -1
+    progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
     const t = smoothstep(progressRef.current)
 
     for (let i = 0; i < COUNT; i++) {
