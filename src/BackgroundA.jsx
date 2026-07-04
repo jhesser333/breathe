@@ -23,7 +23,7 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef }
   const progressRef = useRef(0)
 
   useFrame((_, delta) => {
-    const target = breathPhaseRef?.current === 'inhale' ? 1 : 0
+    const target = breathPhaseRef?.current === 'exhale' ? 1 : 0
     progressRef.current = THREE.MathUtils.lerp(progressRef.current, target, Math.min(delta * LERP_SPEED, 1))
     const t = progressRef.current
 
@@ -31,7 +31,7 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef }
       const mesh = meshRefs.current[i]
       const mat = matRefs.current[i]
       if (!mesh || !mat) continue
-      mesh.position.y = THREE.MathUtils.lerp(positions[i][1] - 10, positions[i][1], t)
+      mesh.position.y = THREE.MathUtils.lerp(positions[i][1] - 5, positions[i][1], t)
       mat.opacity = THREE.MathUtils.lerp(0, 0.1, t)
       mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t)
     }
@@ -46,7 +46,7 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef }
           args={[0.5, 0.5, 0.5]}
           radius={0.1}
           smoothness={3}
-          position={[pos[0], pos[1] - 10, pos[2]]}
+          position={[pos[0], pos[1] - 5, pos[2]]}
         >
           <meshStandardMaterial
             ref={el => { matRefs.current[i] = el }}
