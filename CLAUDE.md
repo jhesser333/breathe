@@ -1,7 +1,7 @@
 # Breathe
 
 ## What we're building
-A mobile-first React Three Fiber app where two thumb sliders drive real-time animation of a central 3D form (the Morph) as it appears to travel through an environment full of Gates. Users choose from three modes on a home screen, each offering a different breathing experience. A Personalize screen lets users choose Shape Options and Color Palettes.
+A mobile-first React Three Fiber app where two thumb sliders drive real-time animation of a central 3D form (the Morph) as it appears to travel through an environment full of Gates. Users choose from three modes on a home screen, each offering a different breathing experience. A Personalize screen lets users choose Shape Options, Color Palettes, and Background options.
 
 ## Vocabulary
 
@@ -116,6 +116,13 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 - **BreathLengthControl**: a small slider + value + label at top-left (`BreathLengthControl.jsx`) that lets the user adjust the breath interval. Hidden (opacity 0) until 2 seconds after Text D fades in, then fades in over 2 seconds. Resets to 12s and hides again when the user returns to this mode. (Also used in Slowing Down post-ramp — see that section.)
 - **Gate spawn timing**: gates start disabled (`gatesEnabledRef.current = false`). They enable only when `showGatesText` fires (i.e., when Text C appears — after Text A and B complete, or immediately if the user skips past them). This means the road shows ties but no gate rings until Text C.
 
+### Box Breathing
+- 4-phase box breath: Inhale → Hold-in → Exhale → Hold-out. Each phase duration = `spawnIntervalRef.current` seconds (default 4s).
+- **Gate mechanics**: `spawnSeries(type)` spawns N=4 gates simultaneously at `SPAWN_Z=−6` with even spacing. Speed = `Math.abs(SPAWN_Z) / spawnIntervalRef.current` u/s (default 1.5 u/s). Last gate (`isLast=true`) triggers the next series when it crosses z=0; type alternates inhale↔exhale. First gate (`isFirst=true`) fires `onFirstGate(type)`; last gate fires `onLastGate(type)` — both pre-triggered at z=−speed×2 so text can start fading before the gate reaches z=0.
+- **Gate files**: `GatesBoxBreathingA.jsx` (torus rings), `GatesBoxBreathingB.jsx` (cube-style), `GatesBoxBreathingC.jsx` (torus + sphere) — matched to shape options A, B, and C/D/E respectively. Pool: 28 slots per file.
+- **No road ties** — Box Breathing does not render railroad ties.
+- **Tutorial coaching sequence**: 2 full box-breath cycles then text hides. Managed by `bbCycleRef` (counts completed exhale-phase "last gate" events) and `bbTutorialActiveRef` in App.jsx. Uses `BB_TEXT_LEAD_MS = 1600ms` for `transitionBoxText` timeout (vs `FADE_TRANSITION_MS = 2000ms` used elsewhere) — ensures text starts appearing when the gate is at z=−0.6, just before the steep emissive ramp at z=−0.5 to z=0.
+
 ### Slowing Down
 - **Text C** fires automatically after Text B (queued via `pendingGatesFnRef` thunk in `App.jsx`). Copy: "Breathe at your own pace for 5 breaths". No auto-dismiss timer — stays visible until Initial Pace is set.
 - **Recording phases** (managed by `SlowingDownController.jsx`):
@@ -140,8 +147,8 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 ## Tutorial text rules
 Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 
-- **Text A** — "Move the sliders in opposite directions with your thumbs" Shown at mode start. Stays visible until the **right slider** has completed **2 full up+down oscillations** (4 direction reversals detected with an 8% deadband, tracked in `rightStrokeCountRef`), then fades out over 2 seconds. If the user never moves the right slider, Text A stays up indefinitely.
-- **Text B** — "The transforming object is named Morph. Sync your breathing to Morph." Fades in once Text A fades out. Stays visible until the right slider completes **3 more full oscillations** (6 reversals, same deadband logic, counters reset when B begins), then fades out over 2 seconds.
+- **Text A** — "Move the sliders / in opposite directions / with your thumbs" (3 lines via `\n`). Shown at mode start. Stays visible until the **right slider** has completed **2 full up+down oscillations** (4 direction reversals detected with an 8% deadband, tracked in `rightStrokeCountRef`), then fades out over 2 seconds. If the user never moves the right slider, Text A stays up indefinitely.
+- **Text B** — "The transforming object is named Morph. / Sync your breathing to Morph." (line break after "Morph." via `\n`). Fades in once Text A fades out. Stays visible until the right slider completes **3 more full oscillations** (6 reversals, same deadband logic, counters reset when B begins), then fades out over 2 seconds.
 - **Text C (Paced Breathing)** — "Fit Morph through the oncoming targets to pace your breath." Queued via `pendingGatesFnRef` thunk when Paced Breathing mode starts. Fires after Text B finishes (or immediately if A/B already done). Enables gates. Fades out after **2 breath cycles** (`spawnIntervalRef × 2` seconds, captured at Text C fire time).
 - **Text D (Paced Breathing)** — "Adjust the pace of the targets with the slider on the left." Fades in 2 seconds after Text C fades (FADE_TRANSITION_MS gap). `BreathLengthControl` fades in 2 seconds after Text D appears. Fades out after **3 breath cycles** (`spawnIntervalRef × 3` seconds).
 - **Text C (Slowing Down)** — "Breathe at your own pace for 5 breaths" Queued via `pendingGatesFnRef` thunk when Slowing Down mode starts. Fires after Text B finishes. Sets `recordingEnabledRef.current = true` to start the warmup/recording flow in `SlowingDownController`. No auto-dismiss timer — stays until `SlowingDownController` calls `onGatesReady()` (recording complete), which triggers Text C fade-out.
@@ -149,18 +156,22 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 - **Text E (Slowing Down only)** — "Keep Morph aligned with the targets to slow down your breathing." Shown 2 seconds after Text D fades. No auto-dismiss timer — stays until `SlowingDownController` calls `onTextEDone()` after 4 more post-gate breath cycles, then fades.
 - **Text F (Slowing Down only)** — "Good job! Your breaths are now twice as long." Shown 2 seconds after the 60s ramp completes (interrupts Text D/E if still visible). No auto-dismiss timer — stays until `SlowingDownController` calls `onTextFDone()` after 2 post-ramp breath cycles, then fades.
 - **Text G (Slowing Down only)** — "You can use the slider on the left to slow down further or speed back up." Shown 2 seconds after Text F fades. No auto-dismiss timer — stays until `SlowingDownController` calls `onTextGDone()` after 2 more post-ramp cycles, then fades. The BreathLengthControl slider fades in at 3 total post-ramp cycles (1 cycle after Text G appears).
+- **Text C (Box Breathing)** — "Inhale slowly". Queued via `pendingGatesFnRef` thunk. Fires after Text B, simultaneously enables gates and shows this text via `showBoxText`. No fade gap — appears immediately using `showBoxText` (not `transitionBoxText`).
+- **Text D (Box Breathing)** — "Hold". Pre-triggered when the first gate of an inhale series reaches z=−speed×2; `transitionBoxText` hides current text then shows "Hold" after `BB_TEXT_LEAD_MS=1600ms` — text starts at gate z≈−0.6, coinciding with the steep emissive ramp.
+- **Text E (Box Breathing)** — "Exhale slowly". Pre-triggered when the last gate of an inhale series reaches z=−speed×2.
+- **Text F (Box Breathing)** — "Hold". Pre-triggered when the last gate of an exhale series reaches z=−speed×2. After 2 complete cycles (`bbCycleRef` reaches 2), `bbTutorialActiveRef` is set false and text hides permanently.
 - **Idle re-show**: if the sliders are still for 10 seconds, the most recently shown text (A, B, C, D, E, F, or G — whichever was last) reappears and stays until 2 seconds after the sliders start moving again, then fades out (does not restart the sequence).
-- Fade transitions take 2 seconds (`FADE_TRANSITION_MS = 2000` in `App.jsx`, must match the CSS transition in `TutorialText.jsx`).
-- `TutorialText.jsx` is positioned at `top: '38%'` with `transform: 'translateY(-50%)'` — centered in front of the Morph.
+- Fade transitions take 2 seconds (`FADE_TRANSITION_MS = 2000` in `App.jsx`, must match the CSS transition in `TutorialText.jsx`). Box Breathing uses `BB_TEXT_LEAD_MS = 1600` instead for its `transitionBoxText` calls.
+- `TutorialText.jsx` is positioned at `top: '38%'` with `transform: 'translateY(-50%)'` — centered in front of the Morph. Uses `whiteSpace: 'pre-line'` so `\n` in copy strings renders as actual line breaks.
 
 ## Personalization system
 - **Personalize** button on Home screen (bottom center)
-- Navigation: Home → Personalize → Shapes or Colors
+- Navigation: Home → Personalize → Shapes, Colors, or Background
 - All nav buttons are consolidated into stacked bottom-center groups — no top-corner buttons on any screen. Gap between buttons: 20px. Positioned at `bottom: 16, left: '50%', transform: 'translateX(-50%)'`.
   - **Experience/breathing screen** (App.jsx overlay): **Personalize** / **Select Mode** / **Restart**
   - **Personalize screen**: **Select Mode** / **Resume Breathing**
-  - **Shape Options / Color Options screens**: **Personalize** / **Select Mode** / **Resume Breathing**
-- Shape/Color Options screens use a scrollable cards container (`height: 380, overflowY: 'auto'`) — shows ~4 cards at a time; scroll to reveal more. Layout is `justifyContent: 'flex-start'` with `paddingTop: 60, paddingBottom: 150` so cards don't slide under the bottom button group.
+  - **Shape Options / Color Options / Background Options screens**: **Personalize** / **Select Mode** / **Resume Breathing**
+- Shape/Color/Background Options screens use a scrollable cards container (`height: 380, overflowY: 'auto'`) — shows ~4 cards at a time; scroll to reveal more. Layout is `justifyContent: 'flex-start'` with `paddingTop: 60, paddingBottom: 150` so cards don't slide under the bottom button group.
 - Selections persisted to localStorage
 
 **Shape Options:**
@@ -173,7 +184,11 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 **Color Palettes:**
 - **Palette A** (default): morphBase=#0a0a6e, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
 - **Palette B**: morphBase=#03455e, morphEmissive=#12ffdb, gateColor=#5e4972, background=#002748
-- All UI screens (Home, Personalize, Shape Options, Color Options) use `palette.background` so the active palette's background color is consistent everywhere
+- All UI screens (Home, Personalize, Shape Options, Color Options, Background Options) use `palette.background` so the active palette's background color is consistent everywhere
+
+**Background Options:**
+- **Option None** (default): no background objects — empty environment. Persisted to localStorage under key `backgroundOption`.
+- **Option A**: 30 scattered RoundedBox cubes (same geometry as GatesB inhale cubes, args [0.5, 0.5, 0.5], radius 0.1) randomly distributed across X∈[−8, 8], Y∈[−10, −4], Z∈[−30, 5]. Material: `gateColor` / `morphEmissive`, transparent. Animate between **State A** (opacity=0, emissiveIntensity=0, Y offset −5 from spawn) and **State B** (opacity=0.1, emissiveIntensity=1, at spawn Y) driven by `breathPhaseRef` + `gatesEnabledRef`: State B during exhale phase (exhale gate crosses z=0), State A during inhale phase. Animation uses linear progress over `spawnIntervalRef/2` seconds (one half-interval per direction) with smoothstep easing, so the transition fills exactly the time between consecutive gate crossings. Cubes remain hidden while `gatesEnabledRef.current` is false — invisible in Basic mode and before Text C in other modes. Shape D (inhale-only gates) stays at State B after the first gate fires since no exhale signal is available.
 
 ## Current scene setup
 - **Camera**: position `[0, 3.5, 5]`, fov 50 — ~35° downward angle
@@ -191,28 +206,33 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 ## File structure
 ```
 src/
-  App.jsx                   — screen routing, palette/shape state, tutorial logic, localStorage; tutorial architecture uses pendingGatesFnRef (function thunk) for mode-specific Text C; key refs: recordingEnabledRef, lastMaxTimeRef, gateEnableTimerRef, shapeRef; showTimedText / showSlowingTextC–G / handleSlowingRecordingDone / handleSlowingTextDDone–GDone / handleSlowingRampDone / handleSlowingShowSlider
+  App.jsx                   — screen routing, palette/shape/background state, tutorial logic, localStorage; tutorial architecture uses pendingGatesFnRef (function thunk) for mode-specific Text C; key refs: recordingEnabledRef, lastMaxTimeRef, gateEnableTimerRef, shapeRef, bbCycleRef, bbTutorialActiveRef, breathPhaseRef (owned here, written by gate files on Z=0 crossings, read by BackgroundA); key state: backgroundOption (localStorage key 'backgroundOption', routes to 'background' screen → BackgroundOptionsScreen); handleBBFirstGate sets breathPhaseRef.current before tutorial guard so BackgroundA responds during Box Breathing post-tutorial; showTimedText / showSlowingTextC–G / handleSlowingRecordingDone / handleSlowingTextDDone–GDone / handleSlowingRampDone / handleSlowingShowSlider / showBoxText / transitionBoxText / handleBBFirstGate / handleBBLastGate
   MorphA.jsx                — Shape A: sphere, Fresnel inner glow via onBeforeCompile
   MorphB.jsx                — Shape B: RoundedBox, same Fresnel approach
   MorphC.jsx                — Shape C: sphere that dissolves into a particle cloud (metaball-style dissolve shader + two particle systems)
   MorphD.jsx                — Shape D: rounded box that dissolves into a particle cloud (same shaders as MorphC, box-sampled particles, MorphB's scale curve)
   MorphE.jsx                — Shape E: exact duplicate of MorphC
-  GatesA.jsx                — Shape A: torus exhale/inhale gates with emissive ramp
-  GatesB.jsx                — Shape B: cube-style gates with same emissive ramp logic
-  GatesC.jsx                — Shape C: alternating inhale torus (z=-20) + exhale sphere (z=-30, r=0.25, 0.25 alpha, emissive pulse at z=0); 3 slots each
-  GatesD.jsx                — Shape D: single recurring cube-pair gate (no exhale gate), copied from GatesB's inhale gate
-  GatesE.jsx                — Shape E: exact duplicate of GatesC (same alternating torus + sphere pattern)
+  GatesA.jsx                — Shape A: torus exhale/inhale gates with emissive ramp; accepts breathPhaseRef — writes 'exhale' when Gate A crosses z=0, 'inhale' when Gate B crosses z=0
+  GatesB.jsx                — Shape B: cube-style gates with same emissive ramp logic; accepts breathPhaseRef — same z=0 crossing callbacks as GatesA
+  GatesC.jsx                — Shape C: alternating inhale torus (z=-20) + exhale sphere (z=-30, r=0.25, 0.25 alpha, emissive pulse at z=0); 3 slots each; accepts breathPhaseRef — writes 'inhale' when torus crosses z=0, 'exhale' when sphere crosses z=0
+  GatesD.jsx                — Shape D: single recurring cube-pair gate (no exhale gate), copied from GatesB's inhale gate; accepts breathPhaseRef — writes 'inhale' only (no exhale gate, so background stays in State B after first gate)
+  GatesE.jsx                — Shape E: exact duplicate of GatesC (same alternating torus + sphere pattern); accepts breathPhaseRef — same z=0 crossing callbacks as GatesC
+  GatesBoxBreathingA.jsx    — Box Breathing, Shape A: torus rings (inhale=narrow tall, exhale=wide flat), POOL_SIZE=28, SPAWN_Z=−6; onFirstGate/onLastGate pre-triggered at z=−speed×2
+  GatesBoxBreathingB.jsx    — Box Breathing, Shape B: cube-style gates, same pool/spawn/callback pattern as A
+  GatesBoxBreathingC.jsx    — Box Breathing, Shape C/D/E: inhale torus + exhale sphere, same pattern; no road ties in any box breathing file
   Sliders.jsx               — DOM overlay sliders (top 63% to 16px from bottom), fill indicator
   useTouchSlider.js         — touch hook with identifier tracking (multi-touch)
   HomeScreen.jsx            — mode selection ("Modes" heading) + Personalize button (bottom center)
-  PersonalizeScreen.jsx     — hub: Shapes + Colors
+  PersonalizeScreen.jsx     — hub: Shapes + Colors + Background
   ShapeOptionsScreen.jsx    — shape selection (A–E), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
   ColorOptionsScreen.jsx    — palette selection (A–B), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
-  TutorialText.jsx          — fade-in/out tutorial overlay (top of screen)
+  BackgroundOptionsScreen.jsx — background option picker ('none' / 'a'), same scrollable-card pattern as ShapeOptionsScreen; stacked nav buttons at bottom
+  BackgroundA.jsx           — 30 scattered RoundedBox cubes (args [0.5,0.5,0.5], gateColor/emissiveColor); positions randomized in useMemo (X∈[−8,8], Y∈[−10,−4], Z∈[−30,5]); animates between State A (opacity=0, emissiveIntensity=0, Y−5) and State B (opacity=0.1, emissiveIntensity=1, spawn Y) via linear progress over spawnIntervalRef/2 seconds with smoothstep easing; driven by breathPhaseRef+gatesEnabledRef; props: gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef
+  TutorialText.jsx          — fade-in/out tutorial overlay (top of screen); `whiteSpace: 'pre-line'` on `<p>` so `\n` in copy strings renders as line breaks
   BreathLengthControl.jsx   — top-left slider + value + label for adjusting breath interval in Paced Breathing; fades in 2s after Text D (Paced Breathing) or Text F (Slowing Down)
   SlowingDownController.jsx — breath cycle detection + dynamic gate interval; phases: idle→warmup(3)→recording(2)→gates; captures lastMaxTimeRef (inhale peak time) for gate phase-locking; calls onGatesReady when Initial Pace is set, onTextDone/EFDone/GDone after respective post-gate/post-ramp cycle counts, onRampDone when 60s ramp t=1, onShowSlider 1 cycle into Text G period
   palettes.js               — PALETTES object: morphBase, morphEmissive, gateColor, background
-  copy.js                   — tutorial text strings (TEXT_A, TEXT_B, TEXTS.gatesTimed / TEXTS.gatesTimedD / TEXTS.gatesSlowing / TEXTS.slowingTextD–G — edit here to change wording)
+  copy.js                   — tutorial text strings (TEXT_A, TEXT_B, TEXTS.gatesTimed / TEXTS.gatesTimedD / TEXTS.gatesSlowing / TEXTS.slowingTextD–G / TEXTS.boxInhale / TEXTS.boxHold / TEXTS.boxExhale — edit here to change wording); TEXT_A and TEXT_B use `\n` for multi-line layout
   Track.jsx                 — wave track lines (not currently rendered, kept for reference)
   Morph.jsx                 — legacy, superseded by MorphA/MorphB
   Gates.jsx                 — legacy, superseded by GatesA/GatesB
