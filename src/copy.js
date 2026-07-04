@@ -1,5 +1,5 @@
-export const TEXT_A = 'Move the sliders in opposite directions with your thumbs'
-export const TEXT_B = 'The transforming object is named Morph. Sync your breathing to Morph.'
+export const TEXT_A = 'Move the sliders\nin opposite directions\nwith your thumbs'
+export const TEXT_B = 'The transforming object is named Morph.\nSync your breathing to Morph.'
 
 export const TEXTS = {
   gatesTimed:   'Fit Morph through the oncoming targets to pace your breath.',

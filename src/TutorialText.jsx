@@ -16,6 +16,7 @@ export default function TutorialText({ text, visible }) {
         fontWeight: 700,
         lineHeight: 1.5,
         maxWidth: 280,
+        whiteSpace: 'pre-line',
         opacity: visible ? 1 : 0,
         transition: 'opacity 2s ease',
         margin: 0,
