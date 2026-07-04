@@ -14,6 +14,8 @@ import HomeScreen from './HomeScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import ShapeOptionsScreen from './ShapeOptionsScreen'
 import ColorOptionsScreen from './ColorOptionsScreen'
+import BackgroundOptionsScreen from './BackgroundOptionsScreen'
+import BackgroundA from './BackgroundA'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
 import BreathLengthControl from './BreathLengthControl'
@@ -44,6 +46,10 @@ export default function App() {
     return ['a', 'b', 'c'].includes(saved) ? saved : 'a'
   })
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
+  const [backgroundOption, setBackgroundOptionState] = useState(() => {
+    const saved = localStorage.getItem('backgroundOption') || 'none'
+    return ['none', 'a'].includes(saved) ? saved : 'none'
+  })
 
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
@@ -53,6 +59,11 @@ export default function App() {
   const setColorPalette = useCallback((v) => {
     localStorage.setItem('colorPalette', v)
     setColorPaletteState(v)
+  }, [])
+
+  const setBackgroundOption = useCallback((v) => {
+    localStorage.setItem('backgroundOption', v)
+    setBackgroundOptionState(v)
   }, [])
 
   const palette = PALETTES[colorPalette]
@@ -502,6 +513,7 @@ export default function App() {
       <PersonalizeScreen
         onShape={() => setScreen('shape')}
         onColor={() => setScreen('color')}
+        onBackground={() => setScreen('background')}
         onBack={() => setScreen('home')}
         onContinue={handleContinue}
         palette={palette}
@@ -532,6 +544,18 @@ export default function App() {
       />
     )
   }
+  if (screen === 'background') {
+    return (
+      <BackgroundOptionsScreen
+        selected={backgroundOption}
+        onSelect={setBackgroundOption}
+        onBack={() => setScreen('personalize')}
+        onHome={() => setScreen('home')}
+        onContinue={handleContinue}
+        palette={palette}
+      />
+    )
+  }
 
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : MorphA
@@ -548,6 +572,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
+        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
