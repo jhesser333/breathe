@@ -46,7 +46,10 @@ export default function App() {
     return ['a', 'b', 'c'].includes(saved) ? saved : 'a'
   })
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
-  const [backgroundOption, setBackgroundOptionState] = useState('none')
+  const [backgroundOption, setBackgroundOptionState] = useState(() => {
+    const saved = localStorage.getItem('backgroundOption') || 'none'
+    return ['none', 'a'].includes(saved) ? saved : 'none'
+  })
 
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
