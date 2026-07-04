@@ -111,6 +111,7 @@ export default function App() {
   const gateEnableTimerRef = useRef(null)
   const bbCycleRef = useRef(0)
   const bbTutorialActiveRef = useRef(false)
+  const breathPhaseRef = useRef('exhale')
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -147,6 +148,7 @@ export default function App() {
   }, [showBoxText])
 
   const handleBBFirstGate = useCallback((type) => {
+    breathPhaseRef.current = type
     if (!bbTutorialActiveRef.current) return
     transitionBoxText(TEXTS.boxHold)
   }, [transitionBoxText])
@@ -572,7 +574,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
-        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} />}
+        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
@@ -582,6 +584,7 @@ export default function App() {
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.gateColor}
             emissiveColor={palette.morphEmissive}
+            breathPhaseRef={breathPhaseRef}
           />
         )}
         {mode === 'box' && hasGates && (

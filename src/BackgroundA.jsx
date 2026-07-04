@@ -1,9 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
+import * as THREE from 'three'
 
 const COUNT = 30
+const LERP_SPEED = 1.5
 
-export default function BackgroundA({ gateColor }) {
+export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef }) {
   const positions = useMemo(() => {
     const pts = []
     for (let i = 0; i < COUNT; i++) {
@@ -15,11 +18,46 @@ export default function BackgroundA({ gateColor }) {
     return pts
   }, [])
 
+  const meshRefs = useRef([])
+  const matRefs = useRef([])
+  const progressRef = useRef(0)
+
+  useFrame((_, delta) => {
+    const target = breathPhaseRef?.current === 'inhale' ? 1 : 0
+    progressRef.current = THREE.MathUtils.lerp(progressRef.current, target, Math.min(delta * LERP_SPEED, 1))
+    const t = progressRef.current
+
+    for (let i = 0; i < COUNT; i++) {
+      const mesh = meshRefs.current[i]
+      const mat = matRefs.current[i]
+      if (!mesh || !mat) continue
+      mesh.position.y = THREE.MathUtils.lerp(positions[i][1] - 10, positions[i][1], t)
+      mat.opacity = THREE.MathUtils.lerp(0, 0.1, t)
+      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t)
+    }
+  })
+
   return (
     <group>
       {positions.map((pos, i) => (
-        <RoundedBox key={i} args={[0.5, 0.5, 0.5]} radius={0.1} smoothness={3} position={pos}>
-          <meshStandardMaterial color={gateColor} roughness={0.5} metalness={0.1} transparent opacity={0.2} />
+        <RoundedBox
+          key={i}
+          ref={el => { meshRefs.current[i] = el }}
+          args={[0.5, 0.5, 0.5]}
+          radius={0.1}
+          smoothness={3}
+          position={[pos[0], pos[1] - 10, pos[2]]}
+        >
+          <meshStandardMaterial
+            ref={el => { matRefs.current[i] = el }}
+            color={gateColor}
+            emissive={emissiveColor}
+            emissiveIntensity={0}
+            roughness={0.5}
+            metalness={0.1}
+            transparent
+            opacity={0}
+          />
         </RoundedBox>
       ))}
     </group>

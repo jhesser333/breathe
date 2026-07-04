@@ -81,7 +81,7 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
+export default function GatesD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matLeftRefs = useRef(Array.from({ length: POOL }, () => null))
@@ -184,6 +184,7 @@ export default function GatesD({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       if (slot.z >= 0 && !slot.hasTriggeredNext) {
         slot.hasTriggeredNext = true
+        if (breathPhaseRef) breathPhaseRef.current = 'inhale'
         spawn()
       }
 

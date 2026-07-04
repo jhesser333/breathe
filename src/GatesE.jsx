@@ -83,7 +83,7 @@ function makeSlot() {
 }
 
 function makeSlotExhale() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0 }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
 
 function createTieMaterial(color) {
@@ -101,7 +101,7 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor }) {
+export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
@@ -215,6 +215,7 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       if (slot.z >= 0 && !slot.hasTriggeredNext) {
         slot.hasTriggeredNext = true
+        if (breathPhaseRef) breathPhaseRef.current = 'inhale'
         spawn()
       }
 
@@ -230,6 +231,11 @@ export default function GatesE({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (!slot.active) { group.visible = false; return }
 
       slot.z += slot.speed * delta
+
+      if (slot.z >= 0 && !slot.hasTriggeredNext) {
+        slot.hasTriggeredNext = true
+        if (breathPhaseRef) breathPhaseRef.current = 'exhale'
+      }
 
       if (slot.z > DESPAWN_Z) { slot.active = false; group.visible = false; return }
 
