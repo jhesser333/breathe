@@ -6,15 +6,16 @@ import MorphC from './MorphC'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import GatesC from './GatesC'
+import GatesHeadless from './GatesHeadless'
 import GatesBoxBreathingA from './GatesBoxBreathingA'
 import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
+import GatesBoxBreathingHeadless from './GatesBoxBreathingHeadless'
 import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import ShapeOptionsScreen from './ShapeOptionsScreen'
 import ColorOptionsScreen from './ColorOptionsScreen'
-import BackgroundOptionsScreen from './BackgroundOptionsScreen'
 import BackgroundA from './BackgroundA'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
@@ -43,13 +44,9 @@ export default function App() {
   const [tutorialVisible, setTutorialVisible] = useState(false)
   const [shapeOption, setShapeOptionState] = useState(() => {
     const saved = localStorage.getItem('shapeOption') || 'a'
-    return ['a', 'b', 'c'].includes(saved) ? saved : 'a'
+    return ['a', 'b', 'c', 'd'].includes(saved) ? saved : 'a'
   })
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
-  const [backgroundOption, setBackgroundOptionState] = useState(() => {
-    const saved = localStorage.getItem('backgroundOption') || 'none'
-    return ['none', 'a'].includes(saved) ? saved : 'none'
-  })
 
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
@@ -61,10 +58,10 @@ export default function App() {
     setColorPaletteState(v)
   }, [])
 
-  const setBackgroundOption = useCallback((v) => {
-    localStorage.setItem('backgroundOption', v)
-    setBackgroundOptionState(v)
-  }, [])
+  // Background is fully derived from the shape choice: Option D is the only
+  // shape with no visible Gates/rails, so it's the only one that needs the
+  // ambient background as a pacing cue. A/B/C stay background-free.
+  const backgroundOption = shapeOption === 'd' ? 'a' : 'none'
 
   const palette = PALETTES[colorPalette]
   const shapeRef = useRef(shapeOption)
@@ -187,10 +184,13 @@ export default function App() {
   const showGatesText = useCallback(() => {
     gatesEnabledRef.current = true
     const breathMs = spawnIntervalRef.current * 1000
+    const isAmbient = shapeRef.current === 'd'
+    const textC = isAmbient ? TEXTS.gatesTimedAmbient : TEXTS.gatesTimed
+    const textD = isAmbient ? TEXTS.gatesTimedDAmbient : TEXTS.gatesTimedD
 
     clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.gatesTimed
-    setTutorialText(TEXTS.gatesTimed)
+    currentMainTextRef.current = textC
+    setTutorialText(textC)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
@@ -199,8 +199,8 @@ export default function App() {
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
       tutorialTimerRef.current = setTimeout(() => {
-        currentMainTextRef.current = TEXTS.gatesTimedD
-        setTutorialText(TEXTS.gatesTimedD)
+        currentMainTextRef.current = textD
+        setTutorialText(textD)
         setTutorialVisible(true)
         tutorialVisibleRef.current = true
         awaitingMovementRef.current = false
@@ -225,18 +225,20 @@ export default function App() {
   }, [])
 
   const showSlowingTextD = useCallback(() => {
+    const text = shapeRef.current === 'd' ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextD
     clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.slowingTextD
-    setTutorialText(TEXTS.slowingTextD)
+    currentMainTextRef.current = text
+    setTutorialText(text)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
   }, [])
 
   const showSlowingTextE = useCallback(() => {
+    const text = shapeRef.current === 'd' ? TEXTS.slowingTextEAmbient : TEXTS.slowingTextE
     clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.slowingTextE
-    setTutorialText(TEXTS.slowingTextE)
+    currentMainTextRef.current = text
+    setTutorialText(text)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
@@ -515,7 +517,6 @@ export default function App() {
       <PersonalizeScreen
         onShape={() => setScreen('shape')}
         onColor={() => setScreen('color')}
-        onBackground={() => setScreen('background')}
         onBack={() => setScreen('home')}
         onContinue={handleContinue}
         palette={palette}
@@ -546,23 +547,10 @@ export default function App() {
       />
     )
   }
-  if (screen === 'background') {
-    return (
-      <BackgroundOptionsScreen
-        selected={backgroundOption}
-        onSelect={setBackgroundOption}
-        onBack={() => setScreen('personalize')}
-        onHome={() => setScreen('home')}
-        onContinue={handleContinue}
-        palette={palette}
-      />
-    )
-  }
-
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
-  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' ? MorphC : MorphA
-  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : GatesA
-  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : GatesBoxBreathingA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : MorphA
+  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : GatesA
+  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingHeadless : GatesBoxBreathingA
 
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
