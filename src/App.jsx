@@ -145,7 +145,11 @@ export default function App() {
   }, [showBoxText])
 
   const handleBBFirstGate = useCallback((type) => {
-    breathPhaseRef.current = type
+    // Inverted vs. GatesC's direct 'inhale'/'exhale' writes: this fires at
+    // Hold-onset and holds until the opposite Hold begins, so writing the
+    // opposite of type is what lines up with BackgroundA's exhale-means-
+    // visible convention (visible during Hold-in, invisible during Hold-out).
+    breathPhaseRef.current = type === 'inhale' ? 'exhale' : 'inhale'
     if (!bbTutorialActiveRef.current) return
     transitionBoxText(TEXTS.boxHold)
   }, [transitionBoxText])
