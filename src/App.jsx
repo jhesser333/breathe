@@ -10,7 +10,6 @@ import GatesHeadless from './GatesHeadless'
 import GatesBoxBreathingA from './GatesBoxBreathingA'
 import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
-import GatesBoxBreathingHeadless from './GatesBoxBreathingHeadless'
 import Sliders from './Sliders'
 import HomeScreen from './HomeScreen'
 import PersonalizeScreen from './PersonalizeScreen'
@@ -554,7 +553,7 @@ export default function App() {
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : MorphA
   const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : GatesA
-  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingHeadless : GatesBoxBreathingA
+  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' || shapeOption === 'd' ? GatesBoxBreathingC : GatesBoxBreathingA
 
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
