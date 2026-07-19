@@ -9,6 +9,7 @@ const INNER_GAP = 114
 const BOTTOM_INSET = 150
 const PILL_LENGTH = Math.sqrt(TRACK_W * TRACK_W + TRACK_H * TRACK_H)
 const ANGLE = Math.atan2(TRACK_H, TRACK_W) * 180 / Math.PI
+const THUMB_INSET_SCALE = 1 - THUMB_SIZE / PILL_LENGTH
 
 const labelStyle = {
   position: 'absolute',
@@ -25,8 +26,11 @@ function DiagonalTrack({ sliderRef, value, side }) {
   const isLeft = side === 'left'
   const rotateDeg = isLeft ? ANGLE : -ANGLE
   const t = 1 - value
-  const localX = t * TRACK_W
-  const localY = isLeft ? t * TRACK_H : (1 - t) * TRACK_H
+  const tEff = 0.5 + (t - 0.5) * THUMB_INSET_SCALE
+  const localX = tEff * TRACK_W
+  const localY = isLeft ? tEff * TRACK_H : (1 - tEff) * TRACK_H
+  const anchorLeft = side === 'right'
+  const fillFrac = anchorLeft ? (1 - value) : value
   const edgeStyle = isLeft
     ? { right: `calc(50% + ${INNER_GAP / 2}px)` }
     : { left: `calc(50% + ${INNER_GAP / 2}px)` }
@@ -50,11 +54,23 @@ function DiagonalTrack({ sliderRef, value, side }) {
           top: '50%', left: '50%',
           width: PILL_LENGTH, height: TRACK_THICKNESS,
           transform: `translate(-50%, -50%) rotate(${rotateDeg}deg)`,
-          borderRadius: TRACK_THICKNESS / 2,
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.15)',
           pointerEvents: 'none',
-        }} />
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            borderRadius: TRACK_THICKNESS / 2,
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.15)',
+          }} />
+          <div style={{
+            position: 'absolute',
+            [anchorLeft ? 'left' : 'right']: 0,
+            top: 0, bottom: 0,
+            width: `${fillFrac * 100}%`,
+            background: 'rgba(255,255,255,0.35)',
+            borderRadius: TRACK_THICKNESS / 2,
+          }} />
+        </div>
         <div style={{
           position: 'absolute',
           left: localX, top: localY,
