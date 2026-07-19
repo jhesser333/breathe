@@ -9,29 +9,37 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
     const el = ref.current
     if (!el) return
 
-    function getValueFromCoord(coord) {
+    function getValueFromPoint(x, y) {
       const rect = el.getBoundingClientRect()
-      const ratio = orientation === 'horizontal'
-        ? 1 - (coord - rect.left) / rect.width
-        : 1 - (coord - rect.top) / rect.height
+      let ratio
+      if (orientation === 'horizontal') {
+        ratio = 1 - (x - rect.left) / rect.width
+      } else if (orientation === 'diagonal-left' || orientation === 'diagonal-right') {
+        const w = rect.width, h = rect.height
+        const [ax, ay, dx, dy] = orientation === 'diagonal-left'
+          ? [rect.left, rect.top, w, h]
+          : [rect.left, rect.top + h, w, -h]
+        const t = ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)
+        ratio = 1 - t
+      } else {
+        ratio = 1 - (y - rect.top) / rect.height
+      }
       if (rawRef) rawRef.current = ratio
       setValue(Math.min(1, Math.max(0, ratio)))
     }
-
-    function coordOf(e) { return orientation === 'horizontal' ? e.clientX : e.clientY }
 
     function onTouchStart(e) {
       e.preventDefault()
       if (touchId.current !== null) return
       const touch = e.changedTouches[0]
       touchId.current = touch.identifier
-      getValueFromCoord(coordOf(touch))
+      getValueFromPoint(touch.clientX, touch.clientY)
     }
 
     function onTouchMove(e) {
       e.preventDefault()
       const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId.current)
-      if (touch) getValueFromCoord(coordOf(touch))
+      if (touch) getValueFromPoint(touch.clientX, touch.clientY)
     }
 
     function onTouchEnd(e) {
@@ -41,8 +49,8 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
 
     // Mouse fallback for desktop testing
     let dragging = false
-    function onMouseDown(e) { dragging = true; getValueFromCoord(coordOf(e)) }
-    function onMouseMove(e) { if (dragging) getValueFromCoord(coordOf(e)) }
+    function onMouseDown(e) { dragging = true; getValueFromPoint(e.clientX, e.clientY) }
+    function onMouseMove(e) { if (dragging) getValueFromPoint(e.clientX, e.clientY) }
     function onMouseUp() { dragging = false }
 
     el.addEventListener('touchstart', onTouchStart, { passive: false })

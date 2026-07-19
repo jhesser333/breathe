@@ -12,6 +12,7 @@ import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
 import Sliders from './Sliders'
 import SlidersHorizontal from './SlidersHorizontal'
+import SlidersDiagonal from './SlidersDiagonal'
 import HomeScreen from './HomeScreen'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
@@ -61,7 +62,7 @@ export default function App() {
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
   const [sliderLayout, setSliderLayoutState] = useState(() => {
     const saved = localStorage.getItem('sliderLayout') || 'vertical'
-    return ['vertical', 'horizontal'].includes(saved) ? saved : 'vertical'
+    return ['vertical', 'horizontal', 'diagonal'].includes(saved) ? saved : 'vertical'
   })
 
   const setShapeOption = useCallback((v) => {
@@ -660,6 +661,8 @@ export default function App() {
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
           {sliderLayout === 'horizontal'
             ? <SlidersHorizontal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
+            : sliderLayout === 'diagonal'
+            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
             : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />}
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
@@ -670,7 +673,7 @@ export default function App() {
             visible={breathControlVisible}
           />
         )}
-        {sliderLayout === 'horizontal' ? (
+        {sliderLayout === 'horizontal' || sliderLayout === 'diagonal' ? (
           <>
             <button onClick={handleBackFromExperience} style={{ ...navPillStyle, position: 'absolute', bottom: 16, left: 16 }}>
               Home

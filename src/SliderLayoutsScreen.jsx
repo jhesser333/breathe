@@ -13,6 +13,7 @@ function optionBtn(selected) {
 const OPTIONS = [
   { id: 'vertical', label: 'Vertical', desc: 'Sliders on the left and right edges of the screen' },
   { id: 'horizontal', label: 'Horizontal', desc: 'Sliders side by side near the bottom of the screen' },
+  { id: 'diagonal', label: 'Diagonal', desc: 'Sliders angled inward near the bottom of the screen' },
 ]
 
 export default function SliderLayoutsScreen({ selected, onSelect, onHome, palette }) {
