@@ -6,7 +6,7 @@ const TRACK_H = 100
 const TRACK_THICKNESS = 56
 const THUMB_SIZE = 46
 const INNER_GAP = 114
-const BOTTOM_INSET = 150
+const BOTTOM_INSET = 112
 const PILL_LENGTH = Math.sqrt(TRACK_W * TRACK_W + TRACK_H * TRACK_H)
 const ANGLE = Math.atan2(TRACK_H, TRACK_W) * 180 / Math.PI
 const THUMB_INSET_SCALE = 1 - THUMB_SIZE / PILL_LENGTH
@@ -97,7 +97,7 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef }) {
     <>
       <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" />
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
-      <span style={{ ...labelStyle, bottom: BOTTOM_INSET + TRACK_H + 22, left: '50%', transform: 'translateX(-50%)' }}>
+      <span style={{ ...labelStyle, bottom: BOTTOM_INSET + TRACK_H / 2, left: '50%', transform: 'translate(-50%, 50%)' }}>
         exhale
       </span>
     </>
