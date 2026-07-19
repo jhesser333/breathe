@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useTouchSlider } from './useTouchSlider'
 
 const THUMB_SIZE = 52
-const CENTER_GAP = 90
+const CENTER_GAP = 150
 
 const trackInner = {
   height: '100%',
