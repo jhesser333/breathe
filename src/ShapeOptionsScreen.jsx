@@ -28,7 +28,7 @@ function optionBtn(selected) {
   }
 }
 
-export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome, onContinue, palette }) {
+export default function ShapeOptionsScreen({ selected, onSelect, onBack, onSelectMode, onContinue, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -73,7 +73,7 @@ export default function ShapeOptionsScreen({ selected, onSelect, onBack, onHome,
       }}>
         {[
           { label: 'Personalize', onClick: onBack },
-          { label: 'Select Mode', onClick: onHome },
+          { label: 'Select Mode', onClick: onSelectMode },
           { label: 'Resume Breathing', onClick: onContinue },
         ].map(({ label, onClick }) => (
           <button key={label} onClick={onClick} style={{

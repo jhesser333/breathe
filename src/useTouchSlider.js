@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 
-export function useTouchSlider(initialValue = 0, rawRef = null) {
+export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'vertical') {
   const ref = useRef(null)
   const touchId = useRef(null)
   const [value, setValue] = useState(initialValue)
@@ -9,25 +9,29 @@ export function useTouchSlider(initialValue = 0, rawRef = null) {
     const el = ref.current
     if (!el) return
 
-    function getValueFromClientY(clientY) {
+    function getValueFromCoord(coord) {
       const rect = el.getBoundingClientRect()
-      const ratio = 1 - (clientY - rect.top) / rect.height
+      const ratio = orientation === 'horizontal'
+        ? 1 - (coord - rect.left) / rect.width
+        : 1 - (coord - rect.top) / rect.height
       if (rawRef) rawRef.current = ratio
       setValue(Math.min(1, Math.max(0, ratio)))
     }
+
+    function coordOf(e) { return orientation === 'horizontal' ? e.clientX : e.clientY }
 
     function onTouchStart(e) {
       e.preventDefault()
       if (touchId.current !== null) return
       const touch = e.changedTouches[0]
       touchId.current = touch.identifier
-      getValueFromClientY(touch.clientY)
+      getValueFromCoord(coordOf(touch))
     }
 
     function onTouchMove(e) {
       e.preventDefault()
       const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId.current)
-      if (touch) getValueFromClientY(touch.clientY)
+      if (touch) getValueFromCoord(coordOf(touch))
     }
 
     function onTouchEnd(e) {
@@ -37,8 +41,8 @@ export function useTouchSlider(initialValue = 0, rawRef = null) {
 
     // Mouse fallback for desktop testing
     let dragging = false
-    function onMouseDown(e) { dragging = true; getValueFromClientY(e.clientY) }
-    function onMouseMove(e) { if (dragging) getValueFromClientY(e.clientY) }
+    function onMouseDown(e) { dragging = true; getValueFromCoord(coordOf(e)) }
+    function onMouseMove(e) { if (dragging) getValueFromCoord(coordOf(e)) }
     function onMouseUp() { dragging = false }
 
     el.addEventListener('touchstart', onTouchStart, { passive: false })

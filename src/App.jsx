@@ -11,7 +11,10 @@ import GatesBoxBreathingA from './GatesBoxBreathingA'
 import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
 import Sliders from './Sliders'
+import SlidersHorizontal from './SlidersHorizontal'
 import HomeScreen from './HomeScreen'
+import SelectModeScreen from './SelectModeScreen'
+import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import ShapeOptionsScreen from './ShapeOptionsScreen'
 import ColorOptionsScreen from './ColorOptionsScreen'
@@ -22,6 +25,16 @@ import BreathLengthControl from './BreathLengthControl'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { TEXT_A, TEXT_B, TEXTS } from './copy'
+
+const navPillStyle = {
+  background: 'rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+  padding: '8px 14px', fontSize: 13,
+  cursor: 'pointer', fontFamily: 'sans-serif',
+  letterSpacing: '0.03em', whiteSpace: 'nowrap',
+  pointerEvents: 'auto',
+}
 
 const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
@@ -46,6 +59,10 @@ export default function App() {
     return ['a', 'b', 'c', 'd'].includes(saved) ? saved : 'a'
   })
   const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
+  const [sliderLayout, setSliderLayoutState] = useState(() => {
+    const saved = localStorage.getItem('sliderLayout') || 'vertical'
+    return ['vertical', 'horizontal'].includes(saved) ? saved : 'vertical'
+  })
 
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
@@ -55,6 +72,11 @@ export default function App() {
   const setColorPalette = useCallback((v) => {
     localStorage.setItem('colorPalette', v)
     setColorPaletteState(v)
+  }, [])
+
+  const setSliderLayout = useCallback((v) => {
+    localStorage.setItem('sliderLayout', v)
+    setSliderLayoutState(v)
   }, [])
 
   // Background is fully derived from the shape choice: Option D is the only
@@ -513,14 +535,34 @@ export default function App() {
   }, [])
 
   if (screen === 'home') {
-    return <HomeScreen onSelect={handleSelectMode} onPersonalize={() => setScreen('personalize')} palette={palette} />
+    return (
+      <HomeScreen
+        onPersonalize={() => setScreen('personalize')}
+        onSelectMode={() => setScreen('selectMode')}
+        onSliderLayouts={() => setScreen('sliderLayouts')}
+        palette={palette}
+      />
+    )
+  }
+  if (screen === 'selectMode') {
+    return <SelectModeScreen onSelect={handleSelectMode} onHome={() => setScreen('home')} palette={palette} />
+  }
+  if (screen === 'sliderLayouts') {
+    return (
+      <SliderLayoutsScreen
+        selected={sliderLayout}
+        onSelect={setSliderLayout}
+        onHome={() => setScreen('home')}
+        palette={palette}
+      />
+    )
   }
   if (screen === 'personalize') {
     return (
       <PersonalizeScreen
         onShape={() => setScreen('shape')}
         onColor={() => setScreen('color')}
-        onBack={() => setScreen('home')}
+        onSelectMode={() => setScreen('selectMode')}
         onContinue={handleContinue}
         palette={palette}
       />
@@ -532,7 +574,7 @@ export default function App() {
         selected={shapeOption}
         onSelect={setShapeOption}
         onBack={() => setScreen('personalize')}
-        onHome={() => setScreen('home')}
+        onSelectMode={() => setScreen('selectMode')}
         onContinue={handleContinue}
         palette={palette}
       />
@@ -544,7 +586,7 @@ export default function App() {
         selected={colorPalette}
         onSelect={setColorPalette}
         onBack={() => setScreen('personalize')}
-        onHome={() => setScreen('home')}
+        onSelectMode={() => setScreen('selectMode')}
         onContinue={handleContinue}
         palette={palette}
       />
@@ -616,7 +658,9 @@ export default function App() {
       </Canvas>
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
-          <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
+          {sliderLayout === 'horizontal'
+            ? <SlidersHorizontal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
+            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />}
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} />
         {(mode === 'timed' || mode === 'slowing') && (
@@ -626,30 +670,33 @@ export default function App() {
             visible={breathControlVisible}
           />
         )}
-        <div style={{
-          position: 'absolute', bottom: 16, left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex', flexDirection: 'column',
-          gap: 20, alignItems: 'center',
-          pointerEvents: 'auto',
-        }}>
-          {[
-            { label: 'Personalize', onClick: () => setScreen('personalize') },
-            { label: 'Select Mode', onClick: handleBackFromExperience },
-            { label: 'Restart', onClick: handleRestart },
-          ].map(({ label, onClick }) => (
-            <button key={label} onClick={onClick} style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-              padding: '8px 14px', fontSize: 13,
-              cursor: 'pointer', fontFamily: 'sans-serif',
-              letterSpacing: '0.03em', whiteSpace: 'nowrap',
-            }}>
-              {label}
+        {sliderLayout === 'horizontal' ? (
+          <>
+            <button onClick={handleBackFromExperience} style={{ ...navPillStyle, position: 'absolute', bottom: 16, left: 16 }}>
+              Home
             </button>
-          ))}
-        </div>
+            <button onClick={handleRestart} style={{ ...navPillStyle, position: 'absolute', bottom: 16, right: 16 }}>
+              Restart
+            </button>
+          </>
+        ) : (
+          <div style={{
+            position: 'absolute', bottom: 16, left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex', flexDirection: 'column',
+            gap: 20, alignItems: 'center',
+            pointerEvents: 'auto',
+          }}>
+            {[
+              { label: 'Home', onClick: handleBackFromExperience },
+              { label: 'Restart', onClick: handleRestart },
+            ].map(({ label, onClick }) => (
+              <button key={label} onClick={onClick} style={navPillStyle}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

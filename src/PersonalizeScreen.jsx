@@ -26,7 +26,7 @@ const continueBtnStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue, palette }) {
+export default function PersonalizeScreen({ onShape, onColor, onSelectMode, onContinue, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -55,7 +55,7 @@ export default function PersonalizeScreen({ onShape, onColor, onBack, onContinue
         gap: 20, alignItems: 'center',
       }}>
         {[
-          { label: 'Select Mode', onClick: onBack },
+          { label: 'Select Mode', onClick: onSelectMode },
           { label: 'Resume Breathing', onClick: onContinue },
         ].map(({ label, onClick }) => (
           <button key={label} onClick={onClick} style={{

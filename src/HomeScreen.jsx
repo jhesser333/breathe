@@ -1,27 +1,19 @@
-const OPTIONS = [
-  {
-    id: 'basic',
-    label: 'Basic',
-    desc: 'Move with your breath',
-  },
-  {
-    id: 'timed',
-    label: 'Paced Breathing',
-    desc: 'Time your breath to fit through the gates',
-  },
-  {
-    id: 'slowing',
-    label: 'Slowing Down',
-    desc: 'The app times your breathing then gently helps you slow down',
-  },
-  {
-    id: 'box',
-    label: 'Box Breathing',
-    desc: 'Inhale, hold, exhale, hold — equal phases guided by the gates',
-  },
-]
+const btnStyle = {
+  width: '100%', maxWidth: 320,
+  padding: '20px 24px',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.15)',
+  borderRadius: 12,
+  cursor: 'pointer', textAlign: 'left',
+  color: '#ffffff', fontFamily: 'sans-serif',
+}
 
-export default function HomeScreen({ onSelect, onPersonalize, palette }) {
+export default function HomeScreen({ onPersonalize, onSelectMode, onSliderLayouts, palette }) {
+  const items = [
+    { label: 'Personalize', desc: 'Choose the shape and color of your experience', onClick: onPersonalize },
+    { label: 'Select Mode', desc: 'Choose a breathing exercise to begin', onClick: onSelectMode },
+    { label: 'Slider Layouts', desc: 'Choose vertical or horizontal sliders', onClick: onSliderLayouts },
+  ]
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -31,41 +23,10 @@ export default function HomeScreen({ onSelect, onPersonalize, palette }) {
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <button
-        onClick={onPersonalize}
-        style={{
-          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-          padding: '8px 14px', fontSize: 13,
-          cursor: 'pointer', fontFamily: 'sans-serif',
-        }}
-      >
-        Personalize
-      </button>
-      <h1 style={{
-        color: '#ffffff', fontSize: 28, fontWeight: 300,
-        marginBottom: 16, letterSpacing: '0.12em', margin: '0 0 24px',
-      }}>
-        Modes
-      </h1>
-      {OPTIONS.map(opt => (
-        <button
-          key={opt.id}
-          onClick={() => onSelect(opt.id)}
-          style={{
-            width: '100%', maxWidth: 320,
-            padding: '20px 24px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 12,
-            cursor: 'pointer', textAlign: 'left',
-            color: '#ffffff', fontFamily: 'sans-serif',
-          }}
-        >
-          <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
+      {items.map(({ label, desc, onClick }) => (
+        <button key={label} onClick={onClick} style={btnStyle}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>{label}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{desc}</div>
         </button>
       ))}
     </div>

@@ -44,6 +44,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - Slider values are refs (not state) to avoid re-renders. Updates happen in `useFrame`.
 - Slider fill indicator shows progress from exhale toward inhale on both sliders.
 - The left slider also exposes a raw (unclamped) ratio via `leftRawRef`, tracking the thumb's true position even past the slider's visual bounds — used by `SlowingDownController` for breath-cycle timing in "Slowing Down" mode.
+- **Slider Layout**: a persisted preference (`sliderLayout`, localStorage key `sliderLayout`, values `'vertical'`/`'horizontal'`, default `'vertical'`), chosen on the **Slider Layouts** screen (see Personalization system below). `'vertical'` renders `Sliders.jsx` (unchanged, described above); `'horizontal'` renders `SlidersHorizontal.jsx` — two tracks side by side splitting the screen width, meeting at the horizontal midpoint, positioned lower on screen (`top: '70%'`) instead of hugging the left/right edges. Slider *value* semantics are identical regardless of layout (0/1 mean the same thing for `lv`/`rv` either way) — only the on-screen orientation changes. `useTouchSlider.js` takes a 3rd `orientation` param (`'vertical'` default, `'horizontal'`) that swaps the coordinate read from `clientY`/`rect.top`/`rect.height` to `clientX`/`rect.left`/`rect.width`, using the same `1 - (coord - start)/size` ratio formula for both axes.
 
 ## Morph material
 - Base color: `palette.morphBase` (Palette A: `#0a0a6e` blue)
@@ -158,12 +159,16 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 - `TutorialText.jsx` is positioned at `top: '38%'` with `transform: 'translateY(-50%)'` — centered in front of the Morph. Uses `whiteSpace: 'pre-line'` so `\n` in copy strings renders as actual line breaks.
 
 ## Personalization system
-- **Personalize** button on Home screen (bottom center)
-- Navigation: Home → Personalize → Shapes or Colors
-- All nav buttons are consolidated into stacked bottom-center groups — no top-corner buttons on any screen. Gap between buttons: 20px. Positioned at `bottom: 16, left: '50%', transform: 'translateX(-50%)'`.
-  - **Experience/breathing screen** (App.jsx overlay): **Personalize** / **Select Mode** / **Restart**
+- **Home screen** (`HomeScreen.jsx`) is a 3-button hub, centered on screen: **Personalize** (→ Personalize screen), **Select Mode** (→ Select Mode screen), **Slider Layouts** (→ Slider Layouts screen). It holds no other content — the mode-picker card list that used to live directly on Home now lives on its own screen.
+- **Select Mode screen** (`SelectModeScreen.jsx`) — the "Modes" heading + 4 mode cards (Basic / Paced Breathing / Slowing Down / Box Breathing), same content/behavior the old Home screen had. Single **Home** nav button (bottom center) returns to the hub.
+- **Slider Layouts screen** (`SliderLayoutsScreen.jsx`) — 2 selectable cards, **Vertical** / **Horizontal** (checkmark on the active one), same `optionBtn(selected)` pattern as Shape/Color Options. Persisted via `sliderLayout` (see Slider controls section). Single **Home** nav button (bottom center) returns to the hub.
+- Navigation from the hub: Home → Personalize → Shapes or Colors; Home → Select Mode → (starts an experience); Home → Slider Layouts.
+- All nav buttons are consolidated into stacked bottom-center groups — no top-corner buttons on any screen (except the Horizontal experience-screen nav, see below). Gap between buttons: 20px. Positioned at `bottom: 16, left: '50%', transform: 'translateX(-50%)'`.
+  - **Experience/breathing screen** (App.jsx overlay), **Vertical slider layout**: stacked center — **Home** / **Restart**. **Home** calls `handleBackFromExperience` (`setMode(null); setScreen('home')`), returning to the hub.
+  - **Experience/breathing screen, Horizontal slider layout**: not stacked — **Home** pinned bottom-left (`bottom:16, left:16`), **Restart** pinned bottom-right (`bottom:16, right:16`), matching the paintover reference.
   - **Personalize screen**: **Select Mode** / **Resume Breathing**
   - **Shape Options / Color Options screens**: **Personalize** / **Select Mode** / **Resume Breathing**
+  - On Personalize/Shape/Color screens, the **Select Mode** button (prop `onSelectMode`, was `onBack`/`onHome`) always jumps straight to the Select Mode screen, not the Home hub — preserves its one-tap "pick a mode" semantic now that Home and Select Mode are separate screens. These screens have no direct one-tap path back to the Home hub (Select Mode → Home is 2 taps); this is an intentional trade-off since Home is a rarely-visited settings hub, not a mid-flow bounce point.
 - Shape/Color Options screens use a scrollable cards container (`height: 380, overflowY: 'auto'`) — shows ~4 cards at a time; scroll to reveal more. Layout is `justifyContent: 'flex-start'` with `paddingTop: 60, paddingBottom: 150` so cards don't slide under the bottom button group.
 - Selections persisted to localStorage. There is no manual Background picker — background is fully derived from the shape choice (see Background section below).
 
@@ -198,7 +203,7 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`):
 ## File structure
 ```
 src/
-  App.jsx                   — screen routing, palette/shape state, tutorial logic, localStorage; tutorial architecture uses pendingGatesFnRef (function thunk) for mode-specific Text C; key refs: recordingEnabledRef, lastMaxTimeRef, gateEnableTimerRef, shapeRef, bbCycleRef, bbTutorialActiveRef, breathPhaseRef (owned here, written by gate files on Z=0 crossings, read by BackgroundA); backgroundOption is a derived constant (not stored state): `shapeOption === 'd' ? 'a' : 'none'`; handleBBFirstGate sets breathPhaseRef.current before tutorial guard so BackgroundA responds during Box Breathing post-tutorial; showTimedText / showSlowingTextC–G / handleSlowingRecordingDone / handleSlowingTextDDone–GDone / handleSlowingRampDone / handleSlowingShowSlider / showBoxText / transitionBoxText / handleBBFirstGate / handleBBLastGate; showGatesText/showSlowingTextD/showSlowingTextE branch on shapeRef.current === 'd' to pick ambient copy variants
+  App.jsx                   — screen routing (home/selectMode/sliderLayouts/personalize/shape/color, else falls through to the experience screen), palette/shape/sliderLayout state, tutorial logic, localStorage; tutorial architecture uses pendingGatesFnRef (function thunk) for mode-specific Text C; key refs: recordingEnabledRef, lastMaxTimeRef, gateEnableTimerRef, shapeRef, bbCycleRef, bbTutorialActiveRef, breathPhaseRef (owned here, written by gate files on Z=0 crossings, read by BackgroundA); backgroundOption is a derived constant (not stored state): `shapeOption === 'd' ? 'a' : 'none'`; handleBBFirstGate sets breathPhaseRef.current before tutorial guard so BackgroundA responds during Box Breathing post-tutorial; showTimedText / showSlowingTextC–G / handleSlowingRecordingDone / handleSlowingTextDDone–GDone / handleSlowingRampDone / handleSlowingShowSlider / showBoxText / transitionBoxText / handleBBFirstGate / handleBBLastGate; showGatesText/showSlowingTextD/showSlowingTextE branch on shapeRef.current === 'd' to pick ambient copy variants
   MorphA.jsx                — Shape A: sphere, Fresnel inner glow via onBeforeCompile
   MorphB.jsx                — Shape B: RoundedBox, same Fresnel approach
   MorphC.jsx                — Shape C and D: sphere that dissolves into a particle cloud (metaball-style dissolve shader + two particle systems); reused directly for Option D, no separate Morph file
@@ -209,9 +214,12 @@ src/
   GatesBoxBreathingA.jsx    — Box Breathing, Shape A: torus rings (inhale=narrow tall, exhale=wide flat), POOL_SIZE=28, SPAWN_Z=−6; onFirstGate/onLastGate pre-triggered at z=−speed×2
   GatesBoxBreathingB.jsx    — Box Breathing, Shape B: cube-style gates, same pool/spawn/callback pattern as A
   GatesBoxBreathingC.jsx    — Box Breathing, Shape C and D: inhale torus + exhale sphere, same pattern; no road ties in any box breathing file; Shape D pairs this with BackgroundA also rendering
-  Sliders.jsx               — DOM overlay sliders (top 63% to 16px from bottom), fill indicator
-  useTouchSlider.js         — touch hook with identifier tracking (multi-touch)
-  HomeScreen.jsx            — mode selection ("Modes" heading) + Personalize button (bottom center)
+  Sliders.jsx               — Vertical slider layout: DOM overlay sliders (top 63% to 16px from bottom), fill indicator
+  SlidersHorizontal.jsx     — Horizontal slider layout: two tracks side by side splitting screen width, meeting at midpoint (top ~70%); same value semantics/props as Sliders.jsx, drop-in swap based on sliderLayout
+  useTouchSlider.js         — touch hook with identifier tracking (multi-touch); 3rd param `orientation` ('vertical' default, 'horizontal') swaps clientY/rect.top/rect.height for clientX/rect.left/rect.width
+  HomeScreen.jsx            — 3-button hub: Personalize / Select Mode / Slider Layouts (centered, no nav bar of its own)
+  SelectModeScreen.jsx      — mode selection ("Modes" heading, 4 mode cards), single Home nav button (bottom center)
+  SliderLayoutsScreen.jsx   — Vertical/Horizontal selectable cards (persisted via sliderLayout), single Home nav button (bottom center)
   PersonalizeScreen.jsx     — hub: Shapes + Colors
   ShapeOptionsScreen.jsx    — shape selection (A–D), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
   ColorOptionsScreen.jsx    — palette selection (A–B), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
