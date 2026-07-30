@@ -15,8 +15,8 @@ export const THUMB_SIZE = 42
 // not "S") — P1 sits mostly above P0 so the curve leaves near-vertical ("up"),
 // and mostly left of P2 so it arrives on a diagonal ("out").
 // The right side mirrors x -> 1 - x.
-export const P0_FRAC = { x: 0.70, y: 0.95 }
-export const P1_FRAC = { x: 0.55, y: 0.35 }
+export const P0_FRAC = { x: 0.82, y: 0.95 }
+export const P1_FRAC = { x: 0.78, y: 0.45 }
 export const P2_FRAC = { x: 0.00, y: 0.05 }
 
 export const CURVE_SAMPLES = 48
