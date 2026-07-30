@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import { useTouchSlider } from './useTouchSlider'
 import {
-  CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE, THUMB_INSET_FRAC,
-  P0_FRAC, sampleCurve, getPathD, pointAtArcFrac, applyArcInset,
+  CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE,
+  P0_FRAC, sampleCurve, getPathD, pointAtArcFrac,
 } from './diagonalCurveGeometry'
 
 const INNER_GAP = 50
@@ -27,8 +27,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
   const pathD = useMemo(() => getPathD(side, w, h), [side])
 
   const rawArcFrac = isLeft ? value : 1 - value
-  const insetArcFrac = applyArcInset(rawArcFrac, THUMB_INSET_FRAC)
-  const thumb = pointAtArcFrac(side, insetArcFrac, w, h)
+  const thumb = pointAtArcFrac(side, rawArcFrac, w, h)
   const dashLength = rawArcFrac * totalLength
 
   const edgeStyle = isLeft

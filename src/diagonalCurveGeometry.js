@@ -7,16 +7,18 @@ export const CURVE_BOX_H = 220
 
 export const TRACK_THICKNESS = 38
 export const THUMB_SIZE = 42
-export const THUMB_INSET_FRAC = 0.12
 
 // Cubic Bezier control points as fractions of (CURVE_BOX_W, CURVE_BOX_H),
 // defined for the LEFT "(" orientation. P0 = exhale end (arc-length s=0,
 // near bottom/center), P3 = inhale end (s=1, near top-outer corner).
 // The right side mirrors x -> 1 - x.
-export const P0_FRAC = { x: 0.72, y: 0.95 }
-export const P1_FRAC = { x: -0.05, y: 0.78 }
-export const P2_FRAC = { x: -0.05, y: 0.18 }
-export const P3_FRAC = { x: 0.22, y: 0.05 }
+// P1 sits directly above P0 so the curve leaves the exhale end near-vertical
+// ("up"), then bows out toward P3 so the curve arrives at the inhale end on
+// a diagonal ("out") — a hockey-stick shape rather than a wide-mouthed bow.
+export const P0_FRAC = { x: 0.70, y: 0.95 }
+export const P1_FRAC = { x: 0.70, y: 0.60 }
+export const P2_FRAC = { x: 0.30, y: 0.25 }
+export const P3_FRAC = { x: 0.05, y: 0.05 }
 
 export const CURVE_SAMPLES = 48
 
@@ -109,10 +111,6 @@ export function projectToCurve(x, y, side, w = CURVE_BOX_W, h = CURVE_BOX_H) {
   }
   const arcFrac = totalLength > 0 ? best.dist / totalLength : 0
   return { arcFrac, point: { x: best.x, y: best.y } }
-}
-
-export function applyArcInset(arcFrac, insetFrac = THUMB_INSET_FRAC) {
-  return insetFrac + arcFrac * (1 - 2 * insetFrac)
 }
 
 // Point at a given arc-length fraction (0..1) along the curve, for thumb placement.
