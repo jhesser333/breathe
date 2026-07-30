@@ -6,7 +6,7 @@ import {
 } from './diagonalCurveGeometry'
 
 const INNER_GAP = 50
-const BOTTOM_INSET = 100
+const BOTTOM_INSET = 16
 
 const labelStyle = {
   position: 'absolute',

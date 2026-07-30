@@ -16,9 +16,9 @@ export const THUMB_SIZE = 42
 // ("up"), then bows out toward P3 so the curve arrives at the inhale end on
 // a diagonal ("out") — a hockey-stick shape rather than a wide-mouthed bow.
 export const P0_FRAC = { x: 0.70, y: 0.95 }
-export const P1_FRAC = { x: 0.70, y: 0.60 }
-export const P2_FRAC = { x: 0.30, y: 0.25 }
-export const P3_FRAC = { x: 0.05, y: 0.05 }
+export const P1_FRAC = { x: 0.70, y: 0.55 }
+export const P2_FRAC = { x: 0.10, y: 0.30 }
+export const P3_FRAC = { x: 0.00, y: 0.05 }
 
 export const CURVE_SAMPLES = 48
 
