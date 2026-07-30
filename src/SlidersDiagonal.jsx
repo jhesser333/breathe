@@ -1,15 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTouchSlider } from './useTouchSlider'
+import {
+  CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE, THUMB_INSET_FRAC,
+  P0_FRAC, sampleCurve, getPathD, pointAtArcFrac, applyArcInset,
+} from './diagonalCurveGeometry'
 
-const TRACK_W = 90
-const TRACK_H = 100
-const TRACK_THICKNESS = 56
-const THUMB_SIZE = 46
-const INNER_GAP = 114
-const BOTTOM_INSET = 112
-const PILL_LENGTH = Math.sqrt(TRACK_W * TRACK_W + TRACK_H * TRACK_H)
-const ANGLE = Math.atan2(TRACK_H, TRACK_W) * 180 / Math.PI
-const THUMB_INSET_SCALE = 1 - THUMB_SIZE / PILL_LENGTH
+const INNER_GAP = 50
+const BOTTOM_INSET = 100
 
 const labelStyle = {
   position: 'absolute',
@@ -24,13 +21,16 @@ const labelStyle = {
 
 function DiagonalTrack({ sliderRef, value, side }) {
   const isLeft = side === 'left'
-  const rotateDeg = isLeft ? ANGLE : -ANGLE
-  const t = 1 - value
-  const tEff = 0.5 + (t - 0.5) * THUMB_INSET_SCALE
-  const localX = tEff * TRACK_W
-  const localY = isLeft ? tEff * TRACK_H : (1 - tEff) * TRACK_H
-  const anchorLeft = side === 'right'
-  const fillFrac = anchorLeft ? (1 - value) : value
+  const w = CURVE_BOX_W, h = CURVE_BOX_H
+
+  const { totalLength } = useMemo(() => sampleCurve(side, w, h), [side])
+  const pathD = useMemo(() => getPathD(side, w, h), [side])
+
+  const rawArcFrac = isLeft ? value : 1 - value
+  const insetArcFrac = applyArcInset(rawArcFrac, THUMB_INSET_FRAC)
+  const thumb = pointAtArcFrac(side, insetArcFrac, w, h)
+  const dashLength = rawArcFrac * totalLength
+
   const edgeStyle = isLeft
     ? { right: `calc(50% + ${INNER_GAP / 2}px)` }
     : { left: `calc(50% + ${INNER_GAP / 2}px)` }
@@ -39,7 +39,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
     <div style={{
       position: 'absolute',
       bottom: BOTTOM_INSET,
-      width: TRACK_W, height: TRACK_H,
+      width: w, height: h,
       ...edgeStyle,
     }}>
       <span style={{ ...labelStyle, top: -22, [isLeft ? 'left' : 'right']: 0 }}>
@@ -49,31 +49,21 @@ function DiagonalTrack({ sliderRef, value, side }) {
         ref={sliderRef}
         style={{ position: 'absolute', inset: 0, cursor: 'pointer', userSelect: 'none', touchAction: 'none' }}
       >
+        <svg
+          width={w} height={h} viewBox={`0 0 ${w} ${h}`}
+          style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
+        >
+          <path d={pathD} stroke="rgba(255,255,255,0.15)" strokeWidth={TRACK_THICKNESS + 3}
+                strokeLinecap="round" fill="none" />
+          <path d={pathD} stroke="rgba(255,255,255,0.08)" strokeWidth={TRACK_THICKNESS}
+                strokeLinecap="round" fill="none" />
+          <path d={pathD} stroke="rgba(255,255,255,0.35)" strokeWidth={TRACK_THICKNESS}
+                strokeLinecap="round" fill="none"
+                strokeDasharray={`${dashLength} ${totalLength}`} strokeDashoffset={0} />
+        </svg>
         <div style={{
           position: 'absolute',
-          top: '50%', left: '50%',
-          width: PILL_LENGTH, height: TRACK_THICKNESS,
-          transform: `translate(-50%, -50%) rotate(${rotateDeg}deg)`,
-          pointerEvents: 'none',
-        }}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            borderRadius: TRACK_THICKNESS / 2,
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.15)',
-          }} />
-          <div style={{
-            position: 'absolute',
-            [anchorLeft ? 'left' : 'right']: 0,
-            top: 0, bottom: 0,
-            width: `${fillFrac * 100}%`,
-            background: 'rgba(255,255,255,0.35)',
-            borderRadius: TRACK_THICKNESS / 2,
-          }} />
-        </div>
-        <div style={{
-          position: 'absolute',
-          left: localX, top: localY,
+          left: thumb.x, top: thumb.y,
           transform: 'translate(-50%, -50%)',
           width: THUMB_SIZE, height: THUMB_SIZE,
           borderRadius: '50%',
@@ -93,11 +83,13 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef }) {
   useEffect(() => { onLeft(leftVal) }, [leftVal])
   useEffect(() => { onRight(rightVal) }, [rightVal])
 
+  const exhaleLabelBottom = BOTTOM_INSET + (1 - P0_FRAC.y) * CURVE_BOX_H
+
   return (
     <>
       <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" />
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
-      <span style={{ ...labelStyle, bottom: BOTTOM_INSET + TRACK_H / 2, left: '50%', transform: 'translate(-50%, 50%)' }}>
+      <span style={{ ...labelStyle, bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 50%)' }}>
         exhale
       </span>
     </>

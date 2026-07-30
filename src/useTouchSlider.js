@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { projectToCurve, CURVE_BOX_W, CURVE_BOX_H } from './diagonalCurveGeometry'
 
 export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'vertical') {
   const ref = useRef(null)
@@ -15,12 +16,11 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
       if (orientation === 'horizontal') {
         ratio = 1 - (x - rect.left) / rect.width
       } else if (orientation === 'diagonal-left' || orientation === 'diagonal-right') {
-        const w = rect.width, h = rect.height
-        const [ax, ay, dx, dy] = orientation === 'diagonal-left'
-          ? [rect.left, rect.top, w, h]
-          : [rect.left, rect.top + h, w, -h]
-        const t = ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)
-        ratio = 1 - t
+        const side = orientation === 'diagonal-left' ? 'left' : 'right'
+        const localX = (x - rect.left) * (CURVE_BOX_W / rect.width)
+        const localY = (y - rect.top) * (CURVE_BOX_H / rect.height)
+        const { arcFrac } = projectToCurve(localX, localY, side)
+        ratio = side === 'left' ? arcFrac : 1 - arcFrac
       } else {
         ratio = 1 - (y - rect.top) / rect.height
       }
