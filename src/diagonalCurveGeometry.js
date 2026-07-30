@@ -8,17 +8,16 @@ export const CURVE_BOX_H = 220
 export const TRACK_THICKNESS = 38
 export const THUMB_SIZE = 42
 
-// Cubic Bezier control points as fractions of (CURVE_BOX_W, CURVE_BOX_H),
+// Quadratic Bezier control points as fractions of (CURVE_BOX_W, CURVE_BOX_H),
 // defined for the LEFT "(" orientation. P0 = exhale end (arc-length s=0,
-// near bottom/center), P3 = inhale end (s=1, near top-outer corner).
+// near bottom/center), P2 = inhale end (s=1, near top-outer corner). A single
+// control point (P1) guarantees one simple bow with no inflection ("C" shape,
+// not "S") — P1 sits mostly above P0 so the curve leaves near-vertical ("up"),
+// and mostly left of P2 so it arrives on a diagonal ("out").
 // The right side mirrors x -> 1 - x.
-// P1 sits directly above P0 so the curve leaves the exhale end near-vertical
-// ("up"), then bows out toward P3 so the curve arrives at the inhale end on
-// a diagonal ("out") — a hockey-stick shape rather than a wide-mouthed bow.
 export const P0_FRAC = { x: 0.70, y: 0.95 }
-export const P1_FRAC = { x: 0.70, y: 0.55 }
-export const P2_FRAC = { x: 0.10, y: 0.30 }
-export const P3_FRAC = { x: 0.00, y: 0.05 }
+export const P1_FRAC = { x: 0.55, y: 0.35 }
+export const P2_FRAC = { x: 0.00, y: 0.05 }
 
 export const CURVE_SAMPLES = 48
 
@@ -30,32 +29,30 @@ export function getSideControlPoints(side, w = CURVE_BOX_W, h = CURVE_BOX_H) {
   const p0 = fracToPoint(P0_FRAC, w, h)
   const p1 = fracToPoint(P1_FRAC, w, h)
   const p2 = fracToPoint(P2_FRAC, w, h)
-  const p3 = fracToPoint(P3_FRAC, w, h)
-  if (side === 'left') return { p0, p1, p2, p3 }
+  if (side === 'left') return { p0, p1, p2 }
   const mirror = (p) => ({ x: w - p.x, y: p.y })
-  return { p0: mirror(p0), p1: mirror(p1), p2: mirror(p2), p3: mirror(p3) }
+  return { p0: mirror(p0), p1: mirror(p1), p2: mirror(p2) }
 }
 
-export function cubicBezierPoint(s, p0, p1, p2, p3) {
+export function quadraticBezierPoint(s, p0, p1, p2) {
   const mt = 1 - s
-  const a = mt * mt * mt
-  const b = 3 * mt * mt * s
-  const c = 3 * mt * s * s
-  const d = s * s * s
+  const a = mt * mt
+  const b = 2 * mt * s
+  const c = s * s
   return {
-    x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
-    y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+    x: a * p0.x + b * p1.x + c * p2.x,
+    y: a * p0.y + b * p1.y + c * p2.y,
   }
 }
 
 export function sampleCurve(side, w = CURVE_BOX_W, h = CURVE_BOX_H, n = CURVE_SAMPLES) {
-  const { p0, p1, p2, p3 } = getSideControlPoints(side, w, h)
+  const { p0, p1, p2 } = getSideControlPoints(side, w, h)
   const points = []
   let totalLength = 0
   let prev = null
   for (let i = 0; i <= n; i++) {
     const s = i / n
-    const pt = cubicBezierPoint(s, p0, p1, p2, p3)
+    const pt = quadraticBezierPoint(s, p0, p1, p2)
     if (prev) totalLength += Math.hypot(pt.x - prev.x, pt.y - prev.y)
     points.push({ x: pt.x, y: pt.y, s, dist: totalLength })
     prev = pt
@@ -127,8 +124,8 @@ export function pointAtArcFrac(side, arcFrac, w = CURVE_BOX_W, h = CURVE_BOX_H) 
 }
 
 export function getPathD(side, w = CURVE_BOX_W, h = CURVE_BOX_H) {
-  const { p0, p1, p2, p3 } = getSideControlPoints(side, w, h)
-  return `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`
+  const { p0, p1, p2 } = getSideControlPoints(side, w, h)
+  return `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y}, ${p2.x} ${p2.y}`
 }
 
 export function getCurveLength(side, w = CURVE_BOX_W, h = CURVE_BOX_H) {
