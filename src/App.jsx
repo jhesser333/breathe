@@ -24,7 +24,7 @@ import SlowingDownController from './SlowingDownController'
 import BreathLengthControl from './BreathLengthControl'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
-import { TEXT_A, TEXT_B, TEXTS } from './copy'
+import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL } from './copy'
 
 const navPillStyle = {
   background: 'rgba(255,255,255,0.08)',
@@ -45,6 +45,13 @@ const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
 const TARGET_STROKES_B = 6  // 3 full up+down oscillations
 
+// Diagonal-layout-only Text A1/A2/B1/B2 tutorial sequence
+const DIAG_EDGE_THRESHOLD = 0.02  // lv within this of 0/1 counts as "at the end"
+const DIAG_DEADBAND = 0.08
+const DIAG_CYCLE_STROKES = 2      // 2 strokes = 1 full up+down breath cycle
+const DIAG_FADE_IN_MS = 1000
+const DIAG_FADE_OUT_MS = 2000
+
 export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
@@ -54,6 +61,8 @@ export default function App() {
   const [modeKey, setModeKey] = useState(0)
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
+  const [tutorialOpacity, setTutorialOpacity] = useState(null)
+  const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
   const [shapeOption, setShapeOptionState] = useState(() => {
     const saved = localStorage.getItem('shapeOption') || 'a'
     return ['a', 'b', 'c', 'd'].includes(saved) ? saved : 'a'
@@ -107,6 +116,12 @@ export default function App() {
   const rightExtremeRef = useRef(null)
   const textAFadeStartedRef = useRef(false)
   const textBFadeStartedRef = useRef(false)
+
+  // Diagonal-layout-only Text A1/A2/B1/B2 tutorial sequence state
+  const diagStageRef = useRef('done')
+  const diagDirectionRef = useRef(0)   // 0=unset, 1=up, -1=down
+  const diagExtremeRef = useRef(null)
+  const diagReversalCountRef = useRef(0)
 
   // Raw (unclamped) left-slider position, tracks thumb movement past the
   // slider's visual bounds. Used by SlowingDownController for breath timing.
@@ -405,9 +420,121 @@ export default function App() {
     }, MOVEMENT_FADE_DELAY_MS)
   }, [advanceSequence])
 
+  const beginDiagonalHold = useCallback((seedV) => {
+    diagReversalCountRef.current = 0
+    diagDirectionRef.current = 0
+    diagExtremeRef.current = seedV
+  }, [])
+
+  const finishDiagonalSequence = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialFadeMs(DIAG_FADE_OUT_MS)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      diagStageRef.current = 'done'
+      if (pendingGatesFnRef.current !== null) {
+        const fn = pendingGatesFnRef.current
+        pendingGatesFnRef.current = null
+        fn()
+      }
+    }, DIAG_FADE_OUT_MS)
+  }, [])
+
+  const showDiagonalB2 = useCallback(() => {
+    diagStageRef.current = 'B2-hold-pending'
+    currentMainTextRef.current = TEXT_B2_DIAGONAL
+    setTutorialText(TEXT_B2_DIAGONAL)
+    setTutorialFadeMs(DIAG_FADE_IN_MS)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    clearTimeout(tutorialTimerRef.current)
+    tutorialTimerRef.current = setTimeout(() => {
+      diagStageRef.current = 'B2-hold'
+      beginDiagonalHold(leftVal.current)
+    }, DIAG_FADE_IN_MS)
+  }, [beginDiagonalHold])
+
+  // Diagonal-slider-layout-only tutorial sequence: continuous, left-slider-
+  // position-driven fades for A1/A2, then timed fade-in + 1-breath-cycle-hold
+  // + timed fade-out for B1/B2. Runs entirely off setLeft (no useFrame needed,
+  // consistent with the rest of App.jsx's event-driven tutorial state).
+  const updateDiagonalSequence = useCallback((v) => {
+    const stage = diagStageRef.current
+    if (stage === 'A1') {
+      setTutorialOpacity(1 - v)
+      if (v >= 1 - DIAG_EDGE_THRESHOLD) {
+        diagStageRef.current = 'A2-appear'
+        setTutorialOpacity(null)
+        currentMainTextRef.current = TEXT_A2_DIAGONAL
+        setTutorialText(TEXT_A2_DIAGONAL)
+        setTutorialFadeMs(DIAG_FADE_IN_MS)
+        setTutorialVisible(true)
+        tutorialVisibleRef.current = true
+        clearTimeout(tutorialTimerRef.current)
+        tutorialTimerRef.current = setTimeout(() => {
+          diagStageRef.current = 'A2-track'
+        }, DIAG_FADE_IN_MS)
+      }
+    } else if (stage === 'A2-track') {
+      setTutorialOpacity(v)
+      if (v <= DIAG_EDGE_THRESHOLD) {
+        diagStageRef.current = 'B1-appear'
+        setTutorialOpacity(null)
+        currentMainTextRef.current = TEXT_B1_DIAGONAL
+        setTutorialText(TEXT_B1_DIAGONAL)
+        setTutorialFadeMs(DIAG_FADE_IN_MS)
+        setTutorialVisible(true)
+        tutorialVisibleRef.current = true
+        clearTimeout(tutorialTimerRef.current)
+        tutorialTimerRef.current = setTimeout(() => {
+          diagStageRef.current = 'B1-hold'
+          beginDiagonalHold(leftVal.current)
+        }, DIAG_FADE_IN_MS)
+      }
+    } else if (stage === 'B1-hold' || stage === 'B2-hold') {
+      if (diagExtremeRef.current === null) {
+        diagExtremeRef.current = v
+        return
+      }
+      const delta = v - diagExtremeRef.current
+      if (diagDirectionRef.current === 0) {
+        if (delta < -DIAG_DEADBAND) {
+          diagDirectionRef.current = -1; diagExtremeRef.current = v; diagReversalCountRef.current = 1
+        } else if (delta > DIAG_DEADBAND) {
+          diagDirectionRef.current = 1; diagExtremeRef.current = v; diagReversalCountRef.current = 1
+        }
+      } else {
+        if (diagDirectionRef.current === 1 && delta < -DIAG_DEADBAND) {
+          diagDirectionRef.current = -1; diagExtremeRef.current = v; diagReversalCountRef.current++
+        } else if (diagDirectionRef.current === -1 && delta > DIAG_DEADBAND) {
+          diagDirectionRef.current = 1; diagExtremeRef.current = v; diagReversalCountRef.current++
+        } else if (diagDirectionRef.current === 1 && v > diagExtremeRef.current) {
+          diagExtremeRef.current = v
+        } else if (diagDirectionRef.current === -1 && v < diagExtremeRef.current) {
+          diagExtremeRef.current = v
+        }
+
+        if (diagReversalCountRef.current >= DIAG_CYCLE_STROKES) {
+          if (stage === 'B1-hold') {
+            diagStageRef.current = 'B1-fadeout'
+            clearTimeout(tutorialTimerRef.current)
+            setTutorialFadeMs(DIAG_FADE_OUT_MS)
+            setTutorialVisible(false)
+            tutorialVisibleRef.current = false
+            tutorialTimerRef.current = setTimeout(showDiagonalB2, DIAG_FADE_OUT_MS)
+          } else {
+            finishDiagonalSequence()
+          }
+        }
+      }
+    }
+  }, [beginDiagonalHold, showDiagonalB2, finishDiagonalSequence])
+
   useEffect(() => {
     if (screen !== 'experience') return
     const id = setInterval(() => {
+      if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
         awaitingMovementRef.current = true
         setTutorialText(currentMainTextRef.current)
@@ -416,7 +543,7 @@ export default function App() {
       }
     }, 500)
     return () => clearInterval(id)
-  }, [screen])
+  }, [screen, sliderLayout])
 
   useEffect(() => () => clearTimeout(tutorialTimerRef.current), [])
 
@@ -431,8 +558,9 @@ export default function App() {
   const setLeft = useCallback((v) => {
     leftVal.current = v
     lastMoveTime.current = Date.now()
+    if (sliderLayout === 'diagonal') updateDiagonalSequence(v)
     handleMovement()
-  }, [handleMovement])
+  }, [handleMovement, sliderLayout, updateDiagonalSequence])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
@@ -486,18 +614,36 @@ export default function App() {
     bbTutorialActiveRef.current = false
 
     clearTimeout(tutorialTimerRef.current)
-    stageRef.current = 'A'
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
-    rightStrokeCountRef.current = 0
-    rightDirectionRef.current = 0
-    rightExtremeRef.current = null
-    textAFadeStartedRef.current = false
-    textBFadeStartedRef.current = false
-    currentMainTextRef.current = TEXT_B
-    setTutorialText(TEXT_A)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
+
+    if (sliderLayout === 'diagonal') {
+      stageRef.current = 'done'
+      diagStageRef.current = 'A1'
+      diagDirectionRef.current = 0
+      diagExtremeRef.current = null
+      diagReversalCountRef.current = 0
+      currentMainTextRef.current = TEXT_A1_DIAGONAL
+      setTutorialText(TEXT_A1_DIAGONAL)
+      setTutorialFadeMs(2000)
+      setTutorialOpacity(1 - leftVal.current)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
+    } else {
+      diagStageRef.current = 'done'
+      setTutorialOpacity(null)
+      setTutorialFadeMs(2000)
+      stageRef.current = 'A'
+      rightStrokeCountRef.current = 0
+      rightDirectionRef.current = 0
+      rightExtremeRef.current = null
+      textAFadeStartedRef.current = false
+      textBFadeStartedRef.current = false
+      currentMainTextRef.current = TEXT_B
+      setTutorialText(TEXT_A)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
+    }
     if (m === 'timed') pendingGatesFnRef.current = showGatesText
     if (m === 'slowing') pendingGatesFnRef.current = showSlowingTextC
     if (m === 'box') pendingGatesFnRef.current = () => {
@@ -510,7 +656,7 @@ export default function App() {
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, showSlowingTextC, showBoxText])
+  }, [resetSlowingState, showGatesText, showSlowingTextC, showBoxText, sliderLayout])
 
   const handleContinue = useCallback(() => {
     if (!mode) {
@@ -662,7 +808,7 @@ export default function App() {
             ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
             : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />}
         </div>
-        <TutorialText text={tutorialText} visible={tutorialVisible} />
+        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs} />
         {(mode === 'timed' || mode === 'slowing') && (
           <BreathLengthControl
             breathLength={breathLength}

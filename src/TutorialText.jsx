@@ -1,4 +1,6 @@
-export default function TutorialText({ text, visible }) {
+export default function TutorialText({ text, visible, opacity, fadeMs = 2000 }) {
+  const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
+  const transition = typeof opacity === 'number' ? 'none' : `opacity ${fadeMs}ms ease`
   return (
     <div style={{
       position: 'absolute',
@@ -17,8 +19,8 @@ export default function TutorialText({ text, visible }) {
         lineHeight: 1.5,
         maxWidth: 280,
         whiteSpace: 'pre-line',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 2s ease',
+        opacity: alpha,
+        transition,
         margin: 0,
       }}>
         {text}
