@@ -1,7 +1,7 @@
 # Breathe
 
 ## What we're building
-A mobile-first React Three Fiber app where two thumb sliders drive real-time animation of a central 3D form (the Morph) as it appears to travel through an environment full of Gates. Users choose from three modes on a home screen, each offering a different breathing experience. A Personalize screen lets users choose Shape Options; Color Palettes are chosen from the Home screen, and Background is fully derived from the shape choice.
+A mobile-first React Three Fiber app where two thumb sliders drive real-time animation of a central 3D form (the Morph) as it appears to travel through an environment full of Gates. Users choose from four modes on a home screen, each offering a different breathing experience. An Art Options screen lets users choose Shape Options; Color Palette is locked to Palette A for all users (no picker), and Background is fully derived from the shape choice.
 
 ## Vocabulary
 
