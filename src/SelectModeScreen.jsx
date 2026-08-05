@@ -21,7 +21,15 @@ const OPTIONS = [
   },
 ]
 
-export default function SelectModeScreen({ onSelect, onHome, palette }) {
+const pillStyle = {
+  background: 'rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+  padding: '8px 14px', fontSize: 13,
+  cursor: 'pointer', fontFamily: 'sans-serif',
+}
+
+export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayouts, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -32,17 +40,16 @@ export default function SelectModeScreen({ onSelect, onHome, palette }) {
       fontFamily: 'sans-serif',
     }}>
       <button
-        onClick={onHome}
-        style={{
-          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-          padding: '8px 14px', fontSize: 13,
-          cursor: 'pointer', fontFamily: 'sans-serif',
-        }}
+        onClick={onSliderLayouts}
+        style={{ ...pillStyle, position: 'absolute', top: 16, left: 16 }}
       >
-        Home
+        Slider Layouts
+      </button>
+      <button
+        onClick={onPersonalize}
+        style={{ ...pillStyle, position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}
+      >
+        Personalize
       </button>
       <h1 style={{
         color: '#ffffff', fontSize: 28, fontWeight: 300,

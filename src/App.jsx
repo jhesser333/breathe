@@ -12,7 +12,6 @@ import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
 import Sliders from './Sliders'
 import SlidersDiagonal from './SlidersDiagonal'
-import HomeScreen from './HomeScreen'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
@@ -56,7 +55,7 @@ export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
 
-  const [screen, setScreen] = useState('home')
+  const [screen, setScreen] = useState('selectMode')
   const [mode, setMode] = useState(null)
   const [modeKey, setModeKey] = useState(0)
   const [tutorialText, setTutorialText] = useState('')
@@ -677,28 +676,25 @@ export default function App() {
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
     setMode(null)
-    setScreen('home')
+    setScreen('selectMode')
   }, [])
 
-  if (screen === 'home') {
+  if (screen === 'selectMode') {
     return (
-      <HomeScreen
+      <SelectModeScreen
+        onSelect={handleSelectMode}
         onPersonalize={() => setScreen('personalize')}
-        onSelectMode={() => setScreen('selectMode')}
         onSliderLayouts={() => setScreen('sliderLayouts')}
         palette={palette}
       />
     )
-  }
-  if (screen === 'selectMode') {
-    return <SelectModeScreen onSelect={handleSelectMode} onHome={() => setScreen('home')} palette={palette} />
   }
   if (screen === 'sliderLayouts') {
     return (
       <SliderLayoutsScreen
         selected={sliderLayout}
         onSelect={setSliderLayout}
-        onHome={() => setScreen('home')}
+        onHome={() => setScreen('selectMode')}
         palette={palette}
       />
     )
