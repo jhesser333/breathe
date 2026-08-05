@@ -1,7 +1,7 @@
 # Breathe
 
 ## What we're building
-A mobile-first React Three Fiber app where two thumb sliders drive real-time animation of a central 3D form (the Morph) as it appears to travel through an environment full of Gates. Users choose from three modes on a home screen, each offering a different breathing experience. A Personalize screen lets users choose Shape Options, Color Palettes, and Background options.
+A mobile-first React Three Fiber app where two thumb sliders drive real-time animation of a central 3D form (the Morph) as it appears to travel through an environment full of Gates. Users choose from three modes on a home screen, each offering a different breathing experience. A Personalize screen lets users choose Shape Options; Color Palettes are chosen from the Home screen, and Background is fully derived from the shape choice.
 
 ## Vocabulary
 
@@ -172,14 +172,14 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`). **Thi
 ## Personalization system
 - **Select Mode screen** (`SelectModeScreen.jsx`) is the app's home/initial screen (`screen` state starts at `'selectMode'`) — an all-caps **HOME** title (`fontSize:32`), then a smaller **Modes** subheading (`fontSize:18`, tight margin) sitting close above the 4 mode cards (Basic / Paced Breathing / Slowing Down / Box Breathing), plus three nav buttons: **Slider Layouts** pinned top-left (`top:16, left:16`, → Slider Layouts screen), **Colors** pinned top-right (`top:16, right:16`, same `pillStyle`, symmetrical with Slider Layouts, → Color Options screen), and **Personalize** pinned bottom-center (`bottom:16, left:'50%', transform:'translateX(-50%)'`, → Personalize screen). There is no separate Home screen/hub — `HomeScreen.jsx` was removed and Select Mode absorbed its two entry points. Mode card labels are pulled from `MODE_LABELS` in `copy.js` (single source of truth shared with the top-center in-play label, see Modes section) — Basic's display label is **"Breath at Your Own Pace"**; its internal id stays `'basic'`.
 - **Slider Layouts screen** (`SliderLayoutsScreen.jsx`) — 2 selectable cards, **Vertical** / **Diagonal** (checkmark on the active one), same `optionBtn(selected)` pattern as Shape/Color Options. Persisted via `sliderLayout` (see Slider controls section). Single **Home** nav button (bottom center) returns to Select Mode.
-- Navigation: Select Mode (home) → Slider Layouts (top-left) or Colors (top-right) or Personalize (bottom-center) → Shapes; Select Mode → (starts an experience).
+- Navigation: Select Mode (home) → Slider Layouts (top-left) or Colors (top-right) or Personalize (bottom-center, shows the Shape Options picker directly); Select Mode → (starts an experience).
 - All nav buttons are consolidated into stacked bottom-center groups — no top-corner buttons on any screen except Select Mode's **Slider Layouts** (top-left) and **Colors** (top-right) buttons and the Diagonal experience-screen nav (see below). Gap between stacked buttons: 20px. Positioned at `bottom: 16, left: '50%', transform: 'translateX(-50%)'`.
   - **Experience/breathing screen** (App.jsx overlay), **Vertical slider layout**: stacked center — **Home** / **Restart**. **Home** calls `handleBackFromExperience` (`setMode(null); setScreen('selectMode')`), returning to Select Mode.
   - **Experience/breathing screen, Diagonal slider layout**: not stacked — **Home** pinned bottom-left (`bottom:16, left:16`), **Restart** pinned bottom-right (`bottom:16, right:16`), matching the paintover reference.
-  - **Personalize screen**: **Select Mode** / **Resume Breathing**
-  - **Shape Options / Color Options screens**: **Personalize** / **Select Mode** / **Resume Breathing**
-  - On Personalize/Shape/Color screens, the **Select Mode** button (prop `onSelectMode`, was `onBack`/`onHome`) jumps straight to the Select Mode (home) screen — its one-tap "pick a mode" semantic now doubles as the one-tap path back home, since Select Mode and Home are the same screen. The Color Options screen's **Personalize** nav button still returns to the Personalize screen, which now only offers Shapes.
-- Shape/Color Options screens use a scrollable cards container (`height: 380, overflowY: 'auto'`) — shows ~4 cards at a time; scroll to reveal more. Layout is `justifyContent: 'flex-start'` with `paddingTop: 60, paddingBottom: 150` so cards don't slide under the bottom button group.
+  - **Personalize screen**: single **Home** nav button (bottom-center), calling `onSelectMode`.
+  - **Color Options screen**: **Personalize** / **Select Mode** / **Resume Breathing**.
+  - On the Color Options screen, the **Select Mode** button (prop `onSelectMode`, was `onBack`/`onHome`) jumps straight to the Select Mode (home) screen. Its **Personalize** nav button returns to the Personalize screen, which now shows the Shape Options picker directly.
+- Personalize and Color Options screens use a scrollable cards container (`height: 380, overflowY: 'auto'`) — shows ~4 cards at a time; scroll to reveal more. Layout is `justifyContent: 'flex-start'` with `paddingTop: 60, paddingBottom: 150` so cards don't slide under the bottom button group.
 - Selections persisted to localStorage. There is no manual Background picker — background is fully derived from the shape choice (see Background section below).
 
 **Shape Options:**
@@ -191,7 +191,7 @@ Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`). **Thi
 **Color Palettes:**
 - **Palette A** (default): morphBase=#0a0a6e, morphEmissive=#ff69b4, gateColor=#9955dd, background=#1a1028
 - **Palette B**: morphBase=#03455e, morphEmissive=#12ffdb, gateColor=#5e4972, background=#002748
-- All UI screens (Home, Personalize, Shape Options, Color Options) use `palette.background` so the active palette's background color is consistent everywhere
+- All UI screens (Home, Personalize, Color Options) use `palette.background` so the active palette's background color is consistent everywhere
 
 **Background:**
 - No user-facing picker — `backgroundOption` is a derived constant in `App.jsx`, not stored state: `shapeOption === 'd' ? 'a' : 'none'`. Shape Options A/B/C always render no background; Shape Option D always renders `BackgroundA`, in every mode including Box Breathing (the derivation is shape-only, not mode-dependent). This exists because A/B/C already communicate breath pacing via visible Gates + ties, and layering the animated background on top of those was judged too visually noisy — Option D removes the Gates/ties in Paced Breathing/Slowing Down and relies on the background as its sole pacing cue there; in Box Breathing, Option D restores the visible gates (see Gate geometry section) and the background layers on top as a supplementary cue.
@@ -230,8 +230,7 @@ src/
   useTouchSlider.js         — touch hook with identifier tracking (multi-touch); 3rd param `orientation` ('vertical' default, 'diagonal-left', 'diagonal-right') controls how a drag point maps to a ratio — single-axis clientY/rect.top/rect.height for vertical, curve-projection via diagonalCurveGeometry.js's `projectToCurve` for the two diagonal orientations
   SelectModeScreen.jsx      — app's home screen (HOME title, smaller "Modes" subheading, 4 mode cards labeled via MODE_LABELS); Slider Layouts nav button top-left, Colors nav button top-right (same pillStyle, symmetrical), Personalize nav button bottom-center
   SliderLayoutsScreen.jsx   — Vertical/Diagonal selectable cards (persisted via sliderLayout), single Home nav button (bottom center)
-  PersonalizeScreen.jsx     — hub: Shapes only (Colors moved to SelectModeScreen)
-  ShapeOptionsScreen.jsx    — shape selection (A–D), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
+  PersonalizeScreen.jsx     — shape selection (A–D) shown directly, scrollable card list (height 380, overflowY auto), single Home nav button at bottom (Colors moved to SelectModeScreen)
   ColorOptionsScreen.jsx    — palette selection (A–B), scrollable card list (height 380, overflowY auto), stacked nav buttons at bottom
   BackgroundA.jsx           — 30 scattered RoundedBox cubes (args [0.5,0.5,0.5], gateColor/emissiveColor); positions randomized in useMemo (X∈[−8,8], Y∈[−10,−4], Z∈[−30,5]); animates between State A (opacity=0, emissiveIntensity=0, Y−5) and State B (opacity=0.1, emissiveIntensity=1, spawn Y) via linear progress over spawnIntervalRef/2 seconds with smoothstep easing; driven by breathPhaseRef+gatesEnabledRef; props: gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef; rendered only when shapeOption === 'd', in every mode including Box Breathing
   TutorialText.jsx          — fade-in/out tutorial overlay (top of screen); `whiteSpace: 'pre-line'` on `<p>` so `\n` in copy strings renders as line breaks; optional `opacity` (0-1 number, overrides `visible` for continuous slider-driven fades) and `fadeMs` (default 2000) props support the Diagonal layout's Text A1/A2/B1/B2 sequence

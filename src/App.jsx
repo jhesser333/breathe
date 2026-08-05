@@ -15,7 +15,6 @@ import SlidersDiagonal from './SlidersDiagonal'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
-import ShapeOptionsScreen from './ShapeOptionsScreen'
 import ColorOptionsScreen from './ColorOptionsScreen'
 import BackgroundA from './BackgroundA'
 import TutorialText from './TutorialText'
@@ -703,21 +702,9 @@ export default function App() {
   if (screen === 'personalize') {
     return (
       <PersonalizeScreen
-        onShape={() => setScreen('shape')}
+        shapeOption={shapeOption}
+        onSelectShape={setShapeOption}
         onSelectMode={() => setScreen('selectMode')}
-        onContinue={handleContinue}
-        palette={palette}
-      />
-    )
-  }
-  if (screen === 'shape') {
-    return (
-      <ShapeOptionsScreen
-        selected={shapeOption}
-        onSelect={setShapeOption}
-        onBack={() => setScreen('personalize')}
-        onSelectMode={() => setScreen('selectMode')}
-        onContinue={handleContinue}
         palette={palette}
       />
     )
