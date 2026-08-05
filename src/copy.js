@@ -2,8 +2,8 @@ export const TEXT_A = 'Move the sliders\nin opposite directions\nwith your thumb
 export const TEXT_B = 'The transforming object is named Morph.\nSync your breathing to Morph.'
 
 export const TEXT_A1_DIAGONAL = 'Inhale and move the sliders up.'
-export const TEXT_A2_DIAGONAL = 'Good! Now move the sliders down as you exhale.'
-export const TEXT_B1_DIAGONAL = 'Wonderful! Now keep moving the sliders up and down with your breath.'
+export const TEXT_A2_DIAGONAL = 'Good! Exhale and move the sliders down.'
+export const TEXT_B1_DIAGONAL = 'Wonderful! Keep moving the sliders with your breath.'
 export const TEXT_B2_DIAGONAL = 'Notice how your breathing transforms the art.'
 
 export const TEXTS = {
