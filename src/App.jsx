@@ -685,6 +685,7 @@ export default function App() {
         onSelect={handleSelectMode}
         onPersonalize={() => setScreen('personalize')}
         onSliderLayouts={() => setScreen('sliderLayouts')}
+        onColor={() => setScreen('color')}
         palette={palette}
       />
     )
@@ -703,7 +704,6 @@ export default function App() {
     return (
       <PersonalizeScreen
         onShape={() => setScreen('shape')}
-        onColor={() => setScreen('color')}
         onSelectMode={() => setScreen('selectMode')}
         onContinue={handleContinue}
         palette={palette}

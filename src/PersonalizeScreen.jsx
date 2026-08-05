@@ -26,7 +26,7 @@ const continueBtnStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-export default function PersonalizeScreen({ onShape, onColor, onSelectMode, onContinue, palette }) {
+export default function PersonalizeScreen({ onShape, onSelectMode, onContinue, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -42,10 +42,6 @@ export default function PersonalizeScreen({ onShape, onColor, onSelectMode, onCo
       <button style={btnStyle} onClick={onShape}>
         <div style={{ fontSize: 17, fontWeight: 500 }}>Shapes</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Choose the shape of the Morph and Gates</div>
-      </button>
-      <button style={btnStyle} onClick={onColor}>
-        <div style={{ fontSize: 17, fontWeight: 500 }}>Colors</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Choose a color palette</div>
       </button>
 
       <div style={{

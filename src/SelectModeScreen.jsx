@@ -31,7 +31,7 @@ const pillStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayouts, palette }) {
+export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayouts, onColor, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -46,6 +46,12 @@ export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayo
         style={{ ...pillStyle, position: 'absolute', top: 16, left: 16 }}
       >
         Slider Layouts
+      </button>
+      <button
+        onClick={onColor}
+        style={{ ...pillStyle, position: 'absolute', top: 16, right: 16 }}
+      >
+        Colors
       </button>
       <button
         onClick={onPersonalize}
