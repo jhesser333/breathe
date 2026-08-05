@@ -28,7 +28,7 @@ function optionBtn(selected) {
   }
 }
 
-export default function ColorOptionsScreen({ selected, onSelect, onBack, onSelectMode, onContinue, palette }) {
+export default function ColorOptionsScreen({ selected, onSelect, onSelectMode, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -63,9 +63,7 @@ export default function ColorOptionsScreen({ selected, onSelect, onBack, onSelec
         gap: 20, alignItems: 'center',
       }}>
         {[
-          { label: 'Personalize', onClick: onBack },
-          { label: 'Select Mode', onClick: onSelectMode },
-          { label: 'Resume Breathing', onClick: onContinue },
+          { label: 'Home', onClick: onSelectMode },
         ].map(({ label, onClick }) => (
           <button key={label} onClick={onClick} style={{
             background: 'rgba(255,255,255,0.08)',

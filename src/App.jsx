@@ -656,14 +656,6 @@ export default function App() {
     setScreen('experience')
   }, [resetSlowingState, showGatesText, showSlowingTextC, showBoxText, sliderLayout])
 
-  const handleContinue = useCallback(() => {
-    if (!mode) {
-      handleSelectMode('basic')
-    } else {
-      setScreen('experience')
-    }
-  }, [mode, handleSelectMode])
-
   const handleRestart = useCallback(() => {
     handleSelectMode(mode)
   }, [mode, handleSelectMode])
@@ -714,9 +706,7 @@ export default function App() {
       <ColorOptionsScreen
         selected={colorPalette}
         onSelect={setColorPalette}
-        onBack={() => setScreen('personalize')}
         onSelectMode={() => setScreen('selectMode')}
-        onContinue={handleContinue}
         palette={palette}
       />
     )
