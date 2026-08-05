@@ -13,9 +13,7 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
     function getValueFromPoint(x, y) {
       const rect = el.getBoundingClientRect()
       let ratio
-      if (orientation === 'horizontal') {
-        ratio = 1 - (x - rect.left) / rect.width
-      } else if (orientation === 'diagonal-left' || orientation === 'diagonal-right') {
+      if (orientation === 'diagonal-left' || orientation === 'diagonal-right') {
         const side = orientation === 'diagonal-left' ? 'left' : 'right'
         const localX = (x - rect.left) * (CURVE_BOX_W / rect.width)
         const localY = (y - rect.top) * (CURVE_BOX_H / rect.height)

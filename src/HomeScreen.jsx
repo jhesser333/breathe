@@ -12,7 +12,7 @@ export default function HomeScreen({ onPersonalize, onSelectMode, onSliderLayout
   const items = [
     { label: 'Personalize', desc: 'Choose the shape and color of your experience', onClick: onPersonalize },
     { label: 'Select Mode', desc: 'Choose a breathing exercise to begin', onClick: onSelectMode },
-    { label: 'Slider Layouts', desc: 'Choose vertical or horizontal sliders', onClick: onSliderLayouts },
+    { label: 'Slider Layouts', desc: 'Choose vertical or diagonal sliders', onClick: onSliderLayouts },
   ]
   return (
     <div style={{
