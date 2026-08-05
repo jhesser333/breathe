@@ -681,7 +681,7 @@ export default function App() {
   if (screen === 'selectMode') {
     return (
       <SelectModeScreen
-        onSelect={handleSelectMode}
+        onStart={handleSelectMode}
         onPersonalize={() => setScreen('personalize')}
         onSliderLayouts={() => setScreen('sliderLayouts')}
         onColor={() => setScreen('color')}

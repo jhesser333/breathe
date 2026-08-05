@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { MODE_LABELS } from './copy'
 
 const OPTIONS = [
@@ -31,7 +32,20 @@ const pillStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayouts, onColor, palette }) {
+function modeBtnStyle(selected) {
+  return {
+    width: '100%', maxWidth: 320,
+    padding: '20px 24px',
+    background: selected ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
+    border: selected ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    cursor: 'pointer', textAlign: 'left',
+    color: '#ffffff', fontFamily: 'sans-serif',
+  }
+}
+
+export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, onColor, palette }) {
+  const [selectedMode, setSelectedMode] = useState('basic')
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -53,12 +67,19 @@ export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayo
       >
         Colors
       </button>
-      <button
-        onClick={onPersonalize}
-        style={{ ...pillStyle, position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}
-      >
-        Personalize
-      </button>
+      <div style={{
+        position: 'absolute', bottom: 16, left: '50%',
+        transform: 'translateX(-50%)',
+        display: 'flex', flexDirection: 'column',
+        gap: 20, alignItems: 'center',
+      }}>
+        <button onClick={() => onStart(selectedMode)} style={pillStyle}>
+          Start
+        </button>
+        <button onClick={onPersonalize} style={pillStyle}>
+          Change the Art
+        </button>
+      </div>
       <h1 style={{
         color: '#ffffff', fontSize: 32, fontWeight: 300,
         letterSpacing: '0.15em', margin: '0 0 8px',
@@ -74,18 +95,10 @@ export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayo
       {OPTIONS.map(opt => (
         <button
           key={opt.id}
-          onClick={() => onSelect(opt.id)}
-          style={{
-            width: '100%', maxWidth: 320,
-            padding: '20px 24px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: 12,
-            cursor: 'pointer', textAlign: 'left',
-            color: '#ffffff', fontFamily: 'sans-serif',
-          }}
+          onClick={() => setSelectedMode(opt.id)}
+          style={modeBtnStyle(selectedMode === opt.id)}
         >
-          <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label}</div>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
         </button>
       ))}

@@ -21,7 +21,7 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
       fontFamily: 'sans-serif',
     }}>
       <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
-        Personalize
+        ART OPTIONS
       </h1>
       <div style={{
         width: '100%', maxWidth: 320,
