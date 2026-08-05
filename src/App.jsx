@@ -23,7 +23,7 @@ import SlowingDownController from './SlowingDownController'
 import BreathLengthControl from './BreathLengthControl'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
-import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL } from './copy'
+import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
 
 const navPillStyle = {
   background: 'rgba(255,255,255,0.08)',
@@ -803,6 +803,14 @@ export default function App() {
           {sliderLayout === 'diagonal'
             ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
             : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />}
+        </div>
+        <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}>
+          <span style={{
+            color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: 'sans-serif',
+            letterSpacing: '0.08em', textTransform: 'uppercase',
+          }}>
+            {MODE_LABELS[mode]}
+          </span>
         </div>
         <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs} />
         {(mode === 'timed' || mode === 'slowing') && (

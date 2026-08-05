@@ -1,22 +1,24 @@
+import { MODE_LABELS } from './copy'
+
 const OPTIONS = [
   {
     id: 'basic',
-    label: 'Basic',
+    label: MODE_LABELS.basic,
     desc: 'Move with your breath',
   },
   {
     id: 'timed',
-    label: 'Paced Breathing',
+    label: MODE_LABELS.timed,
     desc: 'Time your breath to fit through the gates',
   },
   {
     id: 'slowing',
-    label: 'Slowing Down',
+    label: MODE_LABELS.slowing,
     desc: 'The app times your breathing then gently helps you slow down',
   },
   {
     id: 'box',
-    label: 'Box Breathing',
+    label: MODE_LABELS.box,
     desc: 'Inhale, hold, exhale, hold — equal phases guided by the gates',
   },
 ]
@@ -52,11 +54,17 @@ export default function SelectModeScreen({ onSelect, onPersonalize, onSliderLayo
         Personalize
       </button>
       <h1 style={{
-        color: '#ffffff', fontSize: 28, fontWeight: 300,
-        marginBottom: 16, letterSpacing: '0.12em', margin: '0 0 24px',
+        color: '#ffffff', fontSize: 32, fontWeight: 300,
+        letterSpacing: '0.15em', margin: '0 0 8px',
+      }}>
+        HOME
+      </h1>
+      <h2 style={{
+        color: '#ffffff', fontSize: 18, fontWeight: 300,
+        letterSpacing: '0.12em', margin: '0 0 10px',
       }}>
         Modes
-      </h1>
+      </h2>
       {OPTIONS.map(opt => (
         <button
           key={opt.id}
