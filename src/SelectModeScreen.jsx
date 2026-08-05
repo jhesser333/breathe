@@ -44,7 +44,7 @@ function modeBtnStyle(selected) {
   }
 }
 
-export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, onColor, palette }) {
+export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette }) {
   const [selectedMode, setSelectedMode] = useState('basic')
   return (
     <div style={{
@@ -60,12 +60,6 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
         style={{ ...pillStyle, position: 'absolute', top: 16, left: 16 }}
       >
         Slider Layouts
-      </button>
-      <button
-        onClick={onColor}
-        style={{ ...pillStyle, position: 'absolute', top: 16, right: 16 }}
-      >
-        Colors
       </button>
       <div style={{
         position: 'absolute', bottom: 16, left: '50%',

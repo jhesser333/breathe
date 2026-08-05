@@ -15,7 +15,6 @@ import SlidersDiagonal from './SlidersDiagonal'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
-import ColorOptionsScreen from './ColorOptionsScreen'
 import BackgroundA from './BackgroundA'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
@@ -65,7 +64,6 @@ export default function App() {
     const saved = localStorage.getItem('shapeOption') || 'a'
     return ['a', 'b', 'c', 'd'].includes(saved) ? saved : 'a'
   })
-  const [colorPalette, setColorPaletteState] = useState(() => localStorage.getItem('colorPalette') || 'a')
   const [sliderLayout, setSliderLayoutState] = useState(() => {
     const saved = localStorage.getItem('sliderLayout') || 'vertical'
     return ['vertical', 'diagonal'].includes(saved) ? saved : 'vertical'
@@ -74,11 +72,6 @@ export default function App() {
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
     setShapeOptionState(v)
-  }, [])
-
-  const setColorPalette = useCallback((v) => {
-    localStorage.setItem('colorPalette', v)
-    setColorPaletteState(v)
   }, [])
 
   const setSliderLayout = useCallback((v) => {
@@ -91,7 +84,7 @@ export default function App() {
   // ambient background as a pacing cue. A/B/C stay background-free.
   const backgroundOption = shapeOption === 'd' ? 'a' : 'none'
 
-  const palette = PALETTES[colorPalette]
+  const palette = PALETTES.a
   const shapeRef = useRef(shapeOption)
   shapeRef.current = shapeOption
 
@@ -676,7 +669,6 @@ export default function App() {
         onStart={handleSelectMode}
         onPersonalize={() => setScreen('personalize')}
         onSliderLayouts={() => setScreen('sliderLayouts')}
-        onColor={() => setScreen('color')}
         palette={palette}
       />
     )
@@ -696,16 +688,6 @@ export default function App() {
       <PersonalizeScreen
         shapeOption={shapeOption}
         onSelectShape={setShapeOption}
-        onSelectMode={() => setScreen('selectMode')}
-        palette={palette}
-      />
-    )
-  }
-  if (screen === 'color') {
-    return (
-      <ColorOptionsScreen
-        selected={colorPalette}
-        onSelect={setColorPalette}
         onSelectMode={() => setScreen('selectMode')}
         palette={palette}
       />
