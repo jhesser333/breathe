@@ -61,7 +61,7 @@ export default function App() {
   const [tutorialOpacity, setTutorialOpacity] = useState(null)
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
   const [shapeOption, setShapeOptionState] = useState(() => {
-    const saved = localStorage.getItem('shapeOption') || 'a'
+    const saved = localStorage.getItem('shapeOption') || 'd'
     return ['a', 'b', 'c', 'd'].includes(saved) ? saved : 'a'
   })
   const [sliderLayout, setSliderLayoutState] = useState(() => {

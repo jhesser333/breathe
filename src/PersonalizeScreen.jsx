@@ -29,21 +29,11 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         display: 'flex', flexDirection: 'column', gap: 16,
       }}>
-        <button style={optionBtn(shapeOption === 'a')} onClick={() => onSelectShape('a')}>
-          <div style={{ fontSize: 17, fontWeight: 500 }}>Option A {shapeOption === 'a' && '✓'}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Sphere Morph</div>
+        <button style={optionBtn(shapeOption === 'd')} onClick={() => onSelectShape('d')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Sphere that Disappears {shapeOption === 'd' && '✓'}</div>
         </button>
         <button style={optionBtn(shapeOption === 'b')} onClick={() => onSelectShape('b')}>
-          <div style={{ fontSize: 17, fontWeight: 500 }}>Option B {shapeOption === 'b' && '✓'}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Rounded cube Morph</div>
-        </button>
-        <button style={optionBtn(shapeOption === 'c')} onClick={() => onSelectShape('c')}>
-          <div style={{ fontSize: 17, fontWeight: 500 }}>Option C {shapeOption === 'c' && '✓'}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph</div>
-        </button>
-        <button style={optionBtn(shapeOption === 'd')} onClick={() => onSelectShape('d')}>
-          <div style={{ fontSize: 17, fontWeight: 500 }}>Option D {shapeOption === 'd' && '✓'}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Disappearing Morph — ambient background</div>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Cube with Targets {shapeOption === 'b' && '✓'}</div>
         </button>
       </div>
 
