@@ -3,19 +3,24 @@ import { Canvas } from '@react-three/fiber'
 import MorphA from './MorphA'
 import MorphB from './MorphB'
 import MorphC from './MorphC'
+import MorphE from './MorphE'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import GatesC from './GatesC'
 import GatesHeadless from './GatesHeadless'
+import GatesHeadlessE from './GatesHeadlessE'
 import GatesBoxBreathingA from './GatesBoxBreathingA'
 import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
+import GatesBoxBreathingHeadlessE from './GatesBoxBreathingHeadlessE'
 import Sliders from './Sliders'
 import SlidersDiagonal from './SlidersDiagonal'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import BackgroundA from './BackgroundA'
+import BackgroundB from './BackgroundB'
+import StarFieldE from './StarFieldE'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
 import BreathLengthControl from './BreathLengthControl'
@@ -62,7 +67,7 @@ export default function App() {
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
   const [shapeOption, setShapeOptionState] = useState(() => {
     const saved = localStorage.getItem('shapeOption') || 'd'
-    return ['a', 'b', 'c', 'd'].includes(saved) ? saved : 'a'
+    return ['a', 'b', 'c', 'd', 'e'].includes(saved) ? saved : 'a'
   })
   const [sliderLayout, setSliderLayoutState] = useState(() => {
     const saved = localStorage.getItem('sliderLayout') || 'vertical'
@@ -79,10 +84,10 @@ export default function App() {
     setSliderLayoutState(v)
   }, [])
 
-  // Background is fully derived from the shape choice: Option D is the only
-  // shape with no visible Gates/rails, so it's the only one that needs the
-  // ambient background as a pacing cue. A/B/C stay background-free.
-  const backgroundOption = shapeOption === 'd' ? 'a' : 'none'
+  // Background is fully derived from the shape choice: Options D and E have
+  // no visible Gates/rails, so they're the only ones that need an ambient
+  // background as a pacing cue. A/B/C stay background-free.
+  const backgroundOption = shapeOption === 'e' ? 'b' : shapeOption === 'd' ? 'a' : 'none'
 
   const palette = PALETTES.a
   const shapeRef = useRef(shapeOption)
@@ -136,6 +141,7 @@ export default function App() {
   const bbCycleRef = useRef(0)
   const bbTutorialActiveRef = useRef(false)
   const breathPhaseRef = useRef('exhale')
+  const holdFlareRef = useRef(0)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -215,7 +221,7 @@ export default function App() {
   const showGatesText = useCallback(() => {
     gatesEnabledRef.current = true
     const breathMs = spawnIntervalRef.current * 1000
-    const isAmbient = shapeRef.current === 'd'
+    const isAmbient = shapeRef.current === 'd' || shapeRef.current === 'e'
     const textC = isAmbient ? TEXTS.gatesTimedAmbient : TEXTS.gatesTimed
     const textD = isAmbient ? TEXTS.gatesTimedDAmbient : TEXTS.gatesTimedD
 
@@ -256,7 +262,7 @@ export default function App() {
   }, [])
 
   const showSlowingTextD = useCallback(() => {
-    const text = shapeRef.current === 'd' ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextD
+    const text = (shapeRef.current === 'd' || shapeRef.current === 'e') ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextD
     clearTimeout(tutorialTimerRef.current)
     currentMainTextRef.current = text
     setTutorialText(text)
@@ -266,7 +272,7 @@ export default function App() {
   }, [])
 
   const showSlowingTextE = useCallback(() => {
-    const text = shapeRef.current === 'd' ? TEXTS.slowingTextEAmbient : TEXTS.slowingTextE
+    const text = (shapeRef.current === 'd' || shapeRef.current === 'e') ? TEXTS.slowingTextEAmbient : TEXTS.slowingTextE
     clearTimeout(tutorialTimerRef.current)
     currentMainTextRef.current = text
     setTutorialText(text)
@@ -694,9 +700,9 @@ export default function App() {
     )
   }
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
-  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : MorphA
-  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : GatesA
-  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' || shapeOption === 'd' ? GatesBoxBreathingC : GatesBoxBreathingA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : MorphA
+  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
+  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' || shapeOption === 'd' ? GatesBoxBreathingC : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
 
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -709,6 +715,7 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
         {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />}
+        {backgroundOption === 'b' && <BackgroundB gateColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
@@ -729,7 +736,11 @@ export default function App() {
             emissiveColor={palette.morphEmissive}
             onFirstGate={handleBBFirstGate}
             onLastGate={handleBBLastGate}
+            holdFlareRef={holdFlareRef}
           />
+        )}
+        {shapeOption === 'e' && mode === 'box' && (
+          <StarFieldE gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} holdFlareRef={holdFlareRef} />
         )}
         {mode === 'slowing' && (
           <SlowingDownController
