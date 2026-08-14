@@ -407,6 +407,7 @@ export default function App() {
   }, [])
 
   const finishDiagonalSequence = useCallback(() => {
+    diagStageRef.current = 'B2-fadeout'
     clearTimeout(tutorialTimerRef.current)
     setTutorialFadeMs(DIAG_FADE_OUT_MS)
     setTutorialVisible(false)
