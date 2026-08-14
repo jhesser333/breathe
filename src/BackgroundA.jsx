@@ -10,7 +10,7 @@ function smoothstep(t) {
   return t * t * (3 - 2 * t)
 }
 
-export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef }) {
+export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
   const positions = useMemo(() => {
     const pts = []
     for (let i = 0; i < COUNT; i++) {
@@ -29,7 +29,11 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
   useFrame((_, delta) => {
     const gatesActive = gatesEnabledRef?.current ?? false
     const target = gatesActive && breathPhaseRef?.current === 'exhale' ? 1 : 0
-    const halfInterval = (spawnIntervalRef?.current ?? 6) / 2
+    const inhale = inhaleSecondsRef?.current
+    const exhale = exhaleSecondsRef?.current
+    const hasSplit = inhale != null && exhale != null
+    const fallback = (spawnIntervalRef?.current ?? 6) / 2
+    const halfInterval = target === 1 ? (hasSplit ? exhale : fallback) : (hasSplit ? inhale : fallback)
     const dir = target > progressRef.current ? 1 : -1
     progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
     const t = smoothstep(progressRef.current)

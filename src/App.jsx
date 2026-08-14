@@ -18,6 +18,7 @@ import SlidersDiagonal from './SlidersDiagonal'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
+import BreathPaceOptionsScreen from './BreathPaceOptionsScreen'
 import BackgroundA from './BackgroundA'
 import BackgroundB from './BackgroundB'
 import StarFieldE from './StarFieldE'
@@ -27,6 +28,7 @@ import BreathLengthControl from './BreathLengthControl'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
+import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 
 const navPillStyle = {
   background: 'rgba(255,255,255,0.08)',
@@ -73,6 +75,10 @@ export default function App() {
     const saved = localStorage.getItem('sliderLayout') || 'vertical'
     return ['vertical', 'diagonal'].includes(saved) ? saved : 'vertical'
   })
+  const [targetPace, setTargetPaceState] = useState(() => {
+    const saved = localStorage.getItem('targetPace') || DEFAULT_TARGET_PACE
+    return Object.keys(TARGET_PACES).includes(saved) ? saved : DEFAULT_TARGET_PACE
+  })
 
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
@@ -82,6 +88,11 @@ export default function App() {
   const setSliderLayout = useCallback((v) => {
     localStorage.setItem('sliderLayout', v)
     setSliderLayoutState(v)
+  }, [])
+
+  const setTargetPace = useCallback((v) => {
+    localStorage.setItem('targetPace', v)
+    setTargetPaceState(v)
   }, [])
 
   // Background is fully derived from the shape choice: Options D and E have
@@ -135,6 +146,8 @@ export default function App() {
   const phaseRef = useRef('idle')
   const avgBreathRef = useRef(0)
   const phase2StartRef = useRef(0)
+  const inhaleSecondsRef = useRef(null)
+  const exhaleSecondsRef = useRef(null)
   const recordingEnabledRef = useRef(false)
   const lastMaxTimeRef = useRef(0)
   const gateEnableTimerRef = useRef(null)
@@ -154,6 +167,8 @@ export default function App() {
     phaseRef.current = 'idle'
     avgBreathRef.current = 0
     phase2StartRef.current = 0
+    inhaleSecondsRef.current = null
+    exhaleSecondsRef.current = null
     recordingEnabledRef.current = false
     lastMaxTimeRef.current = 0
   }, [])
@@ -286,6 +301,9 @@ export default function App() {
     const P = avgBreathRef.current
     let d = 0
     if (lastMaxTimeRef.current > 0) {
+      // Ratio is still 1.5 (symmetric) at t=0 of SlowingDownController's ramp —
+      // inhaleSecondsRef/exhaleSecondsRef both start at avgBreathRef/2 — so this
+      // fixed 1.5x travel-time assumption holds regardless of the selected target pace.
       const T_travel = ['a', 'b'].includes(shapeRef.current) ? 1.5 * P : P
       const elapsed = t_done - lastMaxTimeRef.current
       const k = Math.ceil((elapsed + T_travel) / P)
@@ -316,50 +334,6 @@ export default function App() {
   }, [showSlowingTextE])
 
   const handleSlowingTextEDone = useCallback(() => {
-    clearTimeout(tutorialTimerRef.current)
-    setTutorialVisible(false)
-    tutorialVisibleRef.current = false
-  }, [])
-
-  const showSlowingTextF = useCallback(() => {
-    clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.slowingTextF
-    setTutorialText(TEXTS.slowingTextF)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
-    awaitingMovementRef.current = false
-  }, [])
-
-  const showSlowingTextG = useCallback(() => {
-    clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.slowingTextG
-    setTutorialText(TEXTS.slowingTextG)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
-    awaitingMovementRef.current = false
-  }, [])
-
-  const handleSlowingRampDone = useCallback(() => {
-    clearTimeout(tutorialTimerRef.current)
-    setTutorialVisible(false)
-    tutorialVisibleRef.current = false
-    tutorialTimerRef.current = setTimeout(() => showSlowingTextF(), FADE_TRANSITION_MS)
-  }, [showSlowingTextF])
-
-  const handleSlowingTextFDone = useCallback(() => {
-    clearTimeout(tutorialTimerRef.current)
-    setTutorialVisible(false)
-    tutorialVisibleRef.current = false
-    tutorialTimerRef.current = setTimeout(() => showSlowingTextG(), FADE_TRANSITION_MS)
-  }, [showSlowingTextG])
-
-  const handleSlowingShowSlider = useCallback(() => {
-    const rounded = Math.round(avgBreathRef.current * 2 / 0.5) * 0.5
-    setBreathLength(rounded)
-    setBreathControlVisible(true)
-  }, [])
-
-  const handleSlowingTextGDone = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
@@ -603,6 +577,8 @@ export default function App() {
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
     spawnIntervalRef.current = m === 'timed' ? 12 : m === 'box' ? 4 : 8
+    inhaleSecondsRef.current = null
+    exhaleSecondsRef.current = null
     if (m === 'timed' || m === 'slowing' || m === 'box') { clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
     if (m === 'timed') setBreathLength(12)
     lastMoveTime.current = Date.now() - STILLNESS_MS - 1
@@ -699,10 +675,21 @@ export default function App() {
       />
     )
   }
+  if (screen === 'breathPaceOptions') {
+    return (
+      <BreathPaceOptionsScreen
+        selected={targetPace}
+        onSelect={setTargetPace}
+        onHome={() => setScreen('experience')}
+        palette={palette}
+      />
+    )
+  }
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : MorphA
   const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
   const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' || shapeOption === 'd' ? GatesBoxBreathingC : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
+  const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
 
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -714,8 +701,8 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
-        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />}
-        {backgroundOption === 'b' && <BackgroundB gateColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} />}
+        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
+        {backgroundOption === 'b' && <BackgroundB gateColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
@@ -726,6 +713,8 @@ export default function App() {
             gateColor={palette.gateColor}
             emissiveColor={palette.morphEmissive}
             breathPhaseRef={breathPhaseRef}
+            inhaleSecondsRef={inhaleSecondsRef}
+            exhaleSecondsRef={exhaleSecondsRef}
           />
         )}
         {mode === 'box' && hasGates && (
@@ -751,10 +740,10 @@ export default function App() {
             onGatesReady={handleSlowingRecordingDone}
             onTextDone={handleSlowingTextDDone}
             onTextEDone={handleSlowingTextEDone}
-            onRampDone={handleSlowingRampDone}
-            onTextFDone={handleSlowingTextFDone}
-            onShowSlider={handleSlowingShowSlider}
-            onTextGDone={handleSlowingTextGDone}
+            inhaleSecondsRef={inhaleSecondsRef}
+            exhaleSecondsRef={exhaleSecondsRef}
+            targetInhaleSeconds={targetPaceInfo.inhale}
+            targetExhaleSeconds={targetPaceInfo.exhale}
             prevRawRef={prevRawRef}
             directionRef={directionRef}
             extremeValueRef={extremeValueRef}
@@ -782,8 +771,14 @@ export default function App() {
             {MODE_LABELS[mode]}
           </span>
         </div>
+        {mode === 'slowing' && (
+          <button onClick={() => setScreen('breathPaceOptions')}
+                  style={{ ...navPillStyle, position: 'absolute', top: 16, right: 16 }}>
+            Change Target Pace
+          </button>
+        )}
         <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs} />
-        {(mode === 'timed' || mode === 'slowing') && (
+        {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}
             onChange={handleBreathChange}

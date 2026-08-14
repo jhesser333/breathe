@@ -73,6 +73,20 @@ function calcEmissive(z) {
   return 0
 }
 
+// Dynamic second-gate (Inhale Gate B) spawn z. Ratio defaults to 1.5 (today's
+// fixed GATE_B_Z/SPAWN_Z constant) whenever inhale/exhale duration refs aren't
+// both set -- i.e. every mode except Slowing Down mid/post-ramp. During the
+// ramp, ratio = 1 + exhaleSeconds/P produces the correct exhale-phase duration
+// between the Exhale Gate (A, this gate) crossing and the Inhale Gate (B)
+// crossing -- see CLAUDE.md's Gate geometry section for the derivation.
+function computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef) {
+  const inhale = inhaleSecondsRef?.current
+  const exhale = exhaleSecondsRef?.current
+  const P = spawnIntervalRef.current
+  const ratio = (inhale != null && exhale != null && P > 0) ? 1 + exhale / P : 1.5
+  return SPAWN_Z * ratio
+}
+
 function makeSlotA() {
   return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
 }
@@ -95,7 +109,7 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef }) {
+export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matRefsA = useRef(Array.from({ length: POOL_A }, () => null))
@@ -141,12 +155,13 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
   useFrame((_, delta) => {
     const spawnB = (speed) => {
-      checkpoints.current.push({ z: GATE_B_Z, speed, fadeElapsed: 0 })
+      const gateBZ = computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
+      checkpoints.current.push({ z: gateBZ, speed, fadeElapsed: 0 })
 
       const slot = slotsB.current.find(s => !s.active)
       if (!slot) return
       Object.assign(slot, makeSlotB())
-      slot.z = GATE_B_Z
+      slot.z = gateBZ
       slot.speed = speed
       slot.active = true
     }
@@ -170,14 +185,14 @@ export default function GatesA({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         pre.needsInitial = false
         const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
         checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
-        checkpoints.current.push({ z: GATE_B_Z, speed, fadeElapsed: 0 })
+        checkpoints.current.push({ z: computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef), speed, fadeElapsed: 0 })
       } else {
         pre.elapsed += delta
         if (pre.elapsed >= spawnIntervalRef.current) {
           pre.elapsed -= spawnIntervalRef.current
           const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
           checkpoints.current.push({ z: SPAWN_Z, speed, fadeElapsed: 0 })
-          checkpoints.current.push({ z: GATE_B_Z, speed, fadeElapsed: 0 })
+          checkpoints.current.push({ z: computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef), speed, fadeElapsed: 0 })
         }
       }
     }

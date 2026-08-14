@@ -8,11 +8,6 @@ const OPTIONS = [
     desc: 'Move with your breath',
   },
   {
-    id: 'timed',
-    label: MODE_LABELS.timed,
-    desc: 'Time your breath to fit through the gates',
-  },
-  {
     id: 'slowing',
     label: MODE_LABELS.slowing,
     desc: 'The app times your breathing then gently helps you slow down',

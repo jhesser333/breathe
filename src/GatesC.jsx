@@ -101,7 +101,21 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef }) {
+// Dynamic exhale-checkpoint spawn z. Ratio defaults to 1.5 (today's fixed
+// EXHALE_SPAWN_Z/SPAWN_Z constant) whenever inhale/exhale duration refs
+// aren't both set -- i.e. every mode except Slowing Down mid/post-ramp.
+// ratio = 1 + inhaleSeconds/P (note: inverted vs GatesA/B's exhale-based
+// formula, since here the inhale gate is FIRST and the exhale checkpoint is
+// SECOND) -- see CLAUDE.md's Gate geometry section for the derivation.
+function computeExhaleSpawnZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef) {
+  const inhale = inhaleSecondsRef?.current
+  const exhale = exhaleSecondsRef?.current
+  const P = spawnIntervalRef.current
+  const ratio = (inhale != null && exhale != null && P > 0) ? 1 + inhale / P : 1.5
+  return SPAWN_Z * ratio
+}
+
+export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
@@ -151,7 +165,7 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       const slot = slotsExhale.current.find(s => !s.active)
       if (!slot) return
       Object.assign(slot, makeSlotExhale())
-      slot.z = EXHALE_SPAWN_Z
+      slot.z = computeExhaleSpawnZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
       slot.speed = speed
       slot.active = true
     }
