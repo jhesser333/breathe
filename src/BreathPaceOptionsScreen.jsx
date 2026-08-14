@@ -44,7 +44,7 @@ export default function BreathPaceOptionsScreen({ selected, onSelect, onHome, pa
           cursor: 'pointer', fontFamily: 'sans-serif',
         }}
       >
-        Home
+        Back
       </button>
     </div>
   )

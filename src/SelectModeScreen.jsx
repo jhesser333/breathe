@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { MODE_LABELS } from './copy'
 
 const OPTIONS = [
@@ -39,8 +38,7 @@ function modeBtnStyle(selected) {
   }
 }
 
-export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette }) {
-  const [selectedMode, setSelectedMode] = useState('basic')
+export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -84,7 +82,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       {OPTIONS.map(opt => (
         <button
           key={opt.id}
-          onClick={() => setSelectedMode(opt.id)}
+          onClick={() => onSelectModeChange(opt.id)}
           style={modeBtnStyle(selectedMode === opt.id)}
         >
           <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>

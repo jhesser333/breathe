@@ -79,6 +79,10 @@ export default function App() {
     const saved = localStorage.getItem('targetPace') || DEFAULT_TARGET_PACE
     return Object.keys(TARGET_PACES).includes(saved) ? saved : DEFAULT_TARGET_PACE
   })
+  const [selectedMode, setSelectedModeState] = useState(() => {
+    const saved = localStorage.getItem('selectedMode') || 'basic'
+    return ['basic', 'timed', 'slowing', 'box'].includes(saved) ? saved : 'basic'
+  })
 
   const setShapeOption = useCallback((v) => {
     localStorage.setItem('shapeOption', v)
@@ -93,6 +97,11 @@ export default function App() {
   const setTargetPace = useCallback((v) => {
     localStorage.setItem('targetPace', v)
     setTargetPaceState(v)
+  }, [])
+
+  const setSelectedMode = useCallback((v) => {
+    localStorage.setItem('selectedMode', v)
+    setSelectedModeState(v)
   }, [])
 
   // Background is fully derived from the shape choice: Options D and E have
@@ -652,6 +661,8 @@ export default function App() {
         onPersonalize={() => setScreen('personalize')}
         onSliderLayouts={() => setScreen('sliderLayouts')}
         palette={palette}
+        selectedMode={selectedMode}
+        onSelectModeChange={setSelectedMode}
       />
     )
   }
