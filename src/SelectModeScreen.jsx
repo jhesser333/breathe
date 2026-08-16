@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { MODE_LABELS } from './copy'
 
 const OPTIONS = [
@@ -39,6 +40,7 @@ function modeBtnStyle(selected) {
 }
 
 export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange }) {
+  const [startPressed, setStartPressed] = useState(false)
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -67,11 +69,15 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       }}>
         <button
           onClick={() => onStart(selectedMode)}
+          onPointerDown={() => setStartPressed(true)}
+          onPointerUp={() => setStartPressed(false)}
+          onPointerLeave={() => setStartPressed(false)}
+          onPointerCancel={() => setStartPressed(false)}
           style={{
-            transform: 'translateY(-24px)',
             width: 110, height: 110, borderRadius: '50%',
-            background: '#ff69b4', border: 'none',
-            color: '#ffffff', fontSize: 20, fontWeight: 700,
+            background: `rgba(255,105,180,${startPressed ? 0.75 : 0.25})`,
+            border: '2px solid #ff69b4',
+            color: '#ff69b4', fontSize: 20, fontWeight: 700,
             fontFamily: 'sans-serif', cursor: 'pointer',
           }}
         >
@@ -88,12 +94,12 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       }}>
         HOME
       </h1>
-      <div style={{ transform: 'translateY(-48px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <div style={{ transform: 'translateY(-96px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
         <h2 style={{
           color: '#ffffff', fontSize: 24, fontWeight: 300,
           letterSpacing: '0.1em', margin: '0 0 16px',
         }}>
-          Modes
+          MODES
         </h2>
         {OPTIONS.map(opt => (
           <button
