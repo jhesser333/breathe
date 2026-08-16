@@ -50,17 +50,31 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
     }}>
       <button
         onClick={onSliderLayouts}
-        style={{ ...pillStyle, position: 'absolute', top: 16, left: 16 }}
-      >
-        Slider Layouts
-      </button>
+        style={{
+          position: 'absolute', top: 16, left: 16,
+          width: 28, height: 28, padding: 0,
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: 6,
+          cursor: 'pointer',
+        }}
+      />
       <div style={{
         position: 'absolute', bottom: 16, left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex', flexDirection: 'column',
         gap: 20, alignItems: 'center',
       }}>
-        <button onClick={() => onStart(selectedMode)} style={pillStyle}>
+        <button
+          onClick={() => onStart(selectedMode)}
+          style={{
+            transform: 'translateY(-24px)',
+            width: 110, height: 110, borderRadius: '50%',
+            background: '#ff69b4', border: 'none',
+            color: '#ffffff', fontSize: 20, fontWeight: 700,
+            fontFamily: 'sans-serif', cursor: 'pointer',
+          }}
+        >
           Start
         </button>
         <button onClick={onPersonalize} style={pillStyle}>
@@ -68,27 +82,30 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
         </button>
       </div>
       <h1 style={{
-        color: '#ffffff', fontSize: 32, fontWeight: 300,
+        color: '#ff69b4', fontSize: 32, fontWeight: 700,
         letterSpacing: '0.15em', margin: '0 0 8px',
+        transform: 'translateY(-72px)',
       }}>
         HOME
       </h1>
-      <h2 style={{
-        color: '#ffffff', fontSize: 18, fontWeight: 300,
-        letterSpacing: '0.12em', margin: '0 0 10px',
-      }}>
-        Modes
-      </h2>
-      {OPTIONS.map(opt => (
-        <button
-          key={opt.id}
-          onClick={() => onSelectModeChange(opt.id)}
-          style={modeBtnStyle(selectedMode === opt.id)}
-        >
-          <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
-        </button>
-      ))}
+      <div style={{ transform: 'translateY(-48px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        <h2 style={{
+          color: '#ffffff', fontSize: 24, fontWeight: 300,
+          letterSpacing: '0.1em', margin: '0 0 16px',
+        }}>
+          Modes
+        </h2>
+        {OPTIONS.map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => onSelectModeChange(opt.id)}
+            style={modeBtnStyle(selectedMode === opt.id)}
+          >
+            <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
