@@ -3,19 +3,19 @@ import { MODE_LABELS } from './copy'
 
 const OPTIONS = [
   {
-    id: 'basic',
-    label: MODE_LABELS.basic,
-    desc: 'Move with your breath',
-  },
-  {
     id: 'slowing',
     label: MODE_LABELS.slowing,
-    desc: 'The app times your breathing then gently helps you slow down',
+    desc: 'The app gently helps you slow the pace of your breathing',
   },
   {
     id: 'box',
     label: MODE_LABELS.box,
-    desc: 'Inhale, hold, exhale, hold — equal phases guided by the gates',
+    desc: 'The app guides you through equal phases of Inhale, hold, Exhale, hold',
+  },
+  {
+    id: 'basic',
+    label: MODE_LABELS.basic,
+    desc: 'Visualize your breathing at whatever pace you\'d like',
   },
 ]
 
@@ -90,27 +90,29 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       <h1 style={{
         color: '#ff69b4', fontSize: 32, fontWeight: 700,
         letterSpacing: '0.15em', margin: '0 0 8px',
-        transform: 'translateY(-72px)',
+        transform: 'translateY(-96px)',
       }}>
         HOME
       </h1>
-      <div style={{ transform: 'translateY(-96px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <div style={{ transform: 'translateY(-96px)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <h2 style={{
           color: '#ffffff', fontSize: 24, fontWeight: 300,
-          letterSpacing: '0.1em', margin: '0 0 16px',
+          letterSpacing: '0.1em', margin: '0 0 12px',
         }}>
           MODES
         </h2>
-        {OPTIONS.map(opt => (
-          <button
-            key={opt.id}
-            onClick={() => onSelectModeChange(opt.id)}
-            style={modeBtnStyle(selectedMode === opt.id)}
-          >
-            <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
-          </button>
-        ))}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          {OPTIONS.map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => onSelectModeChange(opt.id)}
+              style={modeBtnStyle(selectedMode === opt.id)}
+            >
+              <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

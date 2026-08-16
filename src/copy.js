@@ -1,8 +1,8 @@
 export const MODE_LABELS = {
   basic: 'Breath at Your Own Pace',
   timed: 'Paced Breathing',
-  slowing: 'Slowing Down',
-  box: 'Box Breathing',
+  slowing: 'Guided Breathing: Slowing Down',
+  box: 'Guided Breathing: Box Breathing',
 }
 
 export const TEXT_A = 'Move the sliders\nin opposite directions\nwith your thumbs'
