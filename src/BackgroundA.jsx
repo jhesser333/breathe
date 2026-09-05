@@ -8,7 +8,7 @@ const COUNT = 30
 // Default (exhale) position, before rising toward the inhale position.
 const SPAWN_X_MIN = -5
 const SPAWN_X_MAX = 5
-const SPAWN_Y_MIN = -10
+const SPAWN_Y_MIN = -15
 const SPAWN_Y_MAX = -3
 const SPAWN_Z_MIN = -15
 const SPAWN_Z_MAX = -10
