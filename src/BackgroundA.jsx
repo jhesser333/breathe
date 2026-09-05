@@ -6,10 +6,10 @@ import * as THREE from 'three'
 const COUNT = 30
 
 // Default (exhale) position, before rising toward the inhale position.
-const SPAWN_X_MIN = -10
-const SPAWN_X_MAX = 10
-const SPAWN_Y_MIN = -10
-const SPAWN_Y_MAX = 0
+const SPAWN_X_MIN = -5
+const SPAWN_X_MAX = 5
+const SPAWN_Y_MIN = -20
+const SPAWN_Y_MAX = -10
 const SPAWN_Z_MIN = -20
 const SPAWN_Z_MAX = -10
 const RISE_MIN = 10  // how far cubes move up from exhale -> inhale position
@@ -47,10 +47,12 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
   const meshRefs = useRef([])
   const matRefs = useRef([])
   const progressRef = useRef(0)
+  const hasStartedRef = useRef(false)
 
   useFrame((_, delta) => {
     const gatesActive = gatesEnabledRef?.current ?? false
     const target = gatesActive && breathPhaseRef?.current === 'inhale' ? 1 : 0
+    if (target === 1) hasStartedRef.current = true
     const inhale = inhaleSecondsRef?.current
     const exhale = exhaleSecondsRef?.current
     const hasSplit = inhale != null && exhale != null
@@ -59,7 +61,7 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
     const dir = target > progressRef.current ? 1 : -1
     progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
     const t = smoothstep(progressRef.current)
-    const pulse = gatesActive ? pulseFactor(t) : 0
+    const pulse = hasStartedRef.current ? pulseFactor(t) : 0
 
     for (let i = 0; i < COUNT; i++) {
       const mesh = meshRefs.current[i]
