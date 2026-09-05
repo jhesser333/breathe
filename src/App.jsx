@@ -706,13 +706,13 @@ export default function App() {
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={{ position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 }}
+        camera={shapeOption === 'd' ? { position: [0, 0, 10], rotation: [0, 0, 0], fov: 50 } : { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
       >
         <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
-        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} />
+        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} />
         {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} leftRawRef={leftRawRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>

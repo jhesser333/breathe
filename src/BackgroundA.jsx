@@ -8,13 +8,12 @@ const COUNT = 30
 // Default (exhale) position, before rising toward the inhale position.
 const SPAWN_X_MIN = -5
 const SPAWN_X_MAX = 5
-const SPAWN_Y_MIN = -15
-const SPAWN_Y_MAX = -12
+const SPAWN_Y_MIN = -10
+const SPAWN_Y_MAX = -3
 const SPAWN_Z_MIN = -15
-const SPAWN_Z_MAX = -8
-const RISE_MIN = 10   // how far cubes move up (Y) from exhale -> inhale position
-const RISE_MAX = 15
-const Z_RISE_MIN = 5  // how far cubes move in Z from exhale -> inhale position
+const SPAWN_Z_MAX = -10
+const Y_MIRROR_JITTER = 1  // random +/- adjustment applied to the mirrored inhale Y
+const Z_RISE_MIN = 5       // how far cubes move in Z from exhale -> inhale position
 const Z_RISE_MAX = 10
 
 // Only used to arm the very first reveal: how far the raw slider must rise
@@ -59,9 +58,11 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
       const x = SPAWN_X_MIN + Math.random() * (SPAWN_X_MAX - SPAWN_X_MIN)
       const exhaleY = SPAWN_Y_MIN + Math.random() * (SPAWN_Y_MAX - SPAWN_Y_MIN)
       const exhaleZ = SPAWN_Z_MIN + Math.random() * (SPAWN_Z_MAX - SPAWN_Z_MIN)
-      const rise = RISE_MIN + Math.random() * (RISE_MAX - RISE_MIN)
       const zRise = Z_RISE_MIN + Math.random() * (Z_RISE_MAX - Z_RISE_MIN)
-      const inhaleY = exhaleY + rise
+      // Inhale Y mirrors the (negative) exhale Y to its positive counterpart,
+      // plus a small random +/-1 jitter, instead of an additive rise.
+      const yJitter = Math.random() * 2 * Y_MIRROR_JITTER - Y_MIRROR_JITTER
+      const inhaleY = -exhaleY + yJitter
       const inhaleZ = exhaleZ + zRise
       pts.push([x, exhaleY, exhaleZ, inhaleY, inhaleZ])
     }

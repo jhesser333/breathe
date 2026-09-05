@@ -133,7 +133,7 @@ function sampleSpherePositions(count) {
   return positions
 }
 
-export default function MorphC({ leftVal, rightVal, palette }) {
+export default function MorphC({ leftVal, rightVal, palette, shapeOption }) {
   const groupRef = useRef()
   const matRef = useRef()
 
@@ -462,7 +462,7 @@ float dissolveHash(vec3 p) {
   })
 
   return (
-    <group position={[0, 0.25, 0]}>
+    <group position={shapeOption === 'd' ? [0, 0, 0] : [0, 0.25, 0]}>
       <group ref={groupRef}>
         <mesh ref={matRef}>
           <sphereGeometry args={[SPHERE_RADIUS, 32, 16]} />
