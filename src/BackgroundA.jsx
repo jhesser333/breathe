@@ -24,15 +24,15 @@ const REVERSAL_DEADBAND = 0.08
 // Alpha eases along a different pair of endpoints depending on which way
 // the cube is currently moving, so exhale->inhale and inhale->exhale don't
 // share a single curve.
-const RISING_ALPHA_START = 0.2  // at full exhale, heading toward inhale
+const RISING_ALPHA_START = 0.1  // at full exhale, heading toward inhale
 const RISING_ALPHA_END = 0.8    // at full inhale, reached from below
 const FALLING_ALPHA_START = 0   // at full exhale, reached from above
 const FALLING_ALPHA_END = 0.6   // at full inhale, heading toward exhale
 
 // Switching curves at a direction change would otherwise pop instantly
-// (e.g. 0 -> 0.2 at the bottom, 0.8 -> 0.6 at the top) — blend into the new
+// (e.g. 0 -> 0.1 at the bottom, 0.8 -> 0.6 at the top) — blend into the new
 // curve's value over this many seconds instead.
-const ALPHA_BLEND_SECONDS = 0.1
+const ALPHA_BLEND_SECONDS = 0.25
 
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
