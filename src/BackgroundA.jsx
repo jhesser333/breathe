@@ -8,16 +8,18 @@ const COUNT = 30
 // Default (exhale) position, before rising toward the inhale position.
 const SPAWN_X_MIN = -3
 const SPAWN_X_MAX = 3
-const SPAWN_Y_MIN = -20
+const SPAWN_Y_MIN = -15
 const SPAWN_Y_MAX = -10
-const SPAWN_Z_MIN = -20
-const SPAWN_Z_MAX = -10
+const SPAWN_Z_MIN = -15
+const SPAWN_Z_MAX = -5
 const RISE_MIN = 10  // how far cubes move up from exhale -> inhale position
 const RISE_MAX = 15
 
-const PULSE_DURATION = 0.25       // seconds, ease in and out
-const PULSE_OPACITY_BOOST = 0.07  // extra opacity at the extremes (both top and bottom)
-const PULSE_EMISSIVE_BOOST = 0.6  // extra emissiveIntensity at the extremes
+const PULSE_RAMP_IN = 0.125             // seconds — same ramp-in for both flashes
+const PULSE_RAMP_OUT = 0.25             // seconds — doubled ramp-out for both flashes
+const PULSE_OPACITY_BOOST = 0.07        // extra opacity at the extremes (both top and bottom)
+const INHALE_EMISSIVE_BOOST = 0.6       // peak emissive for the inhale flash (full inhale)
+const EXHALE_EMISSIVE_BOOST = 0.3       // peak emissive for the exhale flash (full exhale) — half as bright
 
 // Only used to arm the very first reveal: how far the raw slider must rise
 // above its tracked local min to count as "started heading back up."
@@ -35,13 +37,15 @@ function smootherstep(t) {
   return t * t * t * (t * (t * 6 - 15) + 10)
 }
 
-// Time-based pulse envelope: 0 -> 1 -> 0 eased over PULSE_DURATION seconds,
-// independent of breath pace, restarted from elapsed=0 on every target flip.
+// Time-based pulse envelope: eases 0 -> 1 over PULSE_RAMP_IN seconds, then
+// 1 -> 0 over PULSE_RAMP_OUT seconds — independent of breath pace, restarted
+// from elapsed=0 on every target flip (start of heading toward inhale or
+// toward exhale).
 function pulseEnvelope(elapsed) {
-  if (elapsed >= PULSE_DURATION) return 0
-  const p = elapsed / PULSE_DURATION
-  const tri = 1 - Math.abs(p * 2 - 1)
-  return smoothstep(tri)
+  if (elapsed < PULSE_RAMP_IN) return smoothstep(elapsed / PULSE_RAMP_IN)
+  const fallElapsed = elapsed - PULSE_RAMP_IN
+  if (fallElapsed >= PULSE_RAMP_OUT) return 0
+  return 1 - smoothstep(fallElapsed / PULSE_RAMP_OUT)
 }
 
 export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef, leftRawRef }) {
@@ -74,6 +78,10 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
 
   const prevTargetRef = useRef(0)
   const pulseElapsedRef = useRef(Infinity)
+  // Which flash is currently playing: fires at full exhale (target just
+  // became 1, about to rise) or at full inhale (target just became 0, about
+  // to fall) — set once per flash, when the edge that starts it is detected.
+  const pulseEmissivePeakRef = useRef(INHALE_EMISSIVE_BOOST)
 
   useFrame((_, delta) => {
     const gatesActive = gatesEnabledRef?.current ?? false
@@ -98,6 +106,9 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
     if (target !== prevTargetRef.current) {
       pulseElapsedRef.current = 0
       prevTargetRef.current = target
+      // target just became 1 -> cube was at full exhale, starting to rise.
+      // target just became 0 -> cube was at full inhale, starting to fall.
+      pulseEmissivePeakRef.current = target === 1 ? EXHALE_EMISSIVE_BOOST : INHALE_EMISSIVE_BOOST
     } else {
       pulseElapsedRef.current += delta
     }
@@ -125,7 +136,7 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
       const [, exhaleY, , inhaleY] = positions[i]
       mesh.position.y = THREE.MathUtils.lerp(exhaleY, inhaleY, posT)
       mat.opacity = THREE.MathUtils.clamp(THREE.MathUtils.lerp(0, 0.1, t) + PULSE_OPACITY_BOOST * pulse, 0, 1)
-      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t) + PULSE_EMISSIVE_BOOST * pulse
+      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t) + pulseEmissivePeakRef.current * pulse
     }
   })
 
