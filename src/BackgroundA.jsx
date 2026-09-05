@@ -5,9 +5,28 @@ import * as THREE from 'three'
 
 const COUNT = 30
 
+// Approx world-Y of "screen center" at a given depth, derived from the
+// camera ([0, 3.5, 5], looking at the origin, ~35° downward tilt) — a flat
+// world-Y range would drift wildly off-center across this scene's huge
+// Z spread, so each cube's travel is anchored to this line instead.
+const SIGHT_SLOPE = 0.7
+const TOP_OFFSET = 4     // above sight line — top half of screen (full exhale)
+const BOTTOM_OFFSET = 4  // below sight line — bottom half of screen (full inhale)
+const OFFSET_JITTER = 1  // per-cube variation so cubes don't all travel identically
+
+const PULSE_WIDTH = 0.1          // fraction of travel over which the pulse ramps
+const PULSE_OPACITY_BOOST = 0.07 // extra opacity at the extremes (both top and bottom)
+const PULSE_EMISSIVE_BOOST = 0.6 // extra emissiveIntensity at the extremes
+
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
   return t * t * (3 - 2 * t)
+}
+
+// Peaks at t=0 (full inhale) and t=1 (full exhale), 0 in the middle of the travel.
+function pulseFactor(t) {
+  const d = Math.min(t, 1 - t)
+  return 1 - smoothstep(Math.min(d / PULSE_WIDTH, 1))
 }
 
 export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
@@ -15,9 +34,11 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
     const pts = []
     for (let i = 0; i < COUNT; i++) {
       const x = Math.random() * 16 - 8
-      const y = Math.random() * -6 - 4
       const z = Math.random() * 35 - 30
-      pts.push([x, y, z])
+      const sightY = SIGHT_SLOPE * z
+      const topY = sightY + TOP_OFFSET + (Math.random() * 2 - 1) * OFFSET_JITTER
+      const bottomY = sightY - BOTTOM_OFFSET - (Math.random() * 2 - 1) * OFFSET_JITTER
+      pts.push([x, topY, z, bottomY])
     }
     return pts
   }, [])
@@ -37,14 +58,16 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
     const dir = target > progressRef.current ? 1 : -1
     progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
     const t = smoothstep(progressRef.current)
+    const pulse = pulseFactor(t)
 
     for (let i = 0; i < COUNT; i++) {
       const mesh = meshRefs.current[i]
       const mat = matRefs.current[i]
       if (!mesh || !mat) continue
-      mesh.position.y = THREE.MathUtils.lerp(positions[i][1] - 5, positions[i][1], t)
-      mat.opacity = THREE.MathUtils.lerp(0, 0.1, t)
-      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t)
+      const [, topY, , bottomY] = positions[i]
+      mesh.position.y = THREE.MathUtils.lerp(bottomY, topY, t)
+      mat.opacity = THREE.MathUtils.clamp(THREE.MathUtils.lerp(0, 0.1, t) + PULSE_OPACITY_BOOST * pulse, 0, 1)
+      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t) + PULSE_EMISSIVE_BOOST * pulse
     }
   })
 
@@ -57,7 +80,7 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
           args={[0.5, 0.5, 0.5]}
           radius={0.1}
           smoothness={3}
-          position={[pos[0], pos[1] - 5, pos[2]]}
+          position={[pos[0], pos[3], pos[2]]}
         >
           <meshStandardMaterial
             ref={el => { matRefs.current[i] = el }}

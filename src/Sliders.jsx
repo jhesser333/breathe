@@ -1,8 +1,12 @@
 import { useEffect } from 'react'
 import { useTouchSlider } from './useTouchSlider'
 
+const TRACK_WIDTH = 62
+const HIT_WIDTH = 100
+
 const trackInner = {
-  flex: 1,
+  width: `${TRACK_WIDTH}px`,
+  alignSelf: 'stretch',
   borderRadius: '28px',
   background: 'rgba(255,255,255,0.08)',
   border: '1px solid rgba(255,255,255,0.15)',
@@ -44,7 +48,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
   return (
     <div style={{
       position: 'absolute',
-      [side]: 12,
+      [side]: 16,
       top: '63%', bottom: 16,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 6,
@@ -53,8 +57,8 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
       <div
         ref={sliderRef}
         style={{
-          flex: 1, width: 62,
-          display: 'flex', alignItems: 'stretch',
+          flex: 1, width: HIT_WIDTH,
+          display: 'flex', justifyContent: 'center', alignItems: 'stretch',
           cursor: 'pointer', userSelect: 'none', touchAction: 'none',
         }}
       >
