@@ -14,7 +14,7 @@ import * as THREE from 'three'
 
 const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing with headroom
 const RING_SPACING = 5
-const TUNNEL_FAR_Z = -100
+const TUNNEL_FAR_Z = -50
 const TUNNEL_NEAR_Z = 10        // recycle point, just past the camera
 const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
