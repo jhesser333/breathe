@@ -8,8 +8,8 @@ const COUNT = 30
 // Default (exhale) position, before rising toward the inhale position.
 const SPAWN_X_MIN = -5
 const SPAWN_X_MAX = 5
-const SPAWN_Y_MIN = -15
-const SPAWN_Y_MAX = -3
+const SPAWN_Y_MIN = -5
+const SPAWN_Y_MAX = -1
 const SPAWN_Z_MIN = -15
 const SPAWN_Z_MAX = -10
 const Y_MIRROR_JITTER = 1  // random +/- adjustment applied to the mirrored inhale Y
@@ -36,13 +36,6 @@ const ALPHA_BLEND_SECONDS = 0.25
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
   return t * t * (3 - 2 * t)
-}
-
-// Stronger ease-in/ease-out than smoothstep (zero first *and* second
-// derivative at both ends) — used for the cubes' position travel.
-function smootherstep(t) {
-  t = Math.max(0, Math.min(1, t))
-  return t * t * t * (t * (t * 6 - 15) + 10)
 }
 
 function alphaForTarget(t, target) {
@@ -128,7 +121,6 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
       handedOffRef.current = true
     }
 
-    const posT = smootherstep(progressRef.current)
     const t = smoothstep(progressRef.current)
 
     const rawAlpha = alphaForTarget(t, target)
@@ -142,8 +134,8 @@ export default function BackgroundA({ gateColor, emissiveColor, breathPhaseRef, 
       const mat = matRefs.current[i]
       if (!mesh || !mat) continue
       const [, exhaleY, exhaleZ, inhaleY, inhaleZ] = positions[i]
-      mesh.position.y = THREE.MathUtils.lerp(exhaleY, inhaleY, posT)
-      mesh.position.z = THREE.MathUtils.lerp(exhaleZ, inhaleZ, posT)
+      mesh.position.y = THREE.MathUtils.lerp(exhaleY, inhaleY, t)
+      mesh.position.z = THREE.MathUtils.lerp(exhaleZ, inhaleZ, t)
       mat.opacity = alpha
       mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t)
     }
