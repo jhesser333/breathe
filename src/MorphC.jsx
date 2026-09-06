@@ -10,8 +10,9 @@ const SPREAD_2 = 0.9              // max XZ travel distance for system 2
 const MAX_SPAWN_PER_FRAME = 150   // safety cap against huge dt spikes (e.g. tab refocus)
 const SPAWN_SENTINEL = -1e4
 const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel lv jitter when deciding flow direction
-const OPTION_D_INHALE_Z = 0        // world-Z at full inhale (Option D only)
-const OPTION_D_EXHALE_Z = -25      // world-Z at full exhale (Option D only)
+const OPTION_D_EXHALE_X_SCALE = 1     // Option D only: replaces the shared 4 at full exhale
+const OPTION_D_EXHALE_Y_SCALE = 0.05  // Option D only: replaces the shared 0.4 at full exhale
+const OPTION_D_EXHALE_Z_SCALE = 0.1   // Option D only: replaces the shared 0.2 at full exhale
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -137,7 +138,6 @@ function sampleSpherePositions(count) {
 
 export default function MorphC({ leftVal, rightVal, palette, shapeOption }) {
   const groupRef = useRef()
-  const outerGroupRef = useRef()
   const matRef = useRef()
 
   // System 1 (sparkle): cyclic pool index + fractional spawn-rate accumulator.
@@ -361,14 +361,11 @@ float dissolveHash(vec3 p) {
     const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
     const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
-    const xScale = THREE.MathUtils.lerp(4, 2.25, lv)
-    const zScale = THREE.MathUtils.lerp(0.2, 1.5, lv)
-    const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
+    const isD = shapeOption === 'd'
+    const xScale = THREE.MathUtils.lerp(isD ? OPTION_D_EXHALE_X_SCALE : 4, 2.25, lv)
+    const zScale = THREE.MathUtils.lerp(isD ? OPTION_D_EXHALE_Z_SCALE : 0.2, 1.5, lv)
+    const yScale = THREE.MathUtils.lerp(3.5, isD ? OPTION_D_EXHALE_Y_SCALE : 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
-
-    if (shapeOption === 'd' && outerGroupRef.current) {
-      outerGroupRef.current.position.z = THREE.MathUtils.lerp(OPTION_D_EXHALE_Z, OPTION_D_INHALE_Z, lv)
-    }
 
     material.emissiveIntensity = THREE.MathUtils.lerp(1.5, 0, rv)
     material.roughness = THREE.MathUtils.lerp(0.3, 1, rv)
@@ -469,7 +466,7 @@ float dissolveHash(vec3 p) {
   })
 
   return (
-    <group ref={outerGroupRef} position={shapeOption === 'd' ? [0, 0, 0] : [0, 0.25, 0]}>
+    <group position={shapeOption === 'd' ? [0, 0, 0] : [0, 0.25, 0]}>
       <group ref={groupRef}>
         <mesh ref={matRef}>
           <sphereGeometry args={[SPHERE_RADIUS, 32, 16]} />
