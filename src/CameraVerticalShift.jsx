@@ -10,7 +10,7 @@ import * as THREE from 'three'
 // simply appears higher in the cropped frame, exactly like a camera rise
 // movement in architectural photography.
 const EXTRA_HEIGHT_FRACTION = 0.6  // how much taller the virtual frame is than the viewport; more headroom allows a bigger shift but narrows the effective FOV shown
-const SHIFT_FRACTION = 0.8         // how much of that headroom to use (0 = centered/no shift, 1 = maximum downward crop)
+const SHIFT_FRACTION = 0.7         // how much of that headroom to use (0 = centered/no shift, 1 = maximum downward crop)
 
 export default function CameraVerticalShift() {
   const { camera, size } = useThree()
