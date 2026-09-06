@@ -5,9 +5,12 @@ import * as THREE from 'three'
 // Continuous ring tunnel for Shape Option D, replacing BackgroundA's cubes.
 // Unlike the Gates system, ring motion is NOT breath-paced -- it's a slow,
 // constant conveyor-loop scroll toward the Morph, independent of breath
-// timing. Only each ring's opacity/glow is breath-driven: a plain 0->1
-// smoothstep fade timed to inhale/exhale duration, no exaggerated
-// start/end alpha jumps.
+// timing. Each ring's opacity/glow fades with a plain smoothstep (no
+// exaggerated start/end jumps), but staggered by spatial position so the
+// fade reads as a wave traveling along the tunnel rather than a lockstep
+// flash: on inhale the reveal sweeps from the far end toward the Morph,
+// finishing at full inhale; on exhale it sweeps the opposite way, starting
+// at the Morph/camera end and finishing (fully hidden) at full exhale.
 
 const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing with headroom
 const RING_SPACING = 5
@@ -15,6 +18,7 @@ const TUNNEL_FAR_Z = -100
 const TUNNEL_NEAR_Z = 10        // recycle point, just past the camera
 const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
+const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
 
 const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
@@ -49,10 +53,8 @@ export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhase
     const dir = target > progressRef.current ? 1 : -1
     progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
 
-    const t = smoothstep(progressRef.current)
-    const alpha = t
-
     const tunnelLength = RING_COUNT * RING_SPACING
+    const tunnelSpan = 0 - TUNNEL_FAR_Z
 
     for (let i = 0; i < RING_COUNT; i++) {
       const mesh = meshRefs.current[i]
@@ -63,8 +65,22 @@ export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhase
       if (zRef.current[i] > TUNNEL_NEAR_Z) zRef.current[i] -= tunnelLength
 
       mesh.position.z = zRef.current[i]
-      mat.opacity = alpha
-      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, t)
+
+      const u = THREE.MathUtils.clamp((zRef.current[i] - TUNNEL_FAR_Z) / tunnelSpan, 0, 1)
+      let localAlpha
+      if (target === 1) {
+        const orderFraction = u
+        const localRaw = THREE.MathUtils.clamp((progressRef.current - orderFraction * (1 - WAVE_SPAN)) / WAVE_SPAN, 0, 1)
+        localAlpha = smoothstep(localRaw)
+      } else {
+        const q = 1 - progressRef.current
+        const orderFraction = 1 - u
+        const localRaw = THREE.MathUtils.clamp((q - orderFraction * (1 - WAVE_SPAN)) / WAVE_SPAN, 0, 1)
+        localAlpha = 1 - smoothstep(localRaw)
+      }
+
+      mat.opacity = localAlpha
+      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, localAlpha)
     }
   })
 
