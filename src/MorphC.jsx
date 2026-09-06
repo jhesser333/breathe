@@ -10,8 +10,8 @@ const SPREAD_2 = 0.9              // max XZ travel distance for system 2
 const MAX_SPAWN_PER_FRAME = 150   // safety cap against huge dt spikes (e.g. tab refocus)
 const SPAWN_SENTINEL = -1e4
 const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel lv jitter when deciding flow direction
-const OPTION_D_EXHALE_X_SCALE = 1     // Option D only: replaces the shared 4 at full exhale
-const OPTION_D_EXHALE_Y_SCALE = 0.05  // Option D only: replaces the shared 0.4 at full exhale
+const OPTION_D_EXHALE_X_SCALE = 2     // Option D only: replaces the shared 4 at full exhale
+const OPTION_D_EXHALE_Y_SCALE = 0.1   // Option D only: replaces the shared 0.4 at full exhale
 const OPTION_D_EXHALE_Z_SCALE = 0.1   // Option D only: replaces the shared 0.2 at full exhale
 
 const SPARKLE_VERTEX_SHADER = `
