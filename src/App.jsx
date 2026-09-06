@@ -706,7 +706,7 @@ export default function App() {
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={shapeOption === 'd' ? { position: [0, 0, 7], rotation: [0, 0, 0], fov: 50 } : { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 }}
+        camera={shapeOption === 'd' ? { position: [0, 0, 10], rotation: [0, 0, 0], fov: 50 } : { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 }}
         style={{ position: 'absolute', inset: 0 }}
       >
         <color attach="background" args={[palette.background]} />
