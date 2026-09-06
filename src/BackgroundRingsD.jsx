@@ -5,10 +5,9 @@ import * as THREE from 'three'
 // Continuous ring tunnel for Shape Option D, replacing BackgroundA's cubes.
 // Unlike the Gates system, ring motion is NOT breath-paced -- it's a slow,
 // constant conveyor-loop scroll toward the Morph, independent of breath
-// timing. Only each ring's opacity/glow is breath-driven, reusing
-// BackgroundA.jsx's exact alpha-curve mechanism (copied, not imported --
-// matches this codebase's existing per-file-duplication convention, e.g.
-// GatesHeadlessE duplicating GatesHeadless's constants).
+// timing. Only each ring's opacity/glow is breath-driven: a plain 0->1
+// smoothstep fade timed to inhale/exhale duration, no exaggerated
+// start/end alpha jumps.
 
 const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing with headroom
 const RING_SPACING = 5
@@ -21,27 +20,9 @@ const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
 const GATE_SCALE = [1.376, 1.955, 1]   // same clearance scale as GatesC/GatesBoxBreathingC's inhale torus
 
-// Alpha eases along a different pair of endpoints depending on which way
-// the rings are currently heading, so exhale->inhale and inhale->exhale
-// don't share a single curve.
-const RISING_ALPHA_START = 0.1  // at full exhale, heading toward inhale
-const RISING_ALPHA_END = 0.8    // at full inhale, reached from below
-const FALLING_ALPHA_START = 0   // at full exhale, reached from above
-const FALLING_ALPHA_END = 0.6   // at full inhale, heading toward exhale
-
-// Switching curves at a direction change would otherwise pop instantly --
-// blend into the new curve's value over this many seconds instead.
-const ALPHA_BLEND_SECONDS = 0.25
-
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
   return t * t * (3 - 2 * t)
-}
-
-function alphaForTarget(t, target) {
-  return target === 1
-    ? THREE.MathUtils.lerp(RISING_ALPHA_START, RISING_ALPHA_END, t)
-    : THREE.MathUtils.lerp(FALLING_ALPHA_START, FALLING_ALPHA_END, t)
 }
 
 export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
@@ -56,22 +37,9 @@ export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhase
   const zRef = useRef(startZs.slice())
   const progressRef = useRef(0)
 
-  const prevTargetRef = useRef(0)
-  const alphaBlendElapsedRef = useRef(Infinity)
-  const alphaBlendStartRef = useRef(FALLING_ALPHA_START)
-  const lastAlphaRef = useRef(FALLING_ALPHA_START)
-
   useFrame((_, delta) => {
     const gatesActive = gatesEnabledRef?.current ?? false
     const target = gatesActive && breathPhaseRef?.current === 'inhale' ? 1 : 0
-
-    if (target !== prevTargetRef.current) {
-      alphaBlendStartRef.current = lastAlphaRef.current
-      alphaBlendElapsedRef.current = 0
-      prevTargetRef.current = target
-    } else {
-      alphaBlendElapsedRef.current += delta
-    }
 
     const inhale = inhaleSecondsRef?.current
     const exhale = exhaleSecondsRef?.current
@@ -82,12 +50,7 @@ export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhase
     progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
 
     const t = smoothstep(progressRef.current)
-
-    const rawAlpha = alphaForTarget(t, target)
-    const alpha = alphaBlendElapsedRef.current < ALPHA_BLEND_SECONDS
-      ? THREE.MathUtils.lerp(alphaBlendStartRef.current, rawAlpha, smoothstep(alphaBlendElapsedRef.current / ALPHA_BLEND_SECONDS))
-      : rawAlpha
-    lastAlphaRef.current = alpha
+    const alpha = t
 
     const tunnelLength = RING_COUNT * RING_SPACING
 
