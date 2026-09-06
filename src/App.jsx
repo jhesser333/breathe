@@ -19,7 +19,6 @@ import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import BreathPaceOptionsScreen from './BreathPaceOptionsScreen'
-import BackgroundA from './BackgroundA'
 import BackgroundB from './BackgroundB'
 import StarFieldE from './StarFieldE'
 import TutorialText from './TutorialText'
@@ -107,7 +106,7 @@ export default function App() {
   // Background is fully derived from the shape choice: Options D and E have
   // no visible Gates/rails, so they're the only ones that need an ambient
   // background as a pacing cue. A/B/C stay background-free.
-  const backgroundOption = shapeOption === 'e' ? 'b' : shapeOption === 'd' ? 'a' : 'none'
+  const backgroundOption = shapeOption === 'e' ? 'b' : 'none'
 
   const palette = PALETTES.a
   const shapeRef = useRef(shapeOption)
@@ -713,7 +712,12 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} />
-        {backgroundOption === 'a' && <BackgroundA gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} leftRawRef={leftRawRef} />}
+        {shapeOption === 'd' && (
+          <mesh position={[0, 0, 0]}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshBasicMaterial color="white" />
+          </mesh>
+        )}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />

@@ -10,6 +10,7 @@ const SPREAD_2 = 0.9              // max XZ travel distance for system 2
 const MAX_SPAWN_PER_FRAME = 150   // safety cap against huge dt spikes (e.g. tab refocus)
 const SPAWN_SENTINEL = -1e4
 const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel lv jitter when deciding flow direction
+const OPTION_D_Y_OFFSET = 1.5     // world-Y shift for Option D only; tune based on phone check against the origin reference cube
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -462,7 +463,7 @@ float dissolveHash(vec3 p) {
   })
 
   return (
-    <group position={shapeOption === 'd' ? [0, 0, 0] : [0, 0.25, 0]}>
+    <group position={shapeOption === 'd' ? [0, OPTION_D_Y_OFFSET, 0] : [0, 0.25, 0]}>
       <group ref={groupRef}>
         <mesh ref={matRef}>
           <sphereGeometry args={[SPHERE_RADIUS, 32, 16]} />
