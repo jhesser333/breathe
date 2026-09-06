@@ -20,6 +20,7 @@ import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import BreathPaceOptionsScreen from './BreathPaceOptionsScreen'
 import BackgroundB from './BackgroundB'
+import CameraVerticalShift from './CameraVerticalShift'
 import StarFieldE from './StarFieldE'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
@@ -711,6 +712,7 @@ export default function App() {
         <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
+        {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} />
         {shapeOption === 'd' && (
           <mesh position={[0, 0, 0]}>
