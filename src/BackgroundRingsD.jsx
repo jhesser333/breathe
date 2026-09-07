@@ -5,12 +5,12 @@ import * as THREE from 'three'
 // Continuous ring tunnel for Shape Option D, replacing BackgroundA's cubes.
 // Unlike the Gates system, ring motion is NOT breath-paced -- it's a slow,
 // constant conveyor-loop scroll toward the Morph, independent of breath
-// timing. Each ring's opacity/glow fades with a plain smoothstep (no
-// exaggerated start/end jumps), but staggered by spatial position so the
-// fade reads as a wave traveling along the tunnel rather than a lockstep
-// flash: on inhale the reveal sweeps from the far end toward the Morph,
-// finishing at full inhale; on exhale it sweeps the opposite way, starting
-// at the Morph/camera end and finishing (fully hidden) at full exhale.
+// timing. Rings are always fully opaque; only their emissive glow pulses
+// with a plain smoothstep (no exaggerated start/end jumps), staggered by
+// spatial position so the glow reads as a wave traveling along the tunnel
+// rather than a lockstep flash: on inhale it sweeps from the far end toward
+// the Morph, finishing at full inhale; on exhale it sweeps the opposite way,
+// starting at the Morph/camera end and finishing (fully dark) at full exhale.
 
 const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing with headroom
 const RING_SPACING = 5
@@ -29,7 +29,7 @@ function smoothstep(t) {
   return t * t * (3 - 2 * t)
 }
 
-export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
+export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
   const startZs = useMemo(() => {
     const zs = []
     for (let i = 0; i < RING_COUNT; i++) zs.push(TUNNEL_FAR_Z + i * RING_SPACING)
@@ -67,20 +67,19 @@ export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhase
       mesh.position.z = zRef.current[i]
 
       const u = THREE.MathUtils.clamp((zRef.current[i] - TUNNEL_FAR_Z) / tunnelSpan, 0, 1)
-      let localAlpha
+      let wave
       if (target === 1) {
         const orderFraction = u
         const localRaw = THREE.MathUtils.clamp((progressRef.current - orderFraction * (1 - WAVE_SPAN)) / WAVE_SPAN, 0, 1)
-        localAlpha = smoothstep(localRaw)
+        wave = smoothstep(localRaw)
       } else {
         const q = 1 - progressRef.current
         const orderFraction = 1 - u
         const localRaw = THREE.MathUtils.clamp((q - orderFraction * (1 - WAVE_SPAN)) / WAVE_SPAN, 0, 1)
-        localAlpha = 1 - smoothstep(localRaw)
+        wave = 1 - smoothstep(localRaw)
       }
 
-      mat.opacity = localAlpha
-      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, localAlpha)
+      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, wave)
     }
   })
 
@@ -96,13 +95,11 @@ export default function BackgroundRingsD({ gateColor, emissiveColor, breathPhase
           <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
           <meshStandardMaterial
             ref={el => { matRefs.current[i] = el }}
-            color={gateColor}
+            color={baseColor}
             emissive={emissiveColor}
             emissiveIntensity={0}
             roughness={0.5}
             metalness={0.1}
-            transparent
-            opacity={0}
           />
         </mesh>
       ))}
