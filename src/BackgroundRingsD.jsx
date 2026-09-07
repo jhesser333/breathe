@@ -5,20 +5,22 @@ import * as THREE from 'three'
 // Continuous ring tunnel for Shape Option D, replacing BackgroundA's cubes.
 // Unlike the Gates system, ring motion is NOT breath-paced -- it's a slow,
 // constant conveyor-loop scroll toward the Morph, independent of breath
-// timing. Rings are always fully opaque; only their emissive glow pulses
-// with a plain smoothstep (no exaggerated start/end jumps), staggered by
-// spatial position so the glow reads as a wave traveling along the tunnel
-// rather than a lockstep flash: on inhale it sweeps from the far end toward
-// the Morph, finishing at full inhale; on exhale it sweeps the opposite way,
-// starting at the Morph/camera end and finishing (fully dark) at full exhale.
+// timing. Both opacity (capped at MAX_ALPHA) and emissive glow ramp in
+// together with a plain smoothstep (no exaggerated start/end jumps),
+// staggered by spatial position so it reads as a wave traveling along the
+// tunnel rather than a lockstep flash: on inhale it sweeps from the far end
+// toward the Morph, finishing at full inhale; on exhale it sweeps the
+// opposite way, starting at the Morph/camera end and finishing (fully faded)
+// at full exhale.
 
 const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing with headroom
 const RING_SPACING = 5
-const TUNNEL_FAR_Z = -50
+const TUNNEL_FAR_Z = -25
 const TUNNEL_NEAR_Z = 10        // recycle point, just past the camera
 const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
 const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
+const MAX_ALPHA = 0.5           // overall opacity ceiling the wave ramps up to
 
 const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
@@ -79,6 +81,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
         wave = 1 - smoothstep(localRaw)
       }
 
+      mat.opacity = MAX_ALPHA * wave
       mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, wave)
     }
   })
@@ -100,6 +103,8 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
             emissiveIntensity={0}
             roughness={0.5}
             metalness={0.1}
+            transparent
+            opacity={0}
           />
         </mesh>
       ))}
