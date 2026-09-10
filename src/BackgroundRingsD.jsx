@@ -13,9 +13,9 @@ import * as THREE from 'three'
 // opposite way, starting at the Morph/camera end and finishing (fully faded)
 // at full exhale.
 
-const RING_COUNT = 5            // exactly fits TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 3-unit spacing, no extra headroom
-const RING_SPACING = 3
-const TUNNEL_FAR_Z = -10
+const RING_COUNT = 12           // exactly fits TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing, no extra headroom
+const RING_SPACING = 5
+const TUNNEL_FAR_Z = -55
 const TUNNEL_NEAR_Z = 3          // recycle/disappear point
 const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
