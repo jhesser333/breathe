@@ -13,14 +13,16 @@ import * as THREE from 'three'
 // opposite way, starting at the Morph/camera end and finishing (fully faded)
 // at full exhale.
 
-const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing with headroom
-const RING_SPACING = 5
+const RING_COUNT = 23           // covers TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 3-unit spacing with headroom
+const RING_SPACING = 3
 const TUNNEL_FAR_Z = -10
-const TUNNEL_NEAR_Z = 0        // recycle point, just past the camera
+const TUNNEL_NEAR_Z = 2         // recycle/disappear point
 const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
 const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
 const MAX_ALPHA = 0.5           // overall opacity ceiling the wave ramps up to
+const WAVE_EFFECT_ENABLED = false // temporarily off; flip back on to restore the breath-paced wave
+const FLAT_ALPHA = 0.5          // flat opacity used while the wave is disabled
 
 const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
@@ -81,8 +83,13 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
         wave = 1 - smoothstep(localRaw)
       }
 
-      mat.opacity = MAX_ALPHA * wave
-      mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, wave)
+      if (WAVE_EFFECT_ENABLED) {
+        mat.opacity = MAX_ALPHA * wave
+        mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, wave)
+      } else {
+        mat.opacity = FLAT_ALPHA
+        mat.emissiveIntensity = 0
+      }
     }
   })
 
@@ -104,7 +111,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
             roughness={0.5}
             metalness={0.1}
             transparent
-            opacity={0}
+            opacity={FLAT_ALPHA}
           />
         </mesh>
       ))}
