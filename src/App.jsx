@@ -57,6 +57,19 @@ const DIAG_CYCLE_STROKES = 2      // 2 strokes = 1 full up+down breath cycle
 const DIAG_FADE_IN_MS = 1000
 const DIAG_FADE_OUT_MS = 2000
 
+// Per-shape camera placement. Each art option is framed independently -- omitting
+// `rotation` lets R3F apply its default look-at-origin, which gives the ~35deg
+// downward tilt Options A/B/C were designed around; an explicit rotation opts out
+// of that for a level view. Option D additionally gets CameraVerticalShift.
+const CAMERA_BY_SHAPE = {
+  a: { position: [0, 3.5, 5], fov: 50 },
+  b: { position: [0, 3.5, 5], fov: 50 },
+  c: { position: [0, 3.5, 5], fov: 50 },
+  d: { position: [0, 0, 10], rotation: [0, 0, 0], fov: 50 },
+  e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
+}
+const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
+
 export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
@@ -707,7 +720,7 @@ export default function App() {
   return (
     <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
-        camera={shapeOption === 'd' ? { position: [0, 0, 10], rotation: [0, 0, 0], fov: 50 } : { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 }}
+        camera={CAMERA_BY_SHAPE[shapeOption] || DEFAULT_CAMERA}
         style={{ position: 'absolute', inset: 0 }}
       >
         <color attach="background" args={[palette.background]} />
