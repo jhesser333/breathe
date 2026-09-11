@@ -1,4 +1,4 @@
-function optionBtn(selected) {
+function optionBtn(selected, palette) {
   return {
     width: '100%', maxWidth: 320,
     padding: '20px 24px',
@@ -6,7 +6,7 @@ function optionBtn(selected) {
     border: selected ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.15)',
     borderRadius: 12,
     cursor: 'pointer', textAlign: 'left',
-    color: '#ffffff', fontFamily: 'sans-serif',
+    color: palette.textColor, fontFamily: 'sans-serif',
   }
 }
 
@@ -20,7 +20,7 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
       gap: 16, padding: 32, paddingTop: 60, paddingBottom: 150,
       fontFamily: 'sans-serif',
     }}>
-      <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
+      <h1 style={{ color: palette.headerColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         ART OPTIONS
       </h1>
       <div style={{
@@ -29,13 +29,13 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         display: 'flex', flexDirection: 'column', gap: 16,
       }}>
-        <button style={optionBtn(shapeOption === 'd')} onClick={() => onSelectShape('d')}>
+        <button style={optionBtn(shapeOption === 'd', palette)} onClick={() => onSelectShape('d')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Sphere that Disappears {shapeOption === 'd' && '✓'}</div>
         </button>
-        <button style={optionBtn(shapeOption === 'b')} onClick={() => onSelectShape('b')}>
+        <button style={optionBtn(shapeOption === 'b', palette)} onClick={() => onSelectShape('b')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Cube with Targets {shapeOption === 'b' && '✓'}</div>
         </button>
-        <button style={optionBtn(shapeOption === 'e')} onClick={() => onSelectShape('e')}>
+        <button style={optionBtn(shapeOption === 'e', palette)} onClick={() => onSelectShape('e')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Rotating Rings {shapeOption === 'e' && '✓'}</div>
         </button>
       </div>

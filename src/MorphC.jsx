@@ -164,15 +164,15 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption }) {
     }
 
     const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(palette.morphBase),
-      emissive: new THREE.Color(palette.morphEmissive),
+      color: new THREE.Color(palette.tertiaryColor),
+      emissive: new THREE.Color(palette.primaryColor),
       emissiveIntensity: 2,
       roughness: 1,
       metalness: 0,
       transparent: true,
     })
 
-    mat.customProgramCacheKey = () => `fresnel-morph-c-${palette.morphEmissive}`
+    mat.customProgramCacheKey = () => `fresnel-morph-c-${palette.primaryColor}`
 
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, fresnelUniforms)
@@ -249,7 +249,7 @@ float dissolveHash(vec3 p) {
     }
 
     return { material: mat, fresnelUniforms }
-  }, [palette.morphBase, palette.morphEmissive])
+  }, [palette.tertiaryColor, palette.primaryColor])
 
   const sparkleAttrs = useMemo(() => {
     const positions = sampleSpherePositions(PARTICLE_COUNT)
@@ -323,7 +323,7 @@ float dissolveHash(vec3 p) {
     return new THREE.ShaderMaterial({
       uniforms: {
         uSize:  { value: 60 },
-        uColor: { value: new THREE.Color(palette.morphEmissive) },
+        uColor: { value: new THREE.Color(palette.primaryColor) },
         uTime:  { value: 0 },
       },
       vertexShader: SPARKLE_VERTEX_SHADER,
@@ -333,13 +333,13 @@ float dissolveHash(vec3 p) {
       depthTest: false,
       blending: THREE.AdditiveBlending,
     })
-  }, [palette.morphEmissive])
+  }, [palette.primaryColor])
 
   const flowMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
         uSize:   { value: 60 },
-        uColor:  { value: new THREE.Color(palette.morphEmissive) },
+        uColor:  { value: new THREE.Color(palette.primaryColor) },
         uTime:   { value: 0 },
         uSpread: { value: SPREAD_2 },
         uPullRate: { value: 1.2 },
@@ -351,7 +351,7 @@ float dissolveHash(vec3 p) {
       depthTest: false,
       blending: THREE.AdditiveBlending,
     })
-  }, [palette.morphEmissive])
+  }, [palette.primaryColor])
 
   useFrame((state, delta) => {
     if (!groupRef.current) return

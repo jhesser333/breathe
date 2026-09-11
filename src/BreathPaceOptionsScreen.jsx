@@ -1,6 +1,6 @@
 import { TARGET_PACES } from './breathPace'
 
-function optionBtn(selected) {
+function optionBtn(selected, palette) {
   return {
     width: '100%', maxWidth: 320,
     padding: '20px 24px',
@@ -8,7 +8,7 @@ function optionBtn(selected) {
     border: selected ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.15)',
     borderRadius: 12,
     cursor: 'pointer', textAlign: 'left',
-    color: '#ffffff', fontFamily: 'sans-serif',
+    color: palette.textColor, fontFamily: 'sans-serif',
   }
 }
 
@@ -24,11 +24,11 @@ export default function BreathPaceOptionsScreen({ selected, onSelect, onHome, pa
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <h1 style={{ color: '#ffffff', fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
+      <h1 style={{ color: palette.headerColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Breath Pace Options
       </h1>
       {OPTIONS.map(opt => (
-        <button key={opt.id} style={optionBtn(selected === opt.id)} onClick={() => onSelect(opt.id)}>
+        <button key={opt.id} style={optionBtn(selected === opt.id, palette)} onClick={() => onSelect(opt.id)}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selected === opt.id && '✓'}</div>
         </button>
       ))}

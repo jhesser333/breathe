@@ -17,10 +17,10 @@ export default function MorphE({ leftVal, rightVal, palette }) {
   const ringMeshRefs = useRef([])
 
   const material = useMemo(() => new THREE.MeshStandardMaterial({
-    color: new THREE.Color(palette.morphBase),
+    color: new THREE.Color(palette.tertiaryColor),
     roughness: 1,
     metalness: 0,
-  }), [palette.morphBase])
+  }), [palette.tertiaryColor])
 
   // Exhale pose: every ring flat on the horizontal (XZ) plane. Default
   // TorusGeometry lies in XY (normal +Z, per Gates* convention of never

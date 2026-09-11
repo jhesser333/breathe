@@ -13,14 +13,14 @@ export default function MorphA({ leftVal, rightVal, palette }) {
     }
 
     const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(palette.morphBase),
-      emissive: new THREE.Color(palette.morphEmissive),
+      color: new THREE.Color(palette.tertiaryColor),
+      emissive: new THREE.Color(palette.primaryColor),
       emissiveIntensity: 2,
       roughness: 1,
       metalness: 0,
     })
 
-    mat.customProgramCacheKey = () => `fresnel-morph-a-${palette.morphEmissive}`
+    mat.customProgramCacheKey = () => `fresnel-morph-a-${palette.primaryColor}`
 
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, fresnelUniforms)
@@ -50,7 +50,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     }
 
     return { material: mat, fresnelUniforms }
-  }, [palette.morphBase, palette.morphEmissive])
+  }, [palette.tertiaryColor, palette.primaryColor])
 
   useFrame(() => {
     if (!groupRef.current) return

@@ -728,8 +728,8 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} />
-        {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
-        {backgroundOption === 'b' && <BackgroundB gateColor={palette.gateColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
+        {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
+        {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
@@ -737,8 +737,8 @@ export default function App() {
           <GatesComponent
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
-            gateColor={palette.gateColor}
-            emissiveColor={palette.morphEmissive}
+            gateColor={palette.secondaryColor}
+            emissiveColor={palette.primaryColor}
             breathPhaseRef={breathPhaseRef}
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
@@ -748,15 +748,15 @@ export default function App() {
           <BoxGatesComponent
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
-            gateColor={palette.gateColor}
-            emissiveColor={palette.morphEmissive}
+            gateColor={palette.secondaryColor}
+            emissiveColor={palette.primaryColor}
             onFirstGate={handleBBFirstGate}
             onLastGate={handleBBLastGate}
             holdFlareRef={holdFlareRef}
           />
         )}
         {shapeOption === 'e' && mode === 'box' && (
-          <StarFieldE gateColor={palette.gateColor} emissiveColor={palette.morphEmissive} holdFlareRef={holdFlareRef} />
+          <StarFieldE gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} holdFlareRef={holdFlareRef} />
         )}
         {mode === 'slowing' && (
           <SlowingDownController

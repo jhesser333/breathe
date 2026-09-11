@@ -27,7 +27,7 @@ const pillStyle = {
   cursor: 'pointer', fontFamily: 'sans-serif',
 }
 
-function modeBtnStyle(selected) {
+function modeBtnStyle(selected, palette) {
   return {
     width: '100%', maxWidth: 320,
     padding: '20px 24px',
@@ -35,7 +35,7 @@ function modeBtnStyle(selected) {
     border: selected ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.15)',
     borderRadius: 12,
     cursor: 'pointer', textAlign: 'left',
-    color: '#ffffff', fontFamily: 'sans-serif',
+    color: palette.textColor, fontFamily: 'sans-serif',
   }
 }
 
@@ -76,8 +76,8 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
           style={{
             width: 110, height: 110, borderRadius: '50%',
             background: `rgba(255,105,180,${startPressed ? 0.75 : 0.25})`,
-            border: '2px solid #ff69b4',
-            color: '#ff69b4', fontSize: 20, fontWeight: 700,
+            border: `2px solid ${palette.headerColor}`,
+            color: palette.headerColor, fontSize: 20, fontWeight: 700,
             fontFamily: 'sans-serif', cursor: 'pointer',
           }}
         >
@@ -88,7 +88,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
         </button>
       </div>
       <h1 style={{
-        color: '#ff69b4', fontSize: 32, fontWeight: 700,
+        color: palette.headerColor, fontSize: 32, fontWeight: 700,
         letterSpacing: '0.15em', margin: '0 0 8px',
         transform: 'translateY(-96px)',
       }}>
@@ -96,7 +96,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       </h1>
       <div style={{ transform: 'translateY(-96px)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <h2 style={{
-          color: '#ffffff', fontSize: 24, fontWeight: 300,
+          color: palette.subheaderColor, fontSize: 24, fontWeight: 300,
           letterSpacing: '0.1em', margin: '0 0 12px',
         }}>
           MODES
@@ -106,7 +106,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
             <button
               key={opt.id}
               onClick={() => onSelectModeChange(opt.id)}
-              style={modeBtnStyle(selectedMode === opt.id)}
+              style={modeBtnStyle(selectedMode === opt.id, palette)}
             >
               <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
