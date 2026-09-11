@@ -10,9 +10,12 @@ const SPREAD_2 = 0.9              // max XZ travel distance for system 2
 const MAX_SPAWN_PER_FRAME = 150   // safety cap against huge dt spikes (e.g. tab refocus)
 const SPAWN_SENTINEL = -1e4
 const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel lv jitter when deciding flow direction
-const OPTION_D_EXHALE_X_SCALE = 5     // Option D only: replaces the shared 4 at full exhale
-const OPTION_D_EXHALE_Y_SCALE = 0.5   // Option D only: replaces the shared 0.4 at full exhale
-const OPTION_D_EXHALE_Z_SCALE = 0.5   // Option D only: replaces the shared 0.2 at full exhale
+const OPTION_D_EXHALE_X_SCALE = 3     // Option D only: replaces the shared 4 at full exhale
+const OPTION_D_EXHALE_Y_SCALE = 0.25  // Option D only: replaces the shared 0.4 at full exhale
+const OPTION_D_EXHALE_Z_SCALE = 0.25  // Option D only: replaces the shared 0.2 at full exhale
+const OPTION_D_INHALE_X_SCALE = 1.25  // Option D only: replaces the shared 2.25 at full inhale
+const OPTION_D_INHALE_Y_SCALE = 2     // Option D only: replaces the shared 3.5 at full inhale
+const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 at full inhale
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -362,9 +365,9 @@ float dissolveHash(vec3 p) {
     const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
     const isD = shapeOption === 'd'
-    const xScale = THREE.MathUtils.lerp(isD ? OPTION_D_EXHALE_X_SCALE : 4, 2.25, lv)
-    const zScale = THREE.MathUtils.lerp(isD ? OPTION_D_EXHALE_Z_SCALE : 0.2, 1.5, lv)
-    const yScale = THREE.MathUtils.lerp(3.5, isD ? OPTION_D_EXHALE_Y_SCALE : 0.4, rv)
+    const xScale = THREE.MathUtils.lerp(isD ? OPTION_D_EXHALE_X_SCALE : 4, isD ? OPTION_D_INHALE_X_SCALE : 2.25, lv)
+    const zScale = THREE.MathUtils.lerp(isD ? OPTION_D_EXHALE_Z_SCALE : 0.2, isD ? OPTION_D_INHALE_Z_SCALE : 1.5, lv)
+    const yScale = THREE.MathUtils.lerp(isD ? OPTION_D_INHALE_Y_SCALE : 3.5, isD ? OPTION_D_EXHALE_Y_SCALE : 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
     material.emissiveIntensity = THREE.MathUtils.lerp(1.5, 0, rv)
