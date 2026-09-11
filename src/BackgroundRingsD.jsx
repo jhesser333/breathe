@@ -5,24 +5,23 @@ import * as THREE from 'three'
 // Continuous ring tunnel for Shape Option D, replacing BackgroundA's cubes.
 // Unlike the Gates system, ring motion is NOT breath-paced -- it's a slow,
 // constant conveyor-loop scroll toward the Morph, independent of breath
-// timing. Both opacity (capped at MAX_ALPHA) and emissive glow ramp in
-// together with a plain smoothstep (no exaggerated start/end jumps),
-// staggered by spatial position so it reads as a wave traveling along the
-// tunnel rather than a lockstep flash: on inhale it sweeps from the far end
-// toward the Morph, finishing at full inhale; on exhale it sweeps the
-// opposite way, starting at the Morph/camera end and finishing (fully faded)
-// at full exhale.
+// timing. Material opacity stays flat at FLAT_ALPHA at all times; only the
+// emissive glow ramps, via a plain smoothstep ease (no exaggerated start/end
+// jumps), staggered by spatial position so it reads as a wave traveling
+// along the tunnel rather than a lockstep flash: on inhale it sweeps from
+// the far end toward the Morph, finishing at full inhale; on exhale it
+// sweeps the opposite way, starting at the Morph/camera end and finishing
+// (fully faded) at full exhale.
 
-const RING_COUNT = 12           // exactly fits TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing, no extra headroom
+const RING_COUNT = 5            // exactly fits TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing, no extra headroom
 const RING_SPACING = 5
-const TUNNEL_FAR_Z = -55
+const TUNNEL_FAR_Z = -20
 const TUNNEL_NEAR_Z = 3          // recycle/disappear point
 const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
 const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
-const MAX_ALPHA = 0.5           // overall opacity ceiling the wave ramps up to
-const WAVE_EFFECT_ENABLED = true  // breath-paced emissive/opacity wave
-const FLAT_ALPHA = 0.5          // flat opacity used while the wave is disabled
+const WAVE_EFFECT_ENABLED = true  // breath-paced emissive wave (opacity always stays flat)
+const FLAT_ALPHA = 0.5          // constant material opacity, on or off
 
 const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
@@ -83,13 +82,8 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
         wave = 1 - smoothstep(localRaw)
       }
 
-      if (WAVE_EFFECT_ENABLED) {
-        mat.opacity = MAX_ALPHA * wave
-        mat.emissiveIntensity = THREE.MathUtils.lerp(0, 1, wave)
-      } else {
-        mat.opacity = FLAT_ALPHA
-        mat.emissiveIntensity = 0
-      }
+      mat.opacity = FLAT_ALPHA
+      mat.emissiveIntensity = WAVE_EFFECT_ENABLED ? THREE.MathUtils.lerp(0, 1, wave) : 0
     }
   })
 
