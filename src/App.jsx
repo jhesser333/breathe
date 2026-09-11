@@ -123,7 +123,7 @@ export default function App() {
   // background as a pacing cue. A/B/C stay background-free.
   const backgroundOption = shapeOption === 'e' ? 'b' : shapeOption === 'd' ? 'rings' : 'none'
 
-  const palette = PALETTES.a
+  const palette = PALETTES.teal
   const shapeRef = useRef(shapeOption)
   shapeRef.current = shapeOption
 
