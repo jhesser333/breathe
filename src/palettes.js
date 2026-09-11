@@ -24,7 +24,7 @@ export const PALETTES = {
     tertiaryColor: '#276d8c',
     primaryColor: '#8db1a1',
     secondaryColor: '#0f3261',
-    background: '#012a35',
+    background: '#1a1a3a',
     textColor: '#c2dafb',
     headerColor: '#8db1a1',
     subheaderColor: '#c2dafb',
