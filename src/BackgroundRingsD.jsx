@@ -22,6 +22,8 @@ const RING_Y = 0                // matches Option D's Morph, centered at true or
 const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
 const WAVE_EFFECT_ENABLED = true  // breath-paced emissive wave (opacity always stays flat)
 const FLAT_ALPHA = 0.5          // constant material opacity, on or off
+const MAX_EMISSIVE = 2          // emissive intensity ceiling the wave ramps up to
+const INHALE_HOLD_SECONDS = 0.5 // pause at full inhale before the exhale wave starts
 
 const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
@@ -43,17 +45,29 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
   const matRefs = useRef([])
   const zRef = useRef(startZs.slice())
   const progressRef = useRef(0)
+  const holdRemainingRef = useRef(INHALE_HOLD_SECONDS)
 
   useFrame((_, delta) => {
     const gatesActive = gatesEnabledRef?.current ?? false
     const target = gatesActive && breathPhaseRef?.current === 'inhale' ? 1 : 0
+
+    // Once the wave reaches full inhale, hold there for INHALE_HOLD_SECONDS
+    // before letting it reverse toward exhale, regardless of how quickly the
+    // underlying breath signal already flipped to 'exhale'.
+    if (progressRef.current >= 1 && target === 0) {
+      holdRemainingRef.current = Math.max(0, holdRemainingRef.current - delta)
+    } else {
+      holdRemainingRef.current = INHALE_HOLD_SECONDS
+    }
+    const holding = progressRef.current >= 1 && target === 0 && holdRemainingRef.current > 0
+    const effectiveTarget = holding ? 1 : target
 
     const inhale = inhaleSecondsRef?.current
     const exhale = exhaleSecondsRef?.current
     const hasSplit = inhale != null && exhale != null
     const fallback = (spawnIntervalRef?.current ?? 6) / 2
     const halfInterval = target === 1 ? (hasSplit ? inhale : fallback) : (hasSplit ? exhale : fallback)
-    const dir = target > progressRef.current ? 1 : -1
+    const dir = effectiveTarget > progressRef.current ? 1 : effectiveTarget < progressRef.current ? -1 : 0
     progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
 
     const tunnelLength = RING_COUNT * RING_SPACING
@@ -83,7 +97,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
       }
 
       mat.opacity = FLAT_ALPHA
-      mat.emissiveIntensity = WAVE_EFFECT_ENABLED ? THREE.MathUtils.lerp(0, 1, wave) : 0
+      mat.emissiveIntensity = WAVE_EFFECT_ENABLED ? THREE.MathUtils.lerp(0, MAX_EMISSIVE, wave) : 0
     }
   })
 
