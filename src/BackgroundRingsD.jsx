@@ -21,7 +21,7 @@ const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independen
 const RING_Y = 0                // matches Option D's Morph, centered at true origin
 const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
 const MAX_ALPHA = 0.5           // overall opacity ceiling the wave ramps up to
-const WAVE_EFFECT_ENABLED = false // temporarily off; flip back on to restore the breath-paced wave
+const WAVE_EFFECT_ENABLED = true  // breath-paced emissive/opacity wave
 const FLAT_ALPHA = 0.5          // flat opacity used while the wave is disabled
 
 const BASE_RADIUS = 1.0
