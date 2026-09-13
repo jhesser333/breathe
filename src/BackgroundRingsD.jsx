@@ -11,7 +11,7 @@ import * as THREE from 'three'
 // paced cycle isn't driving (gatesEnabledRef false), everything rests in the
 // exhale configuration.
 
-const EXHALE_RING_Z = -3
+const EXHALE_RING_Z = -8
 const INHALE_RING_Z = 1
 const RING_Y = 0
 
@@ -19,7 +19,7 @@ const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts mov
 
 const PULSE_IN = 0.1         // fixed-ring pulse: ease-in duration
 const PULSE_HOLD = 0.3       // fixed-ring pulse: hold-at-peak duration
-const PULSE_OUT = 0.2        // fixed-ring pulse: ease-out duration
+const PULSE_OUT = 0.5        // fixed-ring pulse: ease-out duration
 const PULSE_TOTAL = PULSE_IN + PULSE_HOLD + PULSE_OUT
 
 const BASE_RADIUS = 1.0
