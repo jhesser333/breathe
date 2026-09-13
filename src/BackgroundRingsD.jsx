@@ -1,128 +1,150 @@
-import { useMemo, useRef } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-// Continuous ring tunnel for Shape Option D, replacing BackgroundA's cubes.
-// Unlike the Gates system, ring motion is NOT breath-paced -- it's a slow,
-// constant conveyor-loop scroll toward the Morph, independent of breath
-// timing. Material opacity stays flat at FLAT_ALPHA at all times; only the
-// emissive glow ramps, via a plain smoothstep ease (no exaggerated start/end
-// jumps), staggered by spatial position so it reads as a wave traveling
-// along the tunnel rather than a lockstep flash: on inhale it sweeps from
-// the far end toward the Morph, finishing at full inhale; on exhale it
-// sweeps the opposite way, starting at the Morph/camera end and finishing
-// (fully faded) at full exhale.
+// Paced ring rig for Shape Option D. Two rings are fixed in place -- the
+// exhale ring (far from camera) and the inhale ring (near camera) -- and
+// never move. A third, thinner "pace ring" travels between them in lockstep
+// with the app-controlled paced breath cycle (breathPhaseRef/gatesEnabledRef),
+// holding briefly at each end before easing across to the other. All motion
+// and emissive ramps use the same smoothstep ease-in/ease-out curve. When the
+// paced cycle isn't driving (gatesEnabledRef false), everything rests in the
+// exhale configuration.
 
-const RING_COUNT = 5            // exactly fits TUNNEL_FAR_Z..TUNNEL_NEAR_Z at 5-unit spacing, no extra headroom
-const RING_SPACING = 5
-const TUNNEL_FAR_Z = -20
-const TUNNEL_NEAR_Z = 3          // recycle/disappear point
-const RING_SPEED = 0.5          // slow constant scroll, units/sec -- independent of breath pace
-const RING_Y = 0                // matches Option D's Morph, centered at true origin
-const WAVE_SPAN = 0.35          // fraction of the inhale/exhale duration one ring's own fade occupies; the rest staggers across rings
-const WAVE_EFFECT_ENABLED = true  // breath-paced emissive wave (opacity always stays flat)
-const FLAT_ALPHA = 0.5          // constant material opacity, on or off
-const MAX_EMISSIVE = 2          // emissive intensity ceiling the wave ramps up to
-const INHALE_HOLD_SECONDS = 0.5 // pause at full inhale before the exhale wave starts
+const EXHALE_RING_Z = -3
+const INHALE_RING_Z = 1
+const RING_Y = 0
+
+const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
+
+const PULSE_IN = 0.1         // fixed-ring pulse: ease-in duration
+const PULSE_HOLD = 0.3       // fixed-ring pulse: hold-at-peak duration
+const PULSE_OUT = 0.2        // fixed-ring pulse: ease-out duration
+const PULSE_TOTAL = PULSE_IN + PULSE_HOLD + PULSE_OUT
 
 const BASE_RADIUS = 1.0
 const BASE_TUBE = 0.06
+const PACE_TUBE = 0.045      // thinner than BASE_TUBE so the pace ring nests inside/hides behind a fixed ring
 const GATE_SCALE = [1.376, 1.955, 1]   // same clearance scale as GatesC/GatesBoxBreathingC's inhale torus
+const FLAT_ALPHA = 0.5
+
+const PACE_EMISSIVE_MIN = 0.1
+const PACE_EMISSIVE_MAX = 0.7
 
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
   return t * t * (3 - 2 * t)
 }
 
-export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
-  const startZs = useMemo(() => {
-    const zs = []
-    for (let i = 0; i < RING_COUNT; i++) zs.push(TUNNEL_FAR_Z + i * RING_SPACING)
-    return zs
-  }, [])
+// One-shot pulse timeline: ease in 0->1 over PULSE_IN, hold at 1 for
+// PULSE_HOLD, ease out 1->0 over PULSE_OUT, then rest at 0.
+function pulseValue(elapsed) {
+  if (elapsed < PULSE_IN) return smoothstep(elapsed / PULSE_IN)
+  if (elapsed < PULSE_IN + PULSE_HOLD) return 1
+  if (elapsed < PULSE_TOTAL) return 1 - smoothstep((elapsed - PULSE_IN - PULSE_HOLD) / PULSE_OUT)
+  return 0
+}
 
-  const meshRefs = useRef([])
-  const matRefs = useRef([])
-  const zRef = useRef(startZs.slice())
-  const progressRef = useRef(0)
-  const holdRemainingRef = useRef(INHALE_HOLD_SECONDS)
+export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
+  const matExhaleRef = useRef()
+  const matInhaleRef = useRef()
+  const paceMeshRef = useRef()
+  const paceMatRef = useRef()
+
+  const prevPhaseRef = useRef('exhale')
+  const phaseElapsedRef = useRef(Infinity)          // time since the active phase last changed
+  const pulseExhaleElapsedRef = useRef(Infinity)    // time since the exhale ring's pulse last triggered
+  const pulseInhaleElapsedRef = useRef(Infinity)    // time since the inhale ring's pulse last triggered
 
   useFrame((_, delta) => {
-    const gatesActive = gatesEnabledRef?.current ?? false
-    const target = gatesActive && breathPhaseRef?.current === 'inhale' ? 1 : 0
+    const active = gatesEnabledRef?.current ?? false
+    const activePhase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
 
-    // Once the wave reaches full inhale, hold there for INHALE_HOLD_SECONDS
-    // before letting it reverse toward exhale, regardless of how quickly the
-    // underlying breath signal already flipped to 'exhale'.
-    if (progressRef.current >= 1 && target === 0) {
-      holdRemainingRef.current = Math.max(0, holdRemainingRef.current - delta)
-    } else {
-      holdRemainingRef.current = INHALE_HOLD_SECONDS
+    if (activePhase !== prevPhaseRef.current) {
+      prevPhaseRef.current = activePhase
+      phaseElapsedRef.current = 0
+      if (activePhase === 'inhale') {
+        pulseExhaleElapsedRef.current = 0
+      } else {
+        pulseInhaleElapsedRef.current = 0
+      }
     }
-    const holding = progressRef.current >= 1 && target === 0 && holdRemainingRef.current > 0
-    const effectiveTarget = holding ? 1 : target
+    phaseElapsedRef.current += delta
+    pulseExhaleElapsedRef.current += delta
+    pulseInhaleElapsedRef.current += delta
 
     const inhale = inhaleSecondsRef?.current
     const exhale = exhaleSecondsRef?.current
     const hasSplit = inhale != null && exhale != null
     const fallback = (spawnIntervalRef?.current ?? 6) / 2
-    const halfInterval = target === 1 ? (hasSplit ? inhale : fallback) : (hasSplit ? exhale : fallback)
-    const dir = effectiveTarget > progressRef.current ? 1 : effectiveTarget < progressRef.current ? -1 : 0
-    progressRef.current = THREE.MathUtils.clamp(progressRef.current + dir * delta / halfInterval, 0, 1)
+    const inhaleDuration = hasSplit ? inhale : fallback
+    const exhaleDuration = hasSplit ? exhale : fallback
 
-    const tunnelLength = RING_COUNT * RING_SPACING
-    const tunnelSpan = 0 - TUNNEL_FAR_Z
-
-    for (let i = 0; i < RING_COUNT; i++) {
-      const mesh = meshRefs.current[i]
-      const mat = matRefs.current[i]
-      if (!mesh || !mat) continue
-
-      zRef.current[i] += RING_SPEED * delta
-      if (zRef.current[i] > TUNNEL_NEAR_Z) zRef.current[i] -= tunnelLength
-
-      mesh.position.z = zRef.current[i]
-
-      const u = THREE.MathUtils.clamp((zRef.current[i] - TUNNEL_FAR_Z) / tunnelSpan, 0, 1)
-      let wave
-      if (target === 1) {
-        const orderFraction = u
-        const localRaw = THREE.MathUtils.clamp((progressRef.current - orderFraction * (1 - WAVE_SPAN)) / WAVE_SPAN, 0, 1)
-        wave = smoothstep(localRaw)
-      } else {
-        const q = 1 - progressRef.current
-        const orderFraction = 1 - u
-        const localRaw = THREE.MathUtils.clamp((q - orderFraction * (1 - WAVE_SPAN)) / WAVE_SPAN, 0, 1)
-        wave = 1 - smoothstep(localRaw)
-      }
-
-      mat.opacity = FLAT_ALPHA
-      mat.emissiveIntensity = WAVE_EFFECT_ENABLED ? THREE.MathUtils.lerp(0, MAX_EMISSIVE, wave) : 0
+    const elapsed = phaseElapsedRef.current
+    let paceZ
+    let paceEmissive
+    if (activePhase === 'inhale') {
+      const moveDuration = Math.max(0.05, inhaleDuration - HOLD_SECONDS)
+      const t = elapsed <= HOLD_SECONDS ? 0 : Math.min(1, (elapsed - HOLD_SECONDS) / moveDuration)
+      const eased = smoothstep(t)
+      paceZ = THREE.MathUtils.lerp(EXHALE_RING_Z, INHALE_RING_Z, eased)
+      paceEmissive = THREE.MathUtils.lerp(PACE_EMISSIVE_MIN, PACE_EMISSIVE_MAX, eased)
+    } else {
+      const moveDuration = Math.max(0.05, exhaleDuration - HOLD_SECONDS)
+      const t = elapsed <= HOLD_SECONDS ? 0 : Math.min(1, (elapsed - HOLD_SECONDS) / moveDuration)
+      const eased = smoothstep(t)
+      paceZ = THREE.MathUtils.lerp(INHALE_RING_Z, EXHALE_RING_Z, eased)
+      paceEmissive = THREE.MathUtils.lerp(PACE_EMISSIVE_MAX, PACE_EMISSIVE_MIN, eased)
     }
+
+    if (paceMeshRef.current) paceMeshRef.current.position.z = paceZ
+    if (paceMatRef.current) paceMatRef.current.emissiveIntensity = paceEmissive
+
+    if (matExhaleRef.current) matExhaleRef.current.emissiveIntensity = pulseValue(pulseExhaleElapsedRef.current)
+    if (matInhaleRef.current) matInhaleRef.current.emissiveIntensity = pulseValue(pulseInhaleElapsedRef.current)
   })
 
   return (
     <group>
-      {startZs.map((z, i) => (
-        <mesh
-          key={i}
-          ref={el => { meshRefs.current[i] = el }}
-          position={[0, RING_Y, z]}
-          scale={GATE_SCALE}
-        >
-          <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
-          <meshStandardMaterial
-            ref={el => { matRefs.current[i] = el }}
-            color={baseColor}
-            emissive={emissiveColor}
-            emissiveIntensity={0}
-            roughness={0.5}
-            metalness={0.1}
-            transparent
-            opacity={FLAT_ALPHA}
-          />
-        </mesh>
-      ))}
+      <mesh position={[0, RING_Y, EXHALE_RING_Z]} scale={GATE_SCALE}>
+        <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
+        <meshStandardMaterial
+          ref={matExhaleRef}
+          color={baseColor}
+          emissive={emissiveColor}
+          emissiveIntensity={0}
+          roughness={0.5}
+          metalness={0.1}
+          transparent
+          opacity={FLAT_ALPHA}
+        />
+      </mesh>
+      <mesh position={[0, RING_Y, INHALE_RING_Z]} scale={GATE_SCALE}>
+        <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
+        <meshStandardMaterial
+          ref={matInhaleRef}
+          color={baseColor}
+          emissive={emissiveColor}
+          emissiveIntensity={0}
+          roughness={0.5}
+          metalness={0.1}
+          transparent
+          opacity={FLAT_ALPHA}
+        />
+      </mesh>
+      <mesh ref={paceMeshRef} position={[0, RING_Y, EXHALE_RING_Z]} scale={GATE_SCALE}>
+        <torusGeometry args={[BASE_RADIUS, PACE_TUBE, 16, 64]} />
+        <meshStandardMaterial
+          ref={paceMatRef}
+          color={baseColor}
+          emissive={emissiveColor}
+          emissiveIntensity={PACE_EMISSIVE_MIN}
+          roughness={0.5}
+          metalness={0.1}
+          transparent
+          opacity={FLAT_ALPHA}
+        />
+      </mesh>
     </group>
   )
 }
