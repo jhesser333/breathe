@@ -13,8 +13,8 @@ const DIRECTION_DEADBAND = 1e-5   // ignore sub-pixel lv jitter when deciding fl
 const OPTION_D_EXHALE_X_SCALE = 3     // Option D only: replaces the shared 4 at full exhale
 const OPTION_D_EXHALE_Y_SCALE = 0.25  // Option D only: replaces the shared 0.4 at full exhale
 const OPTION_D_EXHALE_Z_SCALE = 0.25  // Option D only: replaces the shared 0.2 at full exhale
-const OPTION_D_INHALE_X_SCALE = 1.25  // Option D only: replaces the shared 2.25 at full inhale
-const OPTION_D_INHALE_Y_SCALE = 2     // Option D only: replaces the shared 3.5 at full inhale
+const OPTION_D_INHALE_X_SCALE = 2     // Option D only: replaces the shared 2.25 at full inhale
+const OPTION_D_INHALE_Y_SCALE = 3     // Option D only: replaces the shared 3.5 at full inhale
 const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 at full inhale
 
 const SPARKLE_VERTEX_SHADER = `

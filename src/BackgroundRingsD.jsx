@@ -11,9 +11,9 @@ import * as THREE from 'three'
 // paced cycle isn't driving (gatesEnabledRef false), everything rests in the
 // exhale configuration.
 
-const EXHALE_RING_Z = -8
-const INHALE_RING_Z = 1
-const RING_Y = 0
+export const EXHALE_RING_Z = -5
+export const INHALE_RING_Z = 1
+export const RING_Y = 0
 
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
 
@@ -22,10 +22,13 @@ const PULSE_HOLD = 0.3       // fixed-ring pulse: hold-at-peak duration
 const PULSE_OUT = 0.5        // fixed-ring pulse: ease-out duration
 const PULSE_TOTAL = PULSE_IN + PULSE_HOLD + PULSE_OUT
 
-const BASE_RADIUS = 1.0
-const BASE_TUBE = 0.06
+export const BASE_RADIUS = 1.0
+export const BASE_TUBE = 0.06
 const PACE_TUBE = 0.045      // thinner than BASE_TUBE so the pace ring nests inside/hides behind a fixed ring
-const GATE_SCALE = [1.376, 1.955, 1]   // same clearance scale as GatesC/GatesBoxBreathingC's inhale torus
+// Inner hole half-extent is ~(BASE_RADIUS - BASE_TUBE) * GATE_SCALE[axis] = 0.94 * GATE_SCALE[axis].
+// Sized for a ~15% clearance margin over MorphC's Option D inhale half-extents (1.0, 1.5):
+// X: 1.0*1.15/0.94 ≈ 1.223, Y: 1.5*1.15/0.94 ≈ 1.835.
+export const GATE_SCALE = [1.223, 1.835, 1]
 const FLAT_ALPHA = 0.5
 
 const PACE_EMISSIVE_MIN = 0.1
@@ -45,7 +48,7 @@ function pulseValue(elapsed) {
   return 0
 }
 
-export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
+export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef, paceProgressRef }) {
   const matExhaleRef = useRef()
   const matInhaleRef = useRef()
   const paceMeshRef = useRef()
@@ -83,22 +86,28 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
     const elapsed = phaseElapsedRef.current
     let paceZ
     let paceEmissive
+    let eased
     if (activePhase === 'inhale') {
       const moveDuration = Math.max(0.05, inhaleDuration - HOLD_SECONDS)
       const t = elapsed <= HOLD_SECONDS ? 0 : Math.min(1, (elapsed - HOLD_SECONDS) / moveDuration)
-      const eased = smoothstep(t)
+      eased = smoothstep(t)
       paceZ = THREE.MathUtils.lerp(EXHALE_RING_Z, INHALE_RING_Z, eased)
       paceEmissive = THREE.MathUtils.lerp(PACE_EMISSIVE_MIN, PACE_EMISSIVE_MAX, eased)
     } else {
       const moveDuration = Math.max(0.05, exhaleDuration - HOLD_SECONDS)
       const t = elapsed <= HOLD_SECONDS ? 0 : Math.min(1, (elapsed - HOLD_SECONDS) / moveDuration)
-      const eased = smoothstep(t)
+      eased = smoothstep(t)
       paceZ = THREE.MathUtils.lerp(INHALE_RING_Z, EXHALE_RING_Z, eased)
       paceEmissive = THREE.MathUtils.lerp(PACE_EMISSIVE_MAX, PACE_EMISSIVE_MIN, eased)
     }
 
     if (paceMeshRef.current) paceMeshRef.current.position.z = paceZ
     if (paceMatRef.current) paceMatRef.current.emissiveIntensity = paceEmissive
+
+    // Continuous 0 (exhale rest) -> 1 (inhale) -> 0 (exhale) breath-progress signal,
+    // exposed for other Shape D effects (e.g. RingParticlesD) to drive off of the
+    // paced cycle instead of the sliders -- mirrors the pace ring's own motion.
+    if (paceProgressRef) paceProgressRef.current = activePhase === 'inhale' ? eased : (1 - eased)
 
     if (matExhaleRef.current) matExhaleRef.current.emissiveIntensity = pulseValue(pulseExhaleElapsedRef.current)
     if (matInhaleRef.current) matInhaleRef.current.emissiveIntensity = pulseValue(pulseInhaleElapsedRef.current)
