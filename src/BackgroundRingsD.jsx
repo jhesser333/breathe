@@ -13,6 +13,7 @@ import * as THREE from 'three'
 
 export const EXHALE_RING_Z = -5
 export const INHALE_RING_Z = 1
+export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- anchors RingParticlesD instead of the exhale ring
 export const RING_Y = 0
 
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
@@ -139,6 +140,19 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           metalness={0.1}
           transparent
           opacity={FLAT_ALPHA}
+        />
+      </mesh>
+      <mesh position={[0, RING_Y, HALO_RING_Z]} scale={GATE_SCALE}>
+        <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
+        <meshStandardMaterial
+          color={baseColor}
+          emissive={emissiveColor}
+          emissiveIntensity={0}
+          roughness={0.5}
+          metalness={0.1}
+          transparent
+          opacity={0}
+          depthWrite={false}
         />
       </mesh>
       <mesh ref={paceMeshRef} position={[0, RING_Y, EXHALE_RING_Z]} scale={GATE_SCALE}>

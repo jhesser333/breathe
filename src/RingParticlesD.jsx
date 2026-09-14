@@ -1,15 +1,16 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { EXHALE_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
+import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
 
-// Two particle systems anchored to Shape D's exhale ring, structured after
-// MorphC.jsx's own two particle systems (static surface sparkle + travelling
-// flow) but re-driven by the app-paced breath cycle instead of the sliders,
-// via `paceProgressRef` (written every frame by BackgroundRingsD -- 0 at
-// exhale rest, easing to 1 across inhale, back to 0 across exhale). The flow
-// system travels along Y (top/bottom of screen) instead of X (left/right),
-// since the ring itself doesn't breathe/scale the way the Morph does.
+// Two particle systems anchored to Shape D's (invisible) halo ring,
+// structured after MorphC.jsx's own two particle systems (surface sparkle +
+// travelling flow) but re-driven by the app-paced breath cycle instead of
+// the sliders, via `paceProgressRef` (written every frame by
+// BackgroundRingsD -- 0 at exhale rest, easing to 1 across inhale, back to 0
+// across exhale). The flow system travels along Y (top/bottom of screen)
+// instead of X (left/right), converging on the ring's own center plane
+// (RING_Y) so it reads as filling the ring rather than snapping to its edge.
 
 const SPARKLE_PARTICLE_COUNT = 500
 const FLOW_PARTICLE_COUNT = 350
@@ -18,19 +19,22 @@ const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
 const DIRECTION_DEADBAND = 1e-5
 const EDGE_MARGIN = 1.1           // safety margin beyond the computed screen edge
+const FLOW_PULL_RATE = 3.0        // higher than MorphC's 1.2 so travel is ~done by fade-out (lifeT=0.7)
+const SPARKLE_ATTRACT_RATE = 2.5  // how quickly outward drift decays back toward the surface
 
-// Ring's own outer extent (approximate outer radius along each axis), used
-// both as the flow system's "surface" anchor and the sparkle system's sample
-// surface -- see BackgroundRingsD.jsx for BASE_RADIUS/BASE_TUBE/GATE_SCALE.
+// Ring's own outer X extent, used to spread flow particles across the ring's
+// width -- see BackgroundRingsD.jsx for BASE_RADIUS/BASE_TUBE/GATE_SCALE.
 const RING_OUTER_X = (BASE_RADIUS + BASE_TUBE) * GATE_SCALE[0]
-const RING_OUTER_Y = (BASE_RADIUS + BASE_TUBE) * GATE_SCALE[1]
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
 attribute float aLifetime;
 attribute float aSeed;
+attribute float aOutwardSpeed;
 uniform float uTime;
 uniform float uSize;
+uniform float uAttract;
+uniform float uCenterY;
 varying float vAlpha;
 varying float vSeed;
 
@@ -41,7 +45,18 @@ void main() {
   float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
   float envelope = fadeIn * fadeOut;
 
-  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  // Drift away from the ring's own center axis (0, uCenterY) in its own
+  // plane, then get pulled back toward the surface as it ages -- a simple
+  // rise-then-decay curve (age * exp(-rate*age)), not a spring simulation.
+  // Z is never touched, so each particle keeps the Z it was born with.
+  vec2 radial = vec2(position.x, position.y - uCenterY);
+  float radialLen = length(radial);
+  vec2 dirXY = radialLen > 0.0001 ? radial / radialLen : vec2(0.0);
+  float outward = aOutwardSpeed * age * exp(-uAttract * age);
+
+  vec3 displaced = vec3(position.xy + dirXY * outward, position.z);
+
+  vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
   gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
@@ -50,18 +65,19 @@ void main() {
 }
 `
 
-// Y-only travel (top/bottom of screen), simplified from MorphC's flow shader:
-// no X/Z pull or swoop since the ring never moves, so a particle's X/Z stay
-// fixed at whatever was chosen at spawn time.
+// Y-only travel (top/bottom of screen), converging on uCenterY (the ring's
+// own center plane) rather than its outer edge, so it reads as filling the
+// ring rather than being pulled to a fixed line. X/Z stay fixed at whatever
+// was chosen at spawn time -- the ring never moves, so there's nothing to
+// track there.
 const FLOW_VERTEX_SHADER = `
 attribute float aSpawnTime;
 attribute float aLifetime;
-attribute float aSpeed;
 attribute float aMode;
-attribute float aStartOffset;
 attribute float aSeed;
 uniform float uTime;
-uniform float uSpread;
+uniform float uPullRate;
+uniform float uCenterY;
 uniform float uSize;
 varying float vAlpha;
 varying float vSeed;
@@ -73,13 +89,14 @@ void main() {
   float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
   float envelope = fadeIn * fadeOut;
 
-  float dirY = position.y >= 0.0 ? 1.0 : -1.0;
-  float travel = aSpeed * age;
-  float extraY = aMode > 0.0
-    ? min(travel, uSpread)                  // dispersing: grows outward from the ring toward the screen edge
-    : max(aStartOffset - travel, 0.0);       // gathering: shrinks back in toward the ring
+  // position.y is the FAR anchor (near the screen edge). Gathering particles
+  // start there and decay toward uCenterY; dispersing particles start at
+  // uCenterY and grow back out toward the far anchor.
+  float pull = exp(-uPullRate * lifeT);
+  float relY = position.y - uCenterY;
+  float displacedY = uCenterY + (aMode < 0.0 ? relY * pull : relY * (1.0 - pull));
 
-  vec3 displaced = vec3(position.x, position.y + dirY * extraY, position.z);
+  vec3 displaced = vec3(position.x, displacedY, position.z);
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
   gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
@@ -114,7 +131,7 @@ function sampleTorusPositions(count) {
     const r = BASE_RADIUS + BASE_TUBE * Math.cos(phi)
     positions[i * 3]     = r * Math.cos(theta) * GATE_SCALE[0]
     positions[i * 3 + 1] = r * Math.sin(theta) * GATE_SCALE[1] + RING_Y
-    positions[i * 3 + 2] = BASE_TUBE * Math.sin(phi) * GATE_SCALE[2] + EXHALE_RING_Z
+    positions[i * 3 + 2] = BASE_TUBE * Math.sin(phi) * GATE_SCALE[2] + HALO_RING_Z
   }
   return positions
 }
@@ -136,14 +153,17 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
     const seeds = new Float32Array(SPARKLE_PARTICLE_COUNT)
     const spawnTimes = new Float32Array(SPARKLE_PARTICLE_COUNT)
     const lifetimes = new Float32Array(SPARKLE_PARTICLE_COUNT)
+    const outwardSpeeds = new Float32Array(SPARKLE_PARTICLE_COUNT)
     for (let i = 0; i < SPARKLE_PARTICLE_COUNT; i++) {
       seeds[i] = Math.random()
       spawnTimes[i] = SPAWN_SENTINEL
       lifetimes[i] = 1
+      outwardSpeeds[i] = THREE.MathUtils.lerp(0.15, 0.5, Math.random())
     }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
+    geometry.setAttribute('aOutwardSpeed', new THREE.BufferAttribute(outwardSpeeds, 1))
     const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
     const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
     geometry.setAttribute('aSpawnTime', spawnTimeAttr)
@@ -156,20 +176,16 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
     const seeds = new Float32Array(FLOW_PARTICLE_COUNT)
     const spawnTimes = new Float32Array(FLOW_PARTICLE_COUNT)
     const lifetimes = new Float32Array(FLOW_PARTICLE_COUNT)
-    const speeds = new Float32Array(FLOW_PARTICLE_COUNT)
     const modes = new Float32Array(FLOW_PARTICLE_COUNT)
-    const startOffsets = new Float32Array(FLOW_PARTICLE_COUNT)
     for (let i = 0; i < FLOW_PARTICLE_COUNT; i++) {
       seeds[i] = Math.random()
       spawnTimes[i] = SPAWN_SENTINEL
       lifetimes[i] = 1
-      speeds[i] = 0
       modes[i] = 1
-      startOffsets[i] = 0
       const side = i % 2 === 0 ? 1 : -1
       positions[i * 3] = 0
-      positions[i * 3 + 1] = side * RING_OUTER_Y
-      positions[i * 3 + 2] = EXHALE_RING_Z
+      positions[i * 3 + 1] = RING_Y + side * 1
+      positions[i * 3 + 2] = HALO_RING_Z
     }
     const geometry = new THREE.BufferGeometry()
     const positionAttr = new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage)
@@ -177,15 +193,11 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
     geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
     const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
     const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
-    const speedAttr = new THREE.BufferAttribute(speeds, 1).setUsage(THREE.DynamicDrawUsage)
     const modeAttr = new THREE.BufferAttribute(modes, 1).setUsage(THREE.DynamicDrawUsage)
-    const startOffsetAttr = new THREE.BufferAttribute(startOffsets, 1).setUsage(THREE.DynamicDrawUsage)
     geometry.setAttribute('aSpawnTime', spawnTimeAttr)
     geometry.setAttribute('aLifetime', lifetimeAttr)
-    geometry.setAttribute('aSpeed', speedAttr)
     geometry.setAttribute('aMode', modeAttr)
-    geometry.setAttribute('aStartOffset', startOffsetAttr)
-    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, speedAttr, modeAttr, startOffsetAttr }
+    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr }
   }, [])
 
   const sparkleMaterial = useMemo(() => new THREE.ShaderMaterial({
@@ -193,6 +205,8 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
       uSize: { value: 50 },
       uColor: { value: new THREE.Color(primaryColor) },
       uTime: { value: 0 },
+      uAttract: { value: SPARKLE_ATTRACT_RATE },
+      uCenterY: { value: RING_Y },
     },
     vertexShader: SPARKLE_VERTEX_SHADER,
     fragmentShader: PARTICLE_FRAGMENT_SHADER,
@@ -207,7 +221,8 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
       uSize: { value: 50 },
       uColor: { value: new THREE.Color(primaryColor) },
       uTime: { value: 0 },
-      uSpread: { value: 1 },
+      uPullRate: { value: FLOW_PULL_RATE },
+      uCenterY: { value: RING_Y },
     },
     vertexShader: FLOW_VERTEX_SHADER,
     fragmentShader: PARTICLE_FRAGMENT_SHADER,
@@ -240,7 +255,7 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
       flowDirRef.current = dBp > 0 ? -1 : 1
     }
 
-    // Ring sparkle: static surface points, alpha-only.
+    // Ring sparkle: surface points with a rise-then-decay outward drift.
     spawnAccumulatorRef.current += spawnRate * delta
     let toSpawn = Math.floor(spawnAccumulatorRef.current)
     if (toSpawn > 0) {
@@ -258,47 +273,40 @@ export default function RingParticlesD({ primaryColor, paceProgressRef }) {
     }
     sparkleMaterial.uniforms.uTime.value = now
 
-    // Visible half-height at the exhale ring's depth (approximate -- ignores
+    // Visible half-height at the halo ring's depth (approximate -- ignores
     // CameraVerticalShift's shift-lens crop, which is a fine simplification
     // for a decorative off-screen spawn point; EDGE_MARGIN keeps particles
     // comfortably outside the visible frame). Recomputed every frame so it
     // tracks window resizes.
     const camera = state.camera
-    const depth = Math.max(0.1, camera.position.z - EXHALE_RING_Z)
+    const depth = Math.max(0.1, camera.position.z - HALO_RING_Z)
     const halfFovRad = THREE.MathUtils.degToRad((camera.fov ?? 50) / 2)
     const edgeY = depth * Math.tan(halfFovRad) * EDGE_MARGIN
-    const spreadDistance = Math.max(0.1, edgeY - RING_OUTER_Y)
-    flowMaterial.uniforms.uSpread.value = spreadDistance
 
-    // Ring flow: streams in from / returns to the top and bottom of the screen.
+    // Ring flow: streams in from / returns to the top and bottom of the
+    // screen, converging on the ring's own center plane (uCenterY).
     flowAccumulatorRef.current += flowSpawnRate * delta
     let toSpawnFlow = Math.floor(flowAccumulatorRef.current)
     if (toSpawnFlow > 0) {
       flowAccumulatorRef.current -= toSpawnFlow
       toSpawnFlow = Math.min(toSpawnFlow, MAX_SPAWN_PER_FRAME)
-      const { positionAttr, spawnTimeAttr, lifetimeAttr, speedAttr, modeAttr, startOffsetAttr } = flowAttrs
+      const { positionAttr, spawnTimeAttr, lifetimeAttr, modeAttr } = flowAttrs
       const gathering = flowDirRef.current < 0
       for (let k = 0; k < toSpawnFlow; k++) {
         const idx = flowCursorRef.current % FLOW_PARTICLE_COUNT
         flowCursorRef.current += 1
         const side = Math.random() < 0.5 ? 1 : -1
-        const lifetime = 1 + Math.random()
         positionAttr.array[idx * 3]     = (Math.random() * 2 - 1) * RING_OUTER_X
-        positionAttr.array[idx * 3 + 1] = side * RING_OUTER_Y
-        positionAttr.array[idx * 3 + 2] = EXHALE_RING_Z
+        positionAttr.array[idx * 3 + 1] = RING_Y + side * edgeY
+        positionAttr.array[idx * 3 + 2] = HALO_RING_Z
         spawnTimeAttr.array[idx] = now
-        lifetimeAttr.array[idx] = lifetime
+        lifetimeAttr.array[idx] = 1 + Math.random()
         modeAttr.array[idx] = gathering ? -1 : 1
-        startOffsetAttr.array[idx] = gathering ? spreadDistance * (0.85 + Math.random() * 0.15) : 0
-        // Sized so travel completes right around fade-out's start (70% of life).
-        speedAttr.array[idx] = spreadDistance / (0.7 * lifetime)
       }
       positionAttr.needsUpdate = true
       spawnTimeAttr.needsUpdate = true
       lifetimeAttr.needsUpdate = true
       modeAttr.needsUpdate = true
-      startOffsetAttr.needsUpdate = true
-      speedAttr.needsUpdate = true
     }
     flowMaterial.uniforms.uTime.value = now
   })
