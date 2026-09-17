@@ -5,11 +5,12 @@ import * as THREE from 'three'
 // Paced ring rig for Shape Option D. Three concentric rings all sit at the
 // origin (0,0,0) and are differentiated by scale instead of depth. Two are
 // fixed in place -- the exhale ring (larger) and the inhale ring (smaller,
-// the base scale) -- and never change size. A third, thinner "pace ring"
-// scales between them in lockstep with the app-controlled paced breath cycle
-// (breathPhaseRef/gatesEnabledRef), holding briefly at each end before easing
-// across to the other size. All motion and emissive ramps use the same
-// smoothstep ease-in/ease-out curve. When the paced cycle isn't driving
+// the base scale) -- and never change size, but are invisible at rest and
+// fade in/out (opacity and emissive together) via a one-shot pulse whenever
+// the pace ring departs from them. A third, thinner "pace ring" scales
+// between the fixed rings' sizes in lockstep with the app-controlled paced
+// breath cycle (breathPhaseRef/gatesEnabledRef), holding briefly at each end
+// before easing across to the other size. When the paced cycle isn't driving
 // (gatesEnabledRef false), everything rests in the exhale configuration.
 
 export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- anchors RingParticlesD
@@ -17,9 +18,9 @@ export const RING_Y = 0
 
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
 
-const PULSE_IN = 0.1         // fixed-ring pulse: ease-in duration
+const PULSE_IN = 0.2         // fixed-ring pulse: ease-in duration
 const PULSE_HOLD = 0.3       // fixed-ring pulse: hold-at-peak duration
-const PULSE_OUT = 0.5        // fixed-ring pulse: ease-out duration
+const PULSE_OUT = 1.5        // fixed-ring pulse: ease-out duration
 const PULSE_TOTAL = PULSE_IN + PULSE_HOLD + PULSE_OUT
 
 export const BASE_RADIUS = 1.0
@@ -111,8 +112,16 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
     // paced cycle instead of the sliders -- mirrors the pace ring's own motion.
     if (paceProgressRef) paceProgressRef.current = activePhase === 'inhale' ? eased : (1 - eased)
 
-    if (matExhaleRef.current) matExhaleRef.current.emissiveIntensity = pulseValue(pulseExhaleElapsedRef.current)
-    if (matInhaleRef.current) matInhaleRef.current.emissiveIntensity = pulseValue(pulseInhaleElapsedRef.current)
+    const pulseExhale = pulseValue(pulseExhaleElapsedRef.current)
+    const pulseInhale = pulseValue(pulseInhaleElapsedRef.current)
+    if (matExhaleRef.current) {
+      matExhaleRef.current.emissiveIntensity = pulseExhale
+      matExhaleRef.current.opacity = pulseExhale
+    }
+    if (matInhaleRef.current) {
+      matInhaleRef.current.emissiveIntensity = pulseInhale
+      matInhaleRef.current.opacity = pulseInhale
+    }
   })
 
   return (
@@ -127,7 +136,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           roughness={0.5}
           metalness={0.1}
           transparent
-          opacity={FLAT_ALPHA}
+          opacity={0}
         />
       </mesh>
       <mesh position={[0, RING_Y, 0]} scale={GATE_SCALE}>
@@ -140,7 +149,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           roughness={0.5}
           metalness={0.1}
           transparent
-          opacity={FLAT_ALPHA}
+          opacity={0}
         />
       </mesh>
       <mesh position={[0, RING_Y, HALO_RING_Z]} scale={GATE_SCALE}>
