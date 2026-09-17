@@ -2,18 +2,17 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-// Paced ring rig for Shape Option D. Two rings are fixed in place -- the
-// exhale ring (far from camera) and the inhale ring (near camera) -- and
-// never move. A third, thinner "pace ring" travels between them in lockstep
-// with the app-controlled paced breath cycle (breathPhaseRef/gatesEnabledRef),
-// holding briefly at each end before easing across to the other. All motion
-// and emissive ramps use the same smoothstep ease-in/ease-out curve. When the
-// paced cycle isn't driving (gatesEnabledRef false), everything rests in the
-// exhale configuration.
+// Paced ring rig for Shape Option D. Three concentric rings all sit at the
+// origin (0,0,0) and are differentiated by scale instead of depth. Two are
+// fixed in place -- the exhale ring (larger) and the inhale ring (smaller,
+// the base scale) -- and never change size. A third, thinner "pace ring"
+// scales between them in lockstep with the app-controlled paced breath cycle
+// (breathPhaseRef/gatesEnabledRef), holding briefly at each end before easing
+// across to the other size. All motion and emissive ramps use the same
+// smoothstep ease-in/ease-out curve. When the paced cycle isn't driving
+// (gatesEnabledRef false), everything rests in the exhale configuration.
 
-export const EXHALE_RING_Z = -5
-export const INHALE_RING_Z = 1
-export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- anchors RingParticlesD instead of the exhale ring
+export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- anchors RingParticlesD
 export const RING_Y = 0
 
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
@@ -29,11 +28,15 @@ const PACE_TUBE = 0.045      // thinner than BASE_TUBE so the pace ring nests in
 // Inner hole half-extent is ~(BASE_RADIUS - BASE_TUBE) * GATE_SCALE[axis] = 0.94 * GATE_SCALE[axis].
 // Sized for a ~15% clearance margin over MorphC's Option D inhale half-extents (1.0, 1.5):
 // X: 1.0*1.15/0.94 ≈ 1.223, Y: 1.5*1.15/0.94 ≈ 1.835.
-export const GATE_SCALE = [1.223, 1.835, 1]
+export const GATE_SCALE = [1.223, 1.835, 1]   // inhale ring scale (base scale)
+export const EXHALE_SCALE = GATE_SCALE.map((v) => v * 1.5)   // exhale ring scale: 1.5x inhale in x/y/z
 const FLAT_ALPHA = 0.5
 
 const PACE_EMISSIVE_MIN = 0.1
 const PACE_EMISSIVE_MAX = 0.7
+
+const INHALE_SCALE_VEC = new THREE.Vector3(...GATE_SCALE)
+const EXHALE_SCALE_VEC = new THREE.Vector3(...EXHALE_SCALE)
 
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
@@ -85,24 +88,22 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
     const exhaleDuration = hasSplit ? exhale : fallback
 
     const elapsed = phaseElapsedRef.current
-    let paceZ
     let paceEmissive
     let eased
     if (activePhase === 'inhale') {
       const moveDuration = Math.max(0.05, inhaleDuration - HOLD_SECONDS)
       const t = elapsed <= HOLD_SECONDS ? 0 : Math.min(1, (elapsed - HOLD_SECONDS) / moveDuration)
       eased = smoothstep(t)
-      paceZ = THREE.MathUtils.lerp(EXHALE_RING_Z, INHALE_RING_Z, eased)
+      if (paceMeshRef.current) paceMeshRef.current.scale.lerpVectors(EXHALE_SCALE_VEC, INHALE_SCALE_VEC, eased)
       paceEmissive = THREE.MathUtils.lerp(PACE_EMISSIVE_MIN, PACE_EMISSIVE_MAX, eased)
     } else {
       const moveDuration = Math.max(0.05, exhaleDuration - HOLD_SECONDS)
       const t = elapsed <= HOLD_SECONDS ? 0 : Math.min(1, (elapsed - HOLD_SECONDS) / moveDuration)
       eased = smoothstep(t)
-      paceZ = THREE.MathUtils.lerp(INHALE_RING_Z, EXHALE_RING_Z, eased)
+      if (paceMeshRef.current) paceMeshRef.current.scale.lerpVectors(INHALE_SCALE_VEC, EXHALE_SCALE_VEC, eased)
       paceEmissive = THREE.MathUtils.lerp(PACE_EMISSIVE_MAX, PACE_EMISSIVE_MIN, eased)
     }
 
-    if (paceMeshRef.current) paceMeshRef.current.position.z = paceZ
     if (paceMatRef.current) paceMatRef.current.emissiveIntensity = paceEmissive
 
     // Continuous 0 (exhale rest) -> 1 (inhale) -> 0 (exhale) breath-progress signal,
@@ -116,7 +117,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
 
   return (
     <group>
-      <mesh position={[0, RING_Y, EXHALE_RING_Z]} scale={GATE_SCALE}>
+      <mesh position={[0, RING_Y, 0]} scale={EXHALE_SCALE}>
         <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
         <meshStandardMaterial
           ref={matExhaleRef}
@@ -129,7 +130,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           opacity={FLAT_ALPHA}
         />
       </mesh>
-      <mesh position={[0, RING_Y, INHALE_RING_Z]} scale={GATE_SCALE}>
+      <mesh position={[0, RING_Y, 0]} scale={GATE_SCALE}>
         <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
         <meshStandardMaterial
           ref={matInhaleRef}
@@ -155,7 +156,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           depthWrite={false}
         />
       </mesh>
-      <mesh ref={paceMeshRef} position={[0, RING_Y, EXHALE_RING_Z]} scale={GATE_SCALE}>
+      <mesh ref={paceMeshRef} position={[0, RING_Y, 0]} scale={EXHALE_SCALE}>
         <torusGeometry args={[BASE_RADIUS, PACE_TUBE, 16, 64]} />
         <meshStandardMaterial
           ref={paceMatRef}
