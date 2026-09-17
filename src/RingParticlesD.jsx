@@ -1,21 +1,24 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
+import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE, computePhaseDurations } from './BackgroundRingsD'
 
-// Two particle systems anchored to Shape D's ring rig:
+// Three particle systems anchored to Shape D's ring rig:
 // - Surface sparkle: points sampled on the (invisible) halo ring's surface,
 //   structured after MorphC.jsx's own sparkle system but re-driven by the
 //   app-paced breath cycle instead of the sliders, via `paceProgressRef`
 //   (written every frame by BackgroundRingsD -- 0 at exhale rest, easing to
 //   1 across inhale, back to 0 across exhale).
-// - Inhale burst: fires once per exhale->inhale transition (breathPhaseRef/
-//   gatesEnabledRef), spawning from a tiny invisible ring 90% smaller than
-//   the inhale ring and scaling each particle's position vector outward --
-//   since the emitter ring and the inhale ring are the same shape just at
-//   different scales, this lands each particle exactly on the inhale ring
-//   (and a little beyond) at the same angle it spawned at, with no separate
-//   direction vector needed.
+// - Inhale burst: emits continuously for the whole exhale->inhale transition
+//   (breathPhaseRef/gatesEnabledRef), spawning from a tiny invisible ring 90%
+//   smaller than the inhale ring and scaling each particle's position vector
+//   outward -- since the emitter ring and the inhale ring are the same shape
+//   just at different scales, this lands each particle exactly on the inhale
+//   ring (and a little beyond) at the same angle it spawned at, with no
+//   separate direction vector needed.
+// - Inhale attract: emits only for the first quarter of the exhale phase
+//   (the inhale->exhale return trip), spawning from the real inhale ring and
+//   drifting slowly inward toward the origin via exponential decay.
 
 const SPARKLE_PARTICLE_COUNT = 1000
 const MAX_SPAWN_RATE = 440        // particles/sec
@@ -25,13 +28,18 @@ const SPARKLE_ATTRACT_RATE = 2.5  // how quickly outward drift decays back towar
 
 const BURST_EMITTER_SCALE = GATE_SCALE.map((v) => v * 0.1)   // invisible emitter ring, 90% smaller than the inhale ring
 const BURST_PARTICLE_COUNT = 300
-const BURST_DURATION = 1.0        // seconds -- emits only for 1s at the start of each exhale->inhale transition
 const BURST_SPAWN_RATE = 150      // particles/sec while emitting
-const BURST_MIN_RATE = 0.7        // 1/sec -- slower particles (~1.4s to arrive)
-const BURST_MAX_RATE = 1.3        // 1/sec -- faster particles (~0.8s to arrive)
-const BURST_LIFETIME_MIN = 1.2
-const BURST_LIFETIME_MAX = 2.0    // long enough for even the slowest particles to arrive and hover before fading
+const BURST_MIN_RATE = 0.2        // 1/sec -- slower particles (~5s to arrive)
+const BURST_MAX_RATE = 0.35       // 1/sec -- faster particles (~2.9s to arrive)
+const BURST_LIFETIME_MIN = 8      // long enough for even the slowest particles to arrive (0.7*8=5.6s >= 5s) before fading
+const BURST_LIFETIME_MAX = 10
 const BURST_TRAVEL_MULT = 11.5    // 11.5x the 0.1-scale spawn position = ~1.15x the inhale ring
+
+const ATTRACT_PARTICLE_COUNT = 600
+const ATTRACT_SPAWN_RATE = 100    // particles/sec while emitting
+const ATTRACT_RATE = 0.3          // exponential attraction toward the origin -- fairly slow
+const ATTRACT_LIFETIME_MIN = 4
+const ATTRACT_LIFETIME_MAX = 6
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -108,6 +116,39 @@ void main() {
 }
 `
 
+// Exponential decay toward the origin -- the closed-form solution to
+// "position shrinks toward 0 at a rate proportional to its distance from 0"
+// (dx/dt = -k*x -> x(t) = x0*exp(-k*t)), i.e. attraction to (0,0,0) at a
+// fixed rate.
+const ATTRACT_VERTEX_SHADER = `
+attribute float aSpawnTime;
+attribute float aLifetime;
+attribute float aSeed;
+uniform float uTime;
+uniform float uSize;
+uniform float uAttractRate;
+varying float vAlpha;
+varying float vSeed;
+
+void main() {
+  float age = max(uTime - aSpawnTime, 0.0);
+  float lifeT = clamp(age / aLifetime, 0.0, 1.0);
+  float fadeIn = smoothstep(0.0, 0.15, lifeT);
+  float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
+  float envelope = fadeIn * fadeOut;
+
+  float scaleFactor = exp(-uAttractRate * age);
+  vec3 displaced = position * scaleFactor;
+
+  vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
+  gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
+  gl_Position = projectionMatrix * mvPosition;
+
+  vAlpha = envelope;
+  vSeed = aSeed;
+}
+`
+
 const PARTICLE_FRAGMENT_SHADER = `
 uniform vec3 uColor;
 uniform float uTime;
@@ -137,14 +178,17 @@ function sampleTorusPositions(count, scale = GATE_SCALE) {
   return positions
 }
 
-export default function RingParticlesD({ primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef }) {
+export default function RingParticlesD({ primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef }) {
   const spawnCursorRef = useRef(0)
   const spawnAccumulatorRef = useRef(0)
 
-  const prevBurstPhaseRef = useRef('exhale')
-  const burstElapsedRef = useRef(Infinity)      // time since the last exhale->inhale transition
   const burstCursorRef = useRef(0)
   const burstAccumulatorRef = useRef(0)
+
+  const prevAttractPhaseRef = useRef('inhale')
+  const attractPhaseElapsedRef = useRef(Infinity)   // time since the last inhale->exhale transition
+  const attractCursorRef = useRef(0)
+  const attractAccumulatorRef = useRef(0)
 
   const sparkleAttrs = useMemo(() => {
     const positions = sampleTorusPositions(SPARKLE_PARTICLE_COUNT)
@@ -223,6 +267,41 @@ export default function RingParticlesD({ primaryColor, paceProgressRef, breathPh
     blending: THREE.AdditiveBlending,
   }), [primaryColor])
 
+  const attractAttrs = useMemo(() => {
+    const positions = sampleTorusPositions(ATTRACT_PARTICLE_COUNT)
+    const seeds = new Float32Array(ATTRACT_PARTICLE_COUNT)
+    const spawnTimes = new Float32Array(ATTRACT_PARTICLE_COUNT)
+    const lifetimes = new Float32Array(ATTRACT_PARTICLE_COUNT)
+    for (let i = 0; i < ATTRACT_PARTICLE_COUNT; i++) {
+      seeds[i] = Math.random()
+      spawnTimes[i] = SPAWN_SENTINEL
+      lifetimes[i] = 1
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
+    const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
+    const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
+    geometry.setAttribute('aSpawnTime', spawnTimeAttr)
+    geometry.setAttribute('aLifetime', lifetimeAttr)
+    return { geometry, spawnTimeAttr, lifetimeAttr }
+  }, [])
+
+  const attractMaterial = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uSize: { value: 100 },
+      uColor: { value: new THREE.Color(primaryColor) },
+      uTime: { value: 0 },
+      uAttractRate: { value: ATTRACT_RATE },
+    },
+    vertexShader: ATTRACT_VERTEX_SHADER,
+    fragmentShader: PARTICLE_FRAGMENT_SHADER,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+  }), [primaryColor])
+
   useFrame((state, delta) => {
     const bp = paceProgressRef?.current ?? 0
     const now = state.clock.elapsedTime
@@ -250,17 +329,13 @@ export default function RingParticlesD({ primaryColor, paceProgressRef, breathPh
     }
     sparkleMaterial.uniforms.uTime.value = now
 
-    // Inhale burst: fires a 1s window of spawns at the start of each
-    // exhale->inhale transition, independent of the sparkle system's bp-driven rate.
+    // Shared phase read for the burst and attract systems below.
     const active = gatesEnabledRef?.current ?? false
-    const burstPhase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
-    if (burstPhase === 'inhale' && prevBurstPhaseRef.current === 'exhale') {
-      burstElapsedRef.current = 0
-    }
-    prevBurstPhaseRef.current = burstPhase
-    burstElapsedRef.current += delta
+    const phase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
 
-    if (burstElapsedRef.current < BURST_DURATION) {
+    // Inhale burst: spawns continuously for the whole exhale->inhale
+    // transition, independent of the sparkle system's bp-driven rate.
+    if (phase === 'inhale') {
       burstAccumulatorRef.current += BURST_SPAWN_RATE * delta
       let toSpawnBurst = Math.floor(burstAccumulatorRef.current)
       if (toSpawnBurst > 0) {
@@ -278,6 +353,34 @@ export default function RingParticlesD({ primaryColor, paceProgressRef, breathPh
       }
     }
     burstMaterial.uniforms.uTime.value = now
+
+    // Inhale attract: spawns only for the first quarter of the exhale phase
+    // (the inhale->exhale return trip), then drifts inward on its own.
+    if (phase === 'exhale' && prevAttractPhaseRef.current === 'inhale') {
+      attractPhaseElapsedRef.current = 0
+    }
+    prevAttractPhaseRef.current = phase
+    attractPhaseElapsedRef.current += delta
+
+    const { exhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
+    if (phase === 'exhale' && attractPhaseElapsedRef.current < exhaleDuration * 0.25) {
+      attractAccumulatorRef.current += ATTRACT_SPAWN_RATE * delta
+      let toSpawnAttract = Math.floor(attractAccumulatorRef.current)
+      if (toSpawnAttract > 0) {
+        attractAccumulatorRef.current -= toSpawnAttract
+        toSpawnAttract = Math.min(toSpawnAttract, MAX_SPAWN_PER_FRAME)
+        const { spawnTimeAttr, lifetimeAttr } = attractAttrs
+        for (let k = 0; k < toSpawnAttract; k++) {
+          const idx = attractCursorRef.current % ATTRACT_PARTICLE_COUNT
+          attractCursorRef.current += 1
+          spawnTimeAttr.array[idx] = now
+          lifetimeAttr.array[idx] = THREE.MathUtils.lerp(ATTRACT_LIFETIME_MIN, ATTRACT_LIFETIME_MAX, Math.random())
+        }
+        spawnTimeAttr.needsUpdate = true
+        lifetimeAttr.needsUpdate = true
+      }
+    }
+    attractMaterial.uniforms.uTime.value = now
   })
 
   return (
@@ -287,6 +390,9 @@ export default function RingParticlesD({ primaryColor, paceProgressRef, breathPh
       </points>
       <points geometry={burstAttrs.geometry}>
         <primitive object={burstMaterial} attach="material" />
+      </points>
+      <points geometry={attractAttrs.geometry}>
+        <primitive object={attractMaterial} attach="material" />
       </points>
     </group>
   )

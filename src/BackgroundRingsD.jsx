@@ -44,6 +44,15 @@ function smoothstep(t) {
   return t * t * (3 - 2 * t)
 }
 
+// Shared by RingParticlesD's own phase-gated emission windows.
+export function computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef) {
+  const inhale = inhaleSecondsRef?.current
+  const exhale = exhaleSecondsRef?.current
+  const hasSplit = inhale != null && exhale != null
+  const fallback = (spawnIntervalRef?.current ?? 6) / 2
+  return { inhaleDuration: hasSplit ? inhale : fallback, exhaleDuration: hasSplit ? exhale : fallback }
+}
+
 // One-shot pulse timeline: ease in 0->1 over PULSE_IN, hold at 1 for
 // PULSE_HOLD, ease out 1->0 over PULSE_OUT, then rest at 0.
 function pulseValue(elapsed) {
@@ -81,12 +90,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
     pulseExhaleElapsedRef.current += delta
     pulseInhaleElapsedRef.current += delta
 
-    const inhale = inhaleSecondsRef?.current
-    const exhale = exhaleSecondsRef?.current
-    const hasSplit = inhale != null && exhale != null
-    const fallback = (spawnIntervalRef?.current ?? 6) / 2
-    const inhaleDuration = hasSplit ? inhale : fallback
-    const exhaleDuration = hasSplit ? exhale : fallback
+    const { inhaleDuration, exhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
 
     const elapsed = phaseElapsedRef.current
     let paceEmissive
