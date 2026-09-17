@@ -19,6 +19,14 @@ const OPTIONS = [
   },
 ]
 
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.substring(0, 2), 16)
+  const g = parseInt(clean.substring(2, 4), 16)
+  const b = parseInt(clean.substring(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 const pillStyle = {
   background: 'rgba(255,255,255,0.08)',
   border: '1px solid rgba(255,255,255,0.18)',
@@ -75,7 +83,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
           onPointerCancel={() => setStartPressed(false)}
           style={{
             width: 110, height: 110, borderRadius: '50%',
-            background: `rgba(255,105,180,${startPressed ? 0.75 : 0.25})`,
+            background: hexToRgba(palette.headerColor, startPressed ? 0.75 : 0.25),
             border: `2px solid ${palette.headerColor}`,
             color: palette.headerColor, fontSize: 20, fontWeight: 700,
             fontFamily: 'sans-serif', cursor: 'pointer',
