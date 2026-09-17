@@ -28,7 +28,7 @@ const PACE_TUBE = 0.045      // thinner than BASE_TUBE so the pace ring nests in
 // Inner hole half-extent is ~(BASE_RADIUS - BASE_TUBE) * GATE_SCALE[axis] = 0.94 * GATE_SCALE[axis].
 // Sized for a ~15% clearance margin over MorphC's Option D inhale half-extents (1.0, 1.5):
 // X: 1.0*1.15/0.94 ≈ 1.223, Y: 1.5*1.15/0.94 ≈ 1.835.
-export const GATE_SCALE = [1.223, 1.835, 1]   // inhale ring scale (base scale)
+export const GATE_SCALE = [1.223, 1.835, 1].map((v) => v * 0.95)   // inhale ring scale (base scale), 5% smaller than the clearance-margin sizing derived above
 export const EXHALE_SCALE = GATE_SCALE.map((v) => v * 1.5)   // exhale ring scale: 1.5x inhale in x/y/z
 const FLAT_ALPHA = 0.5
 
