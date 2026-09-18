@@ -208,7 +208,7 @@ function sampleTorusPositions(count, scale = GATE_SCALE) {
   return positions
 }
 
-export default function RingParticlesD({ textColor, secondaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing }) {
+export default function RingParticlesD({ textColor, secondaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef }) {
   const spawnCursorRef = useRef(0)
   const spawnAccumulatorRef = useRef(0)
 
@@ -360,8 +360,6 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
   }), [])
 
   useFrame((state, delta) => {
-    const rawBp = paceProgressRef?.current ?? 0
-    const bp = isBoxBreathing ? 1 - rawBp : rawBp
     const now = state.clock.elapsedTime
 
     // Live palette colors (cheap in-place copy, no allocation).
@@ -375,8 +373,12 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
     // Shared phase read, used below by the sparkle rate ramp and by the
     // fixed-window timer for Inflow/Outflow/Sparkle's global fade.
     const active = gatesEnabledRef?.current ?? false
-    const rawPhase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
-    const phase = isBoxBreathing ? (rawPhase === 'inhale' ? 'exhale' : 'inhale') : rawPhase
+    // Box Breathing has its own clean phase/progress signal (written by
+    // GatesBoxBreathingD from a ground-truth 4-phase clock) instead of
+    // breathPhaseRef/paceProgressRef, whose Box-mode convention is inverted
+    // for BackgroundA and carries a startup artifact.
+    const phase = isBoxBreathing ? (boxPhaseRef?.current ?? 'exhale') : (active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale')
+    const bp = isBoxBreathing ? (boxProgressRef?.current ?? 0) : (paceProgressRef?.current ?? 0)
 
     // Ring sparkle rate: ramps 0 -> max as the cycle moves from exhale to
     // inhale, reaching max at SPARKLE_RATE_RAMP_UP_FRACTION of the way to

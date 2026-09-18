@@ -181,6 +181,14 @@ export default function App() {
   const breathPhaseRef = useRef('exhale')
   const holdFlareRef = useRef(0)
   const ringPaceProgressRef = useRef(0)
+  // Box Breathing (Shape D) only: a clean, ground-truth phase/progress pair
+  // written every frame by GatesBoxBreathingD from its own independent
+  // 4-phase clock, read by RingParticlesD instead of breathPhaseRef/
+  // ringPaceProgressRef (whose Box-mode meaning is inverted for BackgroundA
+  // and has a startup artifact) so Sparkle stays correctly synced to real
+  // Inhale/Hold-in/Exhale/Hold-out boundaries.
+  const boxPhaseRef = useRef('exhale')
+  const boxProgressRef = useRef(0)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -741,7 +749,7 @@ export default function App() {
         {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} />
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} />}
-        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} />}
+        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
@@ -766,6 +774,8 @@ export default function App() {
             onFirstGate={handleBBFirstGate}
             onLastGate={handleBBLastGate}
             holdFlareRef={holdFlareRef}
+            boxPhaseRef={boxPhaseRef}
+            boxProgressRef={boxProgressRef}
           />
         )}
         {shapeOption === 'e' && mode === 'box' && (

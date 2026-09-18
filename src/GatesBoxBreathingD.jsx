@@ -7,7 +7,7 @@ const SPAWN_Z = -6
 const DESPAWN_Z = 6
 
 const TORUS_ARGS = [BASE_RADIUS, BASE_TUBE, 16, 64]
-const EXHALE_HOLD_SPHERE_RADIUS = 0.125   // half of GatesBoxBreathingC's SPHERE_RADIUS (0.25)
+const EXHALE_HOLD_SPHERE_RADIUS = 0.25
 const SPHERE_ARGS = [EXHALE_HOLD_SPHERE_RADIUS, 16, 8]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
@@ -41,7 +41,7 @@ function makeSlot() {
 // torus/sphere meshes. Instead, a second independent clock (below) tracks which of
 // the 4 named box-breathing phases is active and pulses a stationary ring during
 // Hold-in and a stationary sphere during Hold-out.
-export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate }) {
+export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, boxPhaseRef, boxProgressRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -132,9 +132,27 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
           ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse)
           : 0
       }
+
+      // Clean, ground-truth phase/progress pair for RingParticlesD's Sparkle
+      // system to consume in Box mode -- 'inhale' spans Inhale-movement +
+      // Hold-in (progress ramps 0->1 across the movement, holds at 1 through
+      // the hold), 'exhale' spans Exhale-movement + Hold-out (progress ramps
+      // 1->0 across the movement, holds at 0 through the hold). Avoids the
+      // startup artifact and BackgroundA-specific inversion baked into
+      // breathPhaseRef/paceProgressRef.
+      if (boxPhaseRef) boxPhaseRef.current = (phaseIndex === 0 || phaseIndex === 1) ? 'inhale' : 'exhale'
+      if (boxProgressRef) {
+        boxProgressRef.current =
+          phaseIndex === 0 ? phaseElapsed / interval :
+          phaseIndex === 1 ? 1 :
+          phaseIndex === 2 ? 1 - phaseElapsed / interval :
+          0
+      }
     } else {
       if (ringMeshRef.current) ringMeshRef.current.visible = false
       if (sphereMeshRef.current) sphereMeshRef.current.visible = false
+      if (boxPhaseRef) boxPhaseRef.current = 'exhale'
+      if (boxProgressRef) boxProgressRef.current = 0
     }
   })
 
