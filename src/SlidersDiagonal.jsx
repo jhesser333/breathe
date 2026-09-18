@@ -75,7 +75,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
   )
 }
 
-export default function SlidersDiagonal({ onLeft, onRight, leftRawRef }) {
+export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, shiftUp = 0 }) {
   const [leftRef, leftVal] = useTouchSlider(0, leftRawRef, 'diagonal-left')
   const [rightRef, rightVal] = useTouchSlider(1, null, 'diagonal-right')
 
@@ -85,12 +85,12 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef }) {
   const exhaleLabelBottom = BOTTOM_INSET + (1 - P0_FRAC.y) * CURVE_BOX_H
 
   return (
-    <>
+    <div style={{ position: 'absolute', inset: 0, transform: `translateY(-${shiftUp}px)` }}>
       <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" />
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
       <span style={{ ...labelStyle, bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 50%)' }}>
         exhale
       </span>
-    </>
+    </div>
   )
 }

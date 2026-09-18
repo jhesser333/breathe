@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from 'react'
+import { useRef, useCallback, useState, useEffect, useLayoutEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import MorphA from './MorphA'
 import MorphB from './MorphB'
@@ -671,6 +671,15 @@ export default function App() {
     setScreen('selectMode')
   }, [])
 
+  // Measures the Home/Restart button (group)'s own rendered height so the
+  // sliders can be shifted up to sit flush against its top edge -- avoids
+  // hardcoding a guessed pixel height for the nav buttons.
+  const navButtonsRef = useRef(null)
+  const [sliderShiftUp, setSliderShiftUp] = useState(50)
+  useLayoutEffect(() => {
+    if (navButtonsRef.current) setSliderShiftUp(navButtonsRef.current.offsetHeight)
+  }, [sliderLayout])
+
   if (screen === 'selectMode') {
     return (
       <SelectModeScreen
@@ -790,8 +799,8 @@ export default function App() {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
           {sliderLayout === 'diagonal'
-            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />
-            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} />}
+            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} shiftUp={sliderShiftUp} />
+            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} shiftUp={sliderShiftUp} />}
         </div>
         <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}>
           <span style={{
@@ -817,7 +826,7 @@ export default function App() {
         )}
         {sliderLayout === 'diagonal' ? (
           <>
-            <button onClick={handleBackFromExperience} style={{ ...navPillStyle, position: 'absolute', bottom: 16, left: 16 }}>
+            <button ref={navButtonsRef} onClick={handleBackFromExperience} style={{ ...navPillStyle, position: 'absolute', bottom: 16, left: 16 }}>
               Home
             </button>
             <button onClick={handleRestart} style={{ ...navPillStyle, position: 'absolute', bottom: 16, right: 16 }}>
@@ -825,7 +834,7 @@ export default function App() {
             </button>
           </>
         ) : (
-          <div style={{
+          <div ref={navButtonsRef} style={{
             position: 'absolute', bottom: 16, left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex', flexDirection: 'column',
