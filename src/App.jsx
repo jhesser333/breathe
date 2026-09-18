@@ -12,6 +12,7 @@ import GatesHeadlessE from './GatesHeadlessE'
 import GatesBoxBreathingA from './GatesBoxBreathingA'
 import GatesBoxBreathingB from './GatesBoxBreathingB'
 import GatesBoxBreathingC from './GatesBoxBreathingC'
+import GatesBoxBreathingD from './GatesBoxBreathingD'
 import GatesBoxBreathingHeadlessE from './GatesBoxBreathingHeadlessE'
 import Sliders from './Sliders'
 import SlidersDiagonal from './SlidersDiagonal'
@@ -725,7 +726,7 @@ export default function App() {
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : MorphA
   const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
-  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' || shapeOption === 'd' ? GatesBoxBreathingC : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
+  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
 
   return (
