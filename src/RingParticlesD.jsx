@@ -31,6 +31,7 @@ const MAX_SPAWN_RATE = 440        // particles/sec
 const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
 const SPARKLE_ATTRACT_RATE = 1.1  // how quickly outward drift decays back toward the surface -- slow, floaty
+const SPARKLE_FADE_OUT_DURATION = 3.0   // seconds: how long Sparkle takes to fade to invisible once Outflow starts (3x OUTFLOW_WINDOW)
 
 const RING_RATIO = EXHALE_SCALE[0] / GATE_SCALE[0]   // exhale ring is this many times the inhale ring's size (uniform across axes)
 
@@ -42,9 +43,9 @@ const INFLOW_LIFETIME_MAX = 4.0
 const INFLOW_ARRIVAL_FRACTION = 0.65   // reaches the inhale ring at 65% of its own lifetime, ahead of the 70% fade-out
 const INFLOW_TRAVEL_MULT = 1 / RING_RATIO   // shrink from the exhale ring down to the inhale ring
 
-const OUTFLOW_PARTICLE_COUNT = 300
-const OUTFLOW_SPAWN_RATE = 70     // particles/sec while emitting
-const OUTFLOW_WINDOW = 1.0        // seconds: only spawns for the first second of the inhale->exhale phase
+const OUTFLOW_PARTICLE_COUNT = 900
+const OUTFLOW_SPAWN_RATE = 140    // particles/sec while emitting
+const OUTFLOW_WINDOW = 1.5        // seconds: only spawns for the first 1.5s of the inhale->exhale phase
 const OUTFLOW_LIFETIME_MIN = 2.5
 const OUTFLOW_LIFETIME_MAX = 4.0
 const OUTFLOW_ARRIVAL_FRACTION = 0.65   // reaches roughly the exhale ring's scale at 65% of life, then keeps drifting past it
@@ -411,7 +412,7 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
     // everything is flying away), and back in as the next Inflow burst
     // begins -- spawning itself is untouched, only visibility.
     const globalFade = phase === 'exhale'
-      ? 1 - THREE.MathUtils.smoothstep(phaseElapsedRef.current, 0, OUTFLOW_WINDOW)
+      ? 1 - THREE.MathUtils.smoothstep(phaseElapsedRef.current, 0, SPARKLE_FADE_OUT_DURATION)
       : THREE.MathUtils.smoothstep(phaseElapsedRef.current, 0, INFLOW_WINDOW)
     sparkleMaterial.uniforms.uGlobalFade.value = globalFade
 
