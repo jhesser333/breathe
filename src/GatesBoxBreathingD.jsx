@@ -1,12 +1,12 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
 
 const POOL_SIZE = 28
 const SPAWN_Z = -6
 const DESPAWN_Z = 6
 
-const TORUS_ARGS = [1.0, 0.06, 16, 64]
-const GATE_SCALE = [1.376, 1.955, 1]
+const TORUS_ARGS = [BASE_RADIUS, BASE_TUBE, 16, 64]
 const EXHALE_HOLD_SPHERE_RADIUS = 0.125   // half of GatesBoxBreathingC's SPHERE_RADIUS (0.25)
 const SPHERE_ARGS = [EXHALE_HOLD_SPHERE_RADIUS, 16, 8]
 
@@ -140,7 +140,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
 
   return (
     <>
-      <mesh ref={ringMeshRef} position={[0, 0.25, 0]} scale={GATE_SCALE} visible={false}>
+      <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={GATE_SCALE} visible={false}>
         <torusGeometry args={TORUS_ARGS} />
         <meshStandardMaterial ref={ringMatRef}
           color={gateColor} emissive={emissiveColor} transparent depthWrite={false} opacity={0} />

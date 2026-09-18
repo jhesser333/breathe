@@ -208,7 +208,7 @@ function sampleTorusPositions(count, scale = GATE_SCALE) {
   return positions
 }
 
-export default function RingParticlesD({ textColor, secondaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef }) {
+export default function RingParticlesD({ textColor, secondaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing }) {
   const spawnCursorRef = useRef(0)
   const spawnAccumulatorRef = useRef(0)
 
@@ -360,7 +360,8 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
   }), [])
 
   useFrame((state, delta) => {
-    const bp = paceProgressRef?.current ?? 0
+    const rawBp = paceProgressRef?.current ?? 0
+    const bp = isBoxBreathing ? 1 - rawBp : rawBp
     const now = state.clock.elapsedTime
 
     // Live palette colors (cheap in-place copy, no allocation).
@@ -374,7 +375,8 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
     // Shared phase read, used below by the sparkle rate ramp and by the
     // fixed-window timer for Inflow/Outflow/Sparkle's global fade.
     const active = gatesEnabledRef?.current ?? false
-    const phase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
+    const rawPhase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
+    const phase = isBoxBreathing ? (rawPhase === 'inhale' ? 'exhale' : 'inhale') : rawPhase
 
     // Ring sparkle rate: ramps 0 -> max as the cycle moves from exhale to
     // inhale, reaching max at SPARKLE_RATE_RAMP_UP_FRACTION of the way to
