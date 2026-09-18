@@ -16,6 +16,8 @@ import * as THREE from 'three'
 export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- anchors RingParticlesD
 export const RING_Y = 0
 
+const RINGS_VISIBLE = false   // temporarily hidden so the pace-driven particle systems can be tuned in isolation -- flip back to true when done
+
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
 
 const PULSE_IN = 0.2         // fixed-ring pulse: ease-in duration
@@ -130,32 +132,36 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
 
   return (
     <group>
-      <mesh position={[0, RING_Y, 0]} scale={EXHALE_SCALE}>
-        <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
-        <meshStandardMaterial
-          ref={matExhaleRef}
-          color={baseColor}
-          emissive={emissiveColor}
-          emissiveIntensity={0}
-          roughness={0.5}
-          metalness={0.1}
-          transparent
-          opacity={0}
-        />
-      </mesh>
-      <mesh position={[0, RING_Y, 0]} scale={GATE_SCALE}>
-        <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
-        <meshStandardMaterial
-          ref={matInhaleRef}
-          color={baseColor}
-          emissive={emissiveColor}
-          emissiveIntensity={0}
-          roughness={0.5}
-          metalness={0.1}
-          transparent
-          opacity={0}
-        />
-      </mesh>
+      {RINGS_VISIBLE && (
+        <mesh position={[0, RING_Y, 0]} scale={EXHALE_SCALE}>
+          <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
+          <meshStandardMaterial
+            ref={matExhaleRef}
+            color={baseColor}
+            emissive={emissiveColor}
+            emissiveIntensity={0}
+            roughness={0.5}
+            metalness={0.1}
+            transparent
+            opacity={0}
+          />
+        </mesh>
+      )}
+      {RINGS_VISIBLE && (
+        <mesh position={[0, RING_Y, 0]} scale={GATE_SCALE}>
+          <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
+          <meshStandardMaterial
+            ref={matInhaleRef}
+            color={baseColor}
+            emissive={emissiveColor}
+            emissiveIntensity={0}
+            roughness={0.5}
+            metalness={0.1}
+            transparent
+            opacity={0}
+          />
+        </mesh>
+      )}
       <mesh position={[0, RING_Y, HALO_RING_Z]} scale={GATE_SCALE}>
         <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
         <meshStandardMaterial
@@ -169,19 +175,21 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           depthWrite={false}
         />
       </mesh>
-      <mesh ref={paceMeshRef} position={[0, RING_Y, 0]} scale={EXHALE_SCALE}>
-        <torusGeometry args={[BASE_RADIUS, PACE_TUBE, 16, 64]} />
-        <meshStandardMaterial
-          ref={paceMatRef}
-          color={baseColor}
-          emissive={emissiveColor}
-          emissiveIntensity={PACE_EMISSIVE_MIN}
-          roughness={0.5}
-          metalness={0.1}
-          transparent
-          opacity={FLAT_ALPHA}
-        />
-      </mesh>
+      {RINGS_VISIBLE && (
+        <mesh ref={paceMeshRef} position={[0, RING_Y, 0]} scale={EXHALE_SCALE}>
+          <torusGeometry args={[BASE_RADIUS, PACE_TUBE, 16, 64]} />
+          <meshStandardMaterial
+            ref={paceMatRef}
+            color={baseColor}
+            emissive={emissiveColor}
+            emissiveIntensity={PACE_EMISSIVE_MIN}
+            roughness={0.5}
+            metalness={0.1}
+            transparent
+            opacity={FLAT_ALPHA}
+          />
+        </mesh>
+      )}
     </group>
   )
 }
