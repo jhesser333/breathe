@@ -17,7 +17,7 @@ export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- 
 export const RING_Y = 0
 
 const RINGS_VISIBLE = false        // exhale + pace rings: temporarily hidden so the pace-driven particle systems can be tuned in isolation -- flip back to true when done
-const INHALE_RING_VISIBLE = true   // inhale ring: shown on its own while focusing on the sparkle system
+const INHALE_RING_VISIBLE = false  // inhale ring: temporarily hidden so only the sparkle particles show
 
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
 

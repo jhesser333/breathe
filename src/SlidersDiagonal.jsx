@@ -41,7 +41,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
       width: w, height: h,
       ...edgeStyle,
     }}>
-      <span style={{ ...labelStyle, top: -22, [isLeft ? 'left' : 'right']: 0 }}>
+      <span style={{ ...labelStyle, top: -28, [isLeft ? 'left' : 'right']: 0 }}>
         inhale
       </span>
       <div
