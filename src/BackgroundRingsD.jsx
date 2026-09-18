@@ -16,7 +16,8 @@ import * as THREE from 'three'
 export const HALO_RING_Z = 0     // purely decorative, invisible (opacity 0) -- anchors RingParticlesD
 export const RING_Y = 0
 
-const RINGS_VISIBLE = false   // temporarily hidden so the pace-driven particle systems can be tuned in isolation -- flip back to true when done
+const RINGS_VISIBLE = false        // exhale + pace rings: temporarily hidden so the pace-driven particle systems can be tuned in isolation -- flip back to true when done
+const INHALE_RING_VISIBLE = true   // inhale ring: shown on its own while focusing on the sparkle system
 
 const HOLD_SECONDS = 0.5     // pace ring pause at each end before it starts moving
 
@@ -37,6 +38,11 @@ const FLAT_ALPHA = 0.5
 
 const PACE_EMISSIVE_MIN = 0.1
 const PACE_EMISSIVE_MAX = 0.7
+
+const INHALE_RING_ALPHA_MIN = 0
+const INHALE_RING_ALPHA_MAX = 1
+const INHALE_RING_EMISSIVE_MIN = 0.3
+const INHALE_RING_EMISSIVE_MAX = 2
 
 const INHALE_SCALE_VEC = new THREE.Vector3(...GATE_SCALE)
 const EXHALE_SCALE_VEC = new THREE.Vector3(...EXHALE_SCALE)
@@ -73,7 +79,6 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
   const prevPhaseRef = useRef('exhale')
   const phaseElapsedRef = useRef(Infinity)          // time since the active phase last changed
   const pulseExhaleElapsedRef = useRef(Infinity)    // time since the exhale ring's pulse last triggered
-  const pulseInhaleElapsedRef = useRef(Infinity)    // time since the inhale ring's pulse last triggered
 
   useFrame((_, delta) => {
     const active = gatesEnabledRef?.current ?? false
@@ -84,13 +89,10 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
       phaseElapsedRef.current = 0
       if (activePhase === 'inhale') {
         pulseExhaleElapsedRef.current = 0
-      } else {
-        pulseInhaleElapsedRef.current = 0
       }
     }
     phaseElapsedRef.current += delta
     pulseExhaleElapsedRef.current += delta
-    pulseInhaleElapsedRef.current += delta
 
     const { inhaleDuration, exhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
 
@@ -119,14 +121,19 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
     if (paceProgressRef) paceProgressRef.current = activePhase === 'inhale' ? eased : (1 - eased)
 
     const pulseExhale = pulseValue(pulseExhaleElapsedRef.current)
-    const pulseInhale = pulseValue(pulseInhaleElapsedRef.current)
     if (matExhaleRef.current) {
       matExhaleRef.current.emissiveIntensity = pulseExhale
       matExhaleRef.current.opacity = pulseExhale
     }
+
+    // Inhale ring: continuous alpha/emissive ramp tied to per-phase progress
+    // (eased is already smoothstep-based, so this is eased in and out),
+    // reversing direction across the exhale<->inhale boundary with no jump
+    // (both formulas agree at eased=1/0 -> inhaleRingT=1 at full inhale).
+    const inhaleRingT = activePhase === 'inhale' ? eased : (1 - eased)
     if (matInhaleRef.current) {
-      matInhaleRef.current.emissiveIntensity = pulseInhale
-      matInhaleRef.current.opacity = pulseInhale
+      matInhaleRef.current.opacity = THREE.MathUtils.lerp(INHALE_RING_ALPHA_MIN, INHALE_RING_ALPHA_MAX, inhaleRingT)
+      matInhaleRef.current.emissiveIntensity = THREE.MathUtils.lerp(INHALE_RING_EMISSIVE_MIN, INHALE_RING_EMISSIVE_MAX, inhaleRingT)
     }
   })
 
@@ -147,7 +154,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
           />
         </mesh>
       )}
-      {RINGS_VISIBLE && (
+      {INHALE_RING_VISIBLE && (
         <mesh position={[0, RING_Y, 0]} scale={GATE_SCALE}>
           <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
           <meshStandardMaterial

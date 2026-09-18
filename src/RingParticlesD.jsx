@@ -32,6 +32,10 @@ const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
 const SPARKLE_ATTRACT_RATE = 1.1  // how quickly outward drift decays back toward the surface -- slow, floaty
 const SPARKLE_FADE_OUT_DURATION = 3.0   // seconds: how long Sparkle takes to fade to invisible once Outflow starts (3x OUTFLOW_WINDOW)
+const SPARKLE_RATE_RAMP_UP_FRACTION = 0.8    // reaches max spawn rate at 80% of the way to full inhale
+const SPARKLE_RATE_RAMP_DOWN_MIDPOINT = 0.5  // spawn rate reaches 0 halfway through the inhale->exhale return trip
+
+const SHOW_INFLOW_OUTFLOW = false   // temporarily hidden so Sparkle + the inhale ring can be tuned in isolation -- flip back to true when done
 
 const RING_RATIO = EXHALE_SCALE[0] / GATE_SCALE[0]   // exhale ring is this many times the inhale ring's size (uniform across axes)
 
@@ -367,10 +371,25 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
     outflowMaterial.uniforms.uColorA.value.copy(colorTextC)
     outflowMaterial.uniforms.uColorB.value.copy(colorSecondaryC)
 
-    // Ring sparkle rate mirrors MorphC's System 1, with (1-bp) standing in
-    // for rv -- dies out only as the cycle settles back to exhale rest.
-    const spawnRampProgress = THREE.MathUtils.smoothstep(1 - bp, 0.75, 1.0)
-    const spawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, spawnRampProgress)
+    // Shared phase read, used below by the sparkle rate ramp and by the
+    // fixed-window timer for Inflow/Outflow/Sparkle's global fade.
+    const active = gatesEnabledRef?.current ?? false
+    const phase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
+
+    // Ring sparkle rate: ramps 0 -> max as the cycle moves from exhale to
+    // inhale, reaching max at SPARKLE_RATE_RAMP_UP_FRACTION of the way to
+    // full inhale and holding there; ramps max -> 0 on the way back,
+    // reaching 0 at SPARKLE_RATE_RAMP_DOWN_MIDPOINT of that return trip and
+    // holding at 0 for the rest of exhale. Both branches agree at bp=1 (the
+    // phase boundary), so there's no jump when the phase flips.
+    let spawnRate
+    if (phase === 'inhale') {
+      const rampT = THREE.MathUtils.clamp(bp / SPARKLE_RATE_RAMP_UP_FRACTION, 0, 1)
+      spawnRate = THREE.MathUtils.lerp(0, MAX_SPAWN_RATE, rampT)
+    } else {
+      const rampT = THREE.MathUtils.clamp((bp - SPARKLE_RATE_RAMP_DOWN_MIDPOINT) / (1 - SPARKLE_RATE_RAMP_DOWN_MIDPOINT), 0, 1)
+      spawnRate = THREE.MathUtils.lerp(0, MAX_SPAWN_RATE, rampT)
+    }
 
     // Ring sparkle: surface points with a rise-then-decay outward drift.
     spawnAccumulatorRef.current += spawnRate * delta
@@ -396,11 +415,8 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
     }
     sparkleMaterial.uniforms.uTime.value = now
 
-    // Shared phase read + fixed-window timer for Inflow/Outflow below, also
-    // used to gate Sparkle's global fade.
-    const active = gatesEnabledRef?.current ?? false
-    const phase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
-
+    // Fixed-window timer for Inflow/Outflow below, also used to gate
+    // Sparkle's global fade.
     if (phase !== prevPhaseRef.current) {
       prevPhaseRef.current = phase
       phaseElapsedRef.current = 0
@@ -475,12 +491,16 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
       <points geometry={sparkleAttrs.geometry}>
         <primitive object={sparkleMaterial} attach="material" />
       </points>
-      <points geometry={inflowAttrs.geometry}>
-        <primitive object={inflowMaterial} attach="material" />
-      </points>
-      <points geometry={outflowAttrs.geometry}>
-        <primitive object={outflowMaterial} attach="material" />
-      </points>
+      {SHOW_INFLOW_OUTFLOW && (
+        <points geometry={inflowAttrs.geometry}>
+          <primitive object={inflowMaterial} attach="material" />
+        </points>
+      )}
+      {SHOW_INFLOW_OUTFLOW && (
+        <points geometry={outflowAttrs.geometry}>
+          <primitive object={outflowMaterial} attach="material" />
+        </points>
+      )}
     </group>
   )
 }
