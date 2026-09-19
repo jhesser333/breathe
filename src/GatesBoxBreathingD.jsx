@@ -6,13 +6,14 @@ const POOL_SIZE = 28
 const SPAWN_Z = -6
 const DESPAWN_Z = 6
 
-const TORUS_ARGS = [BASE_RADIUS, BASE_TUBE, 16, 64]
-const EXHALE_HOLD_SPHERE_RADIUS = 0.25
-const SPHERE_ARGS = [EXHALE_HOLD_SPHERE_RADIUS, 16, 8]
+const PULSE_RING_TUBE = 0.015   // thin line, ~1/4 of BASE_TUBE -- tune by eye
+const INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS   // 0.94: the sparkle ring's own inner edge
+const PULSE_RING_SCALE = GATE_SCALE.map(v => v * INNER_EDGE_FACTOR)
+const TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
 const PULSE_RAMP_IN = 0.2    // seconds ramping in before ramping out for the remainder
-const PULSE_ALPHA_MAX = 0.5
+const PULSE_ALPHA_MAX = 0.25
 const PULSE_EMISSIVE_MIN = 0.2
 const PULSE_EMISSIVE_MAX = 1
 
@@ -39,17 +40,15 @@ function makeSlot() {
 // simulation (so onFirstGate/onLastGate keep firing at the same instants, preserving
 // App.jsx's tutorial text and breathPhaseRef behavior) but renders no traveling
 // torus/sphere meshes. Instead, a second independent clock (below) tracks which of
-// the 4 named box-breathing phases is active and pulses a stationary ring during
-// Hold-in and a stationary sphere during Hold-out.
+// the 4 named box-breathing phases is active and pulses a single thin, inset ring
+// during both Hold-in and Hold-out.
 export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, boxPhaseRef, boxProgressRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
   const totalElapsedRef = useRef(0)
   const ringMatRef = useRef()
-  const sphereMatRef = useRef()
   const ringMeshRef = useRef()
-  const sphereMeshRef = useRef()
 
   useFrame((_, delta) => {
     const ss = slots.current
@@ -112,23 +111,14 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       const phaseIndex = Math.floor(cycleT / interval)
       const phaseElapsed = cycleT % interval
 
-      const isHoldIn = phaseIndex === 1
-      const isHoldOut = phaseIndex === 3
+      const isHold = phaseIndex === 1 || phaseIndex === 3   // Hold-in or Hold-out
       const tInPulse = phaseElapsed % PULSE_DURATION
       const pulse = pulseEnvelope(tInPulse)
 
-      if (ringMeshRef.current) ringMeshRef.current.visible = isHoldIn
+      if (ringMeshRef.current) ringMeshRef.current.visible = isHold
       if (ringMatRef.current) {
-        ringMatRef.current.opacity = isHoldIn ? PULSE_ALPHA_MAX * pulse : 0
-        ringMatRef.current.emissiveIntensity = isHoldIn
-          ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse)
-          : 0
-      }
-
-      if (sphereMeshRef.current) sphereMeshRef.current.visible = isHoldOut
-      if (sphereMatRef.current) {
-        sphereMatRef.current.opacity = isHoldOut ? PULSE_ALPHA_MAX * pulse : 0
-        sphereMatRef.current.emissiveIntensity = isHoldOut
+        ringMatRef.current.opacity = isHold ? PULSE_ALPHA_MAX * pulse : 0
+        ringMatRef.current.emissiveIntensity = isHold
           ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse)
           : 0
       }
@@ -150,24 +140,16 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       }
     } else {
       if (ringMeshRef.current) ringMeshRef.current.visible = false
-      if (sphereMeshRef.current) sphereMeshRef.current.visible = false
       if (boxPhaseRef) boxPhaseRef.current = 'exhale'
       if (boxProgressRef) boxProgressRef.current = 0
     }
   })
 
   return (
-    <>
-      <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={GATE_SCALE} visible={false}>
-        <torusGeometry args={TORUS_ARGS} />
-        <meshStandardMaterial ref={ringMatRef}
-          color={gateColor} emissive={emissiveColor} transparent depthWrite={false} opacity={0} />
-      </mesh>
-      <mesh ref={sphereMeshRef} position={[0, 0, 0]} visible={false}>
-        <sphereGeometry args={SPHERE_ARGS} />
-        <meshStandardMaterial ref={sphereMatRef}
-          color={gateColor} emissive={emissiveColor} transparent depthWrite={false} opacity={0} />
-      </mesh>
-    </>
+    <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={PULSE_RING_SCALE} visible={false}>
+      <torusGeometry args={TORUS_ARGS} />
+      <meshStandardMaterial ref={ringMatRef}
+        color={gateColor} emissive={emissiveColor} transparent depthWrite={false} opacity={0} />
+    </mesh>
   )
 }
