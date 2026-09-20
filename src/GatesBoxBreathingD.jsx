@@ -13,7 +13,8 @@ const TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
 const PULSE_RAMP_IN = 0.2    // seconds ramping in before ramping out for the remainder
-const PULSE_ALPHA_MAX = 0.25
+const PULSE_ALPHA_MIN = 0.2
+const PULSE_ALPHA_MAX = 0.4
 const PULSE_EMISSIVE_MIN = 0.2
 const PULSE_EMISSIVE_MAX = 1
 
@@ -117,7 +118,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
 
       if (ringMeshRef.current) ringMeshRef.current.visible = isHold
       if (ringMatRef.current) {
-        ringMatRef.current.opacity = isHold ? PULSE_ALPHA_MAX * pulse : 0
+        ringMatRef.current.opacity = isHold ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse) : 0
         ringMatRef.current.emissiveIntensity = isHold
           ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse)
           : 0

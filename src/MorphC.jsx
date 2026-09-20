@@ -325,7 +325,7 @@ float dissolveHash(vec3 p) {
   const sparkleMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        uSize:  { value: 60 },
+        uSize:  { value: 120 },
         uColor: { value: new THREE.Color(palette.primaryColor) },
         uTime:  { value: 0 },
       },
@@ -341,7 +341,7 @@ float dissolveHash(vec3 p) {
   const flowMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        uSize:   { value: 60 },
+        uSize:   { value: 120 },
         uColor:  { value: new THREE.Color(palette.primaryColor) },
         uTime:   { value: 0 },
         uSpread: { value: SPREAD_2 },
