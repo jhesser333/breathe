@@ -18,6 +18,9 @@ const PULSE_ALPHA_MAX = 0.4
 const PULSE_EMISSIVE_MIN = 0.2
 const PULSE_EMISSIVE_MAX = 1
 
+const COUNT_RING_POOL_SIZE = 16      // generous cap; only the first numCountRings are ever shown
+const COUNT_RING_X_SCALE_MULT = 2    // starts at 2x the main ring's resting X scale
+
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
   return c * c * (3 - 2 * c)
@@ -50,6 +53,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
   const totalElapsedRef = useRef(0)
   const ringMatRef = useRef()
   const ringMeshRef = useRef()
+  const countRingsRef = useRef(Array.from({ length: COUNT_RING_POOL_SIZE }, () => ({ mesh: null, mat: null })))
 
   useFrame((_, delta) => {
     const ss = slots.current
@@ -144,6 +148,36 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
           : lerp(0, PULSE_EMISSIVE_MIN, moveRamp)
       }
 
+      // Staggered "count" rings: one per second of the hold, each shrinking
+      // from 2x width down to the main ring's own resting scale while fading
+      // in (0 -> PULSE_ALPHA_MIN) across the preceding Inhale/Exhale movement,
+      // then snapping to alpha 0 exactly as the corresponding numbered pulse
+      // begins in the following hold. `sideElapsed` runs continuously across
+      // a movement phase and its following hold (cycleT itself never resets
+      // mid-cycle), so subtracting `i` seconds gives each instance's own
+      // local clock with no extra state needed.
+      const numCountRings = Math.min(COUNT_RING_POOL_SIZE, Math.floor((interval - 1e-4) / PULSE_DURATION) + 1)
+      const sideElapsed = phaseIndex < 2 ? cycleT : cycleT - 2 * interval
+      for (let i = 0; i < COUNT_RING_POOL_SIZE; i++) {
+        const slot = countRingsRef.current[i]
+        if (!slot.mesh || !slot.mat) continue
+        if (i >= numCountRings) { slot.mesh.visible = false; continue }
+        const tLocal = sideElapsed - i
+        if (tLocal < 0 || tLocal >= interval) {
+          slot.mesh.visible = false
+          slot.mat.opacity = 0
+        } else {
+          const progress = smoothstep(tLocal / interval)
+          slot.mesh.scale.set(
+            lerp(PULSE_RING_SCALE[0] * COUNT_RING_X_SCALE_MULT, PULSE_RING_SCALE[0], progress),
+            PULSE_RING_SCALE[1],
+            PULSE_RING_SCALE[2]
+          )
+          slot.mesh.visible = true
+          slot.mat.opacity = lerp(0, PULSE_ALPHA_MIN, progress)
+        }
+      }
+
       // Clean, ground-truth phase/progress pair for RingParticlesD's Sparkle
       // system to consume in Box mode -- 'inhale' spans Inhale-movement +
       // Hold-in (progress ramps 0->1 across the movement, holds at 1 through
@@ -161,16 +195,36 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       }
     } else {
       if (ringMeshRef.current) ringMeshRef.current.visible = false
+      for (let i = 0; i < COUNT_RING_POOL_SIZE; i++) {
+        const slot = countRingsRef.current[i]
+        if (slot.mesh) slot.mesh.visible = false
+      }
       if (boxPhaseRef) boxPhaseRef.current = 'exhale'
       if (boxProgressRef) boxProgressRef.current = 0
     }
   })
 
   return (
-    <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={PULSE_RING_SCALE} visible={false} renderOrder={1}>
-      <torusGeometry args={TORUS_ARGS} />
-      <meshStandardMaterial ref={ringMatRef}
-        color={gateColor} emissive={emissiveColor} transparent depthWrite={false} depthTest={false} opacity={0} />
-    </mesh>
+    <>
+      <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={PULSE_RING_SCALE} visible={false} renderOrder={1}>
+        <torusGeometry args={TORUS_ARGS} />
+        <meshStandardMaterial ref={ringMatRef}
+          color={gateColor} emissive={emissiveColor} transparent depthWrite={false} depthTest={false} opacity={0} />
+      </mesh>
+      {Array.from({ length: COUNT_RING_POOL_SIZE }).map((_, i) => (
+        <mesh key={i}
+          ref={(m) => { countRingsRef.current[i].mesh = m }}
+          position={[0, RING_Y, HALO_RING_Z]}
+          visible={false}
+          renderOrder={1}
+        >
+          <torusGeometry args={TORUS_ARGS} />
+          <meshStandardMaterial
+            ref={(m) => { countRingsRef.current[i].mat = m }}
+            color={gateColor} emissive={emissiveColor} emissiveIntensity={1}
+            transparent depthWrite={false} depthTest={false} opacity={0} />
+        </mesh>
+      ))}
+    </>
   )
 }
