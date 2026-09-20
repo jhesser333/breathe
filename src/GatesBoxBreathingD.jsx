@@ -166,6 +166,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
         if (tLocal < 0 || tLocal >= interval) {
           slot.mesh.visible = false
           slot.mat.opacity = 0
+          slot.mat.emissiveIntensity = 0
         } else {
           const progress = smoothstep(tLocal / interval)
           slot.mesh.scale.set(
@@ -173,6 +174,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
             PULSE_RING_SCALE[1],
             PULSE_RING_SCALE[2]
           )
+          slot.mat.emissiveIntensity = lerp(0, PULSE_EMISSIVE_MIN, progress)
           slot.mesh.visible = true
           slot.mat.opacity = lerp(0, PULSE_ALPHA_MIN, progress)
         }
@@ -221,7 +223,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
           <torusGeometry args={TORUS_ARGS} />
           <meshStandardMaterial
             ref={(m) => { countRingsRef.current[i].mat = m }}
-            color={gateColor} emissive={emissiveColor} emissiveIntensity={1}
+            color={gateColor} emissive={emissiveColor}
             transparent depthWrite={false} depthTest={false} opacity={0} />
         </mesh>
       ))}
