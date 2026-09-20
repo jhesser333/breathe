@@ -167,10 +167,10 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
   })
 
   return (
-    <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={PULSE_RING_SCALE} visible={false}>
+    <mesh ref={ringMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={PULSE_RING_SCALE} visible={false} renderOrder={1}>
       <torusGeometry args={TORUS_ARGS} />
       <meshStandardMaterial ref={ringMatRef}
-        color={gateColor} emissive={emissiveColor} transparent depthWrite={false} opacity={0} />
+        color={gateColor} emissive={emissiveColor} transparent depthWrite={false} depthTest={false} opacity={0} />
     </mesh>
   )
 }
