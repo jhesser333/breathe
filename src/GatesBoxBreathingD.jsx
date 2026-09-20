@@ -115,6 +115,20 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       const isHold = phaseIndex === 1 || phaseIndex === 3   // Hold-in or Hold-out
       const tInPulse = phaseElapsed % PULSE_DURATION
       const pulse = isHold ? pulseEnvelope(tInPulse) : 0
+
+      // The last pulse of each hold ramps all the way down to 0 (instead of
+      // back to PULSE_ALPHA_MIN/PULSE_EMISSIVE_MIN), so the ring fades out
+      // cleanly right before the following movement phase's own ramp-up from
+      // 0 begins. "Last" is whichever pulse is in progress right as the hold
+      // ends, so this works for any hold length, not just ones that happen
+      // to divide evenly by PULSE_DURATION.
+      const pulseIndex = Math.floor(phaseElapsed / PULSE_DURATION)
+      const lastPulseIndex = Math.floor((interval - 1e-4) / PULSE_DURATION)
+      const isLastPulse = isHold && pulseIndex === lastPulseIndex
+      const rampingOut = tInPulse >= PULSE_RAMP_IN
+      const alphaFloor = isLastPulse && rampingOut ? 0 : PULSE_ALPHA_MIN
+      const emissiveFloor = isLastPulse && rampingOut ? 0 : PULSE_EMISSIVE_MIN
+
       // Inhale/Exhale movement phases: ease alpha/emissive 0 -> PULSE_ALPHA_MIN/
       // PULSE_EMISSIVE_MIN across the phase, arriving at the hold's own baseline
       // exactly as the hold begins (no jump at the phase boundary).
@@ -123,10 +137,10 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       if (ringMeshRef.current) ringMeshRef.current.visible = true
       if (ringMatRef.current) {
         ringMatRef.current.opacity = isHold
-          ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse)
+          ? lerp(alphaFloor, PULSE_ALPHA_MAX, pulse)
           : lerp(0, PULSE_ALPHA_MIN, moveRamp)
         ringMatRef.current.emissiveIntensity = isHold
-          ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse)
+          ? lerp(emissiveFloor, PULSE_EMISSIVE_MAX, pulse)
           : lerp(0, PULSE_EMISSIVE_MIN, moveRamp)
       }
 
