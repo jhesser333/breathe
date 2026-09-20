@@ -114,14 +114,20 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
 
       const isHold = phaseIndex === 1 || phaseIndex === 3   // Hold-in or Hold-out
       const tInPulse = phaseElapsed % PULSE_DURATION
-      const pulse = pulseEnvelope(tInPulse)
+      const pulse = isHold ? pulseEnvelope(tInPulse) : 0
+      // Inhale/Exhale movement phases: ease alpha/emissive 0 -> PULSE_ALPHA_MIN/
+      // PULSE_EMISSIVE_MIN across the phase, arriving at the hold's own baseline
+      // exactly as the hold begins (no jump at the phase boundary).
+      const moveRamp = isHold ? 1 : smoothstep(phaseElapsed / interval)
 
-      if (ringMeshRef.current) ringMeshRef.current.visible = isHold
+      if (ringMeshRef.current) ringMeshRef.current.visible = true
       if (ringMatRef.current) {
-        ringMatRef.current.opacity = isHold ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse) : 0
+        ringMatRef.current.opacity = isHold
+          ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse)
+          : lerp(0, PULSE_ALPHA_MIN, moveRamp)
         ringMatRef.current.emissiveIntensity = isHold
           ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse)
-          : 0
+          : lerp(0, PULSE_EMISSIVE_MIN, moveRamp)
       }
 
       // Clean, ground-truth phase/progress pair for RingParticlesD's Sparkle

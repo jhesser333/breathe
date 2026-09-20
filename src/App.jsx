@@ -67,7 +67,7 @@ const CAMERA_BY_SHAPE = {
   a: { position: [0, 3.5, 5], fov: 50 },
   b: { position: [0, 3.5, 5], fov: 50 },
   c: { position: [0, 3.5, 5], fov: 50 },
-  d: { position: [0, 0, 10], rotation: [0, 0, 0], fov: 50 },
+  d: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
