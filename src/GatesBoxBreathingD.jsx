@@ -1,5 +1,6 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
 
 const POOL_SIZE = 28
@@ -20,6 +21,9 @@ const PULSE_EMISSIVE_MAX = 1
 
 const COUNT_RING_POOL_SIZE = 16      // generous cap; only the first numCountRings are ever shown
 const COUNT_RING_X_SCALE_MULT = 2    // starts at 2x the main ring's resting X scale
+
+const COUNT_RING_FADE_START_Y = 0.8   // world-space |Y - RING_Y| distance where the fade begins (fully opaque inside this)
+const COUNT_RING_FADE_END_Y = 1.6     // world-space |Y - RING_Y| distance where opacity reaches 0
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -54,6 +58,56 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
   const ringMatRef = useRef()
   const ringMeshRef = useRef()
   const countRingsRef = useRef(Array.from({ length: COUNT_RING_POOL_SIZE }, () => ({ mesh: null, mat: null })))
+
+  // Count rings need a per-fragment world-space Y fade (top/bottom taper,
+  // symmetric about RING_Y) that plain meshStandardMaterial can't express,
+  // so these are built by hand with an onBeforeCompile injection -- same
+  // technique as the Fresnel glow in MorphA/MorphB -- rather than the JSX
+  // <meshStandardMaterial> shorthand used elsewhere in this file.
+  const countRingMaterials = useMemo(() => {
+    const mats = Array.from({ length: COUNT_RING_POOL_SIZE }, () => {
+      const mat = new THREE.MeshStandardMaterial({
+        color: gateColor,
+        emissive: emissiveColor,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        opacity: 0,
+      })
+      mat.customProgramCacheKey = () => 'count-ring-yfade'
+      mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uFadeCenterY = { value: RING_Y }
+        shader.uniforms.uFadeStartY = { value: COUNT_RING_FADE_START_Y }
+        shader.uniforms.uFadeEndY = { value: COUNT_RING_FADE_END_Y }
+
+        shader.vertexShader = 'varying float vFadeWorldY;\n' + shader.vertexShader
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          vFadeWorldY = (modelMatrix * vec4(position, 1.0)).y;`
+        )
+
+        shader.fragmentShader =
+          `varying float vFadeWorldY;
+uniform float uFadeCenterY;
+uniform float uFadeStartY;
+uniform float uFadeEndY;\n` + shader.fragmentShader
+
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+          {
+            float distFromCenterY = abs(vFadeWorldY - uFadeCenterY);
+            float yFade = 1.0 - smoothstep(uFadeStartY, uFadeEndY, distFromCenterY);
+            diffuseColor.a *= yFade;
+          }`
+        )
+      }
+      return mat
+    })
+    mats.forEach((mat, i) => { countRingsRef.current[i].mat = mat })
+    return mats
+  }, [gateColor, emissiveColor])
 
   useFrame((_, delta) => {
     const ss = slots.current
@@ -221,10 +275,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
           renderOrder={1}
         >
           <torusGeometry args={TORUS_ARGS} />
-          <meshStandardMaterial
-            ref={(m) => { countRingsRef.current[i].mat = m }}
-            color={gateColor} emissive={emissiveColor}
-            transparent depthWrite={false} depthTest={false} opacity={0} />
+          <primitive object={countRingMaterials[i]} attach="material" />
         </mesh>
       ))}
     </>
