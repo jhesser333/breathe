@@ -30,7 +30,6 @@ const COUNT_RING_X_SCALE_MULT = 2    // starts at 2x the count ring's own restin
 // every angle around the ellipse -- no per-axis tuning needed.
 const COUNT_RING_TOUCH_SCALE = (BASE_RADIUS + PULSE_RING_TUBE) / (BASE_RADIUS - PULSE_RING_TUBE)
 const COUNT_RING_REST_SCALE = PULSE_RING_SCALE.map(v => v * COUNT_RING_TOUCH_SCALE)   // count rings' resting (touching) scale -- slightly larger than the main ring's own PULSE_RING_SCALE
-const COUNT_RING_FLASH_DURATION = 0.2   // seconds: eases opacity to full once the shrink animation ends, instead of popping straight to invisible
 
 // Fade start/end expressed as a fraction of the count ring's own middle-to-
 // top/bottom distance (its outer Y extent), so they scale automatically with
@@ -227,13 +226,11 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
       // main ring's own PULSE_RING_SCALE, so its inner edge just touches the
       // main ring's outer edge -- see COUNT_RING_TOUCH_SCALE) while fading in
       // (0 -> PULSE_ALPHA_MIN) across the preceding Inhale/Exhale movement,
-      // then easing up to full alpha over COUNT_RING_FLASH_DURATION exactly
-      // as the corresponding numbered pulse begins in the following hold,
-      // before finally hiding -- a brief flash instead of an abrupt pop.
-      // `sideElapsed` runs continuously across a movement phase and its
-      // following hold (cycleT itself never resets mid-cycle), so subtracting
-      // `i` seconds gives each instance's own local clock with no extra state
-      // needed.
+      // then disappearing exactly as the corresponding numbered pulse begins
+      // in the following hold. `sideElapsed` runs continuously across a
+      // movement phase and its following hold (cycleT itself never resets
+      // mid-cycle), so subtracting `i` seconds gives each instance's own
+      // local clock with no extra state needed.
       const numCountRings = Math.min(COUNT_RING_POOL_SIZE, Math.floor((interval - 1e-4) / PULSE_DURATION) + 1)
       const sideElapsed = phaseIndex < 2 ? cycleT : cycleT - 2 * interval
       for (let i = 0; i < COUNT_RING_POOL_SIZE; i++) {
@@ -241,11 +238,11 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
         if (!slot.mesh || !slot.mat) continue
         if (i >= numCountRings) { slot.mesh.visible = false; continue }
         const tLocal = sideElapsed - i
-        if (tLocal < 0 || tLocal >= interval + COUNT_RING_FLASH_DURATION) {
+        if (tLocal < 0 || tLocal >= interval) {
           slot.mesh.visible = false
           slot.mat.opacity = 0
           slot.mat.emissiveIntensity = 0
-        } else if (tLocal < interval) {
+        } else {
           const progress = smoothstep(tLocal / interval)
           slot.mesh.scale.set(
             lerp(COUNT_RING_REST_SCALE[0] * COUNT_RING_X_SCALE_MULT, COUNT_RING_REST_SCALE[0], progress),
@@ -255,14 +252,6 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
           slot.mat.emissiveIntensity = lerp(0, PULSE_EMISSIVE_MIN, progress)
           slot.mesh.visible = true
           slot.mat.opacity = lerp(0, PULSE_ALPHA_MIN, progress)
-        } else {
-          // Touch-flash: holds the resting (touching) scale/emissive, eases
-          // opacity up to full so the ring merges into the main ring's own
-          // pulse-start step instead of popping straight to invisible.
-          const flashProgress = smoothstep((tLocal - interval) / COUNT_RING_FLASH_DURATION)
-          slot.mesh.visible = true
-          slot.mat.emissiveIntensity = PULSE_EMISSIVE_MIN
-          slot.mat.opacity = lerp(PULSE_ALPHA_MIN, 1, flashProgress)
         }
       }
 
