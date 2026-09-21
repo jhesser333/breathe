@@ -30,25 +30,32 @@ function pulseAlpha(elapsed, interval) {
   return lerp(floor, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
-export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseStartTimeRef, pulseIntervalRef }) {
+export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseCycleStartRef, pulseIntervalRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
   // rAF loop writing straight to the DOM node, bypassing React state so this
   // doesn't trigger a re-render every frame. useLayoutEffect + an immediate
   // synchronous tick() avoids a one-frame flash before the loop's first paint.
+  // Timing is derived from pulseCycleStartRef -- a single timestamp stamped
+  // once when Box Breathing starts (never reset per-caption) -- via the same
+  // free-running 4-phase-modulo math GatesBoxBreathingD's own ring pulse
+  // uses, so the two stay in step even though they're computed independently
+  // (one on a rAF/performance.now clock, the other on R3F's per-frame delta).
   useLayoutEffect(() => {
     if (!pulseActive) return
     let raf
     const tick = () => {
-      const elapsed = Math.max(0, (performance.now() - pulseStartTimeRef.current) / 1000)
+      const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
       const interval = Math.max(0.05, pulseIntervalRef.current)
-      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(elapsed, interval))
+      const cycleT = totalElapsed % (4 * interval)
+      const phaseElapsed = cycleT % interval
+      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(phaseElapsed, interval))
       raf = requestAnimationFrame(tick)
     }
     tick()
     return () => cancelAnimationFrame(raf)
-  }, [pulseActive, pulseStartTimeRef, pulseIntervalRef])
+  }, [pulseActive, pulseCycleStartRef, pulseIntervalRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`

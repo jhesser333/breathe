@@ -189,10 +189,12 @@ export default function App() {
   // Inhale/Hold-in/Exhale/Hold-out boundaries.
   const boxPhaseRef = useRef('exhale')
   const boxProgressRef = useRef(0)
-  // Timestamp (performance.now()) of when the currently-shown Box Breathing
-  // caption (Inhale/Hold/Exhale/Hold) started -- stamped in showBoxText,
-  // shape-agnostic, drives TutorialText's per-second pulse for these captions.
-  const boxTextStartTimeRef = useRef(0)
+  // Timestamp (performance.now()) of the start of the whole Box Breathing
+  // session -- stamped once (never reset per-caption/per-phase), shape-
+  // agnostic. TutorialText derives its per-second caption pulse from this via
+  // the same free-running 4-phase-modulo math GatesBoxBreathingD's own ring
+  // pulse uses, so the two stay in sync.
+  const boxCycleStartTimeRef = useRef(0)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -218,7 +220,6 @@ export default function App() {
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
-    boxTextStartTimeRef.current = performance.now()
   }, [])
 
   const transitionBoxText = useCallback((text) => {
@@ -663,6 +664,7 @@ export default function App() {
       bbCycleRef.current = 0
       bbTutorialActiveRef.current = true
       gatesEnabledRef.current = true
+      boxCycleStartTimeRef.current = performance.now()
       showBoxText(TEXTS.boxInhale)
     }
 
@@ -833,7 +835,8 @@ export default function App() {
           </button>
         )}
         <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
-          pulseActive={mode === 'box' && tutorialVisible} pulseStartTimeRef={boxTextStartTimeRef} pulseIntervalRef={spawnIntervalRef} />
+          pulseActive={mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale)}
+          pulseCycleStartRef={boxCycleStartTimeRef} pulseIntervalRef={spawnIntervalRef} />
         {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}
