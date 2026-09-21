@@ -4,16 +4,24 @@ import * as THREE from 'three'
 import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE, EXHALE_SCALE } from './BackgroundRingsD'
 
 // Three particle systems anchored to Shape D's ring rig. Each particle is
-// born with its own color, randomly blended between textColor and
-// secondaryColor (aColorMix), fixed for its life -- not animated by the
-// breath cycle.
+// born with its own color, fixed for its life -- not animated by the breath
+// cycle. Inflow/Outflow are randomly blended between textColor and
+// secondaryColor (aColorMix, a live-uniform blend). Sparkle instead bakes an
+// actual RGB into a per-particle aColor attribute at spawn time (see below),
+// since its two source colors change with the box breath phase and a
+// live-uniform blend would retroactively recolor already-alive particles.
 // - Sparkle: points sampled on the (invisible) halo ring's surface, drifting
 //   away from the ring and decaying back -- a slow-motion "popcorn"/"sun
 //   ray" look, with most particles staying subtle and some popping out much
 //   further. Spawn rate is driven by `paceProgressRef` (dies out near full
 //   exhale rest). Its overall visibility also fades to 0 right as Outflow
 //   begins emitting (as if everything is flying away), recovering as the
-//   next Inflow burst begins.
+//   next Inflow burst begins. Birth color: outside Box Breathing, a random
+//   blend of textColor/secondaryColor (unchanged). In Box Breathing, a
+//   random blend of textColor/primaryColor during Inhale+Hold-in, switching
+//   to tertiaryColor/primaryColor during Exhale+Hold-out -- baked in at
+//   spawn so particles born under one regime keep their color for their
+//   whole life even after the phase flips underneath them.
 // - Inflow: spawns on the real exhale ring for the first second of the
 //   exhale->inhale phase and eases inward onto the real inhale ring, where
 //   it stays (fading in place) for the rest of its life.
@@ -59,13 +67,11 @@ attribute float aSpawnTime;
 attribute float aLifetime;
 attribute float aSeed;
 attribute float aOutwardSpeed;
-attribute float aColorMix;
+attribute vec3 aColor;
 uniform float uTime;
 uniform float uSize;
 uniform float uAttract;
 uniform float uCenterY;
-uniform vec3 uColorA;
-uniform vec3 uColorB;
 varying float vAlpha;
 varying float vSeed;
 varying vec3 vColor;
@@ -94,7 +100,7 @@ void main() {
 
   vAlpha = envelope;
   vSeed = aSeed;
-  vColor = mix(uColorA, uColorB, aColorMix);
+  vColor = aColor;
 }
 `
 
@@ -225,6 +231,7 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
   const colorSecondaryC = useMemo(() => new THREE.Color(secondaryColor), [secondaryColor])
   const colorTertiaryC = useMemo(() => new THREE.Color(tertiaryColor), [tertiaryColor])
   const colorPrimaryC = useMemo(() => new THREE.Color(primaryColor), [primaryColor])
+  const birthColorScratchRef = useRef(new THREE.Color())   // reused per spawned Sparkle particle to avoid allocation
 
   const sparkleAttrs = useMemo(() => {
     const positions = sampleTorusPositions(SPARKLE_PARTICLE_COUNT)
@@ -232,33 +239,30 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
     const spawnTimes = new Float32Array(SPARKLE_PARTICLE_COUNT)
     const lifetimes = new Float32Array(SPARKLE_PARTICLE_COUNT)
     const outwardSpeeds = new Float32Array(SPARKLE_PARTICLE_COUNT)
-    const colorMixes = new Float32Array(SPARKLE_PARTICLE_COUNT)
+    const colors = new Float32Array(SPARKLE_PARTICLE_COUNT * 3)
     for (let i = 0; i < SPARKLE_PARTICLE_COUNT; i++) {
       seeds[i] = Math.random()
       spawnTimes[i] = SPAWN_SENTINEL
       lifetimes[i] = 1
       outwardSpeeds[i] = 0
-      colorMixes[i] = Math.random()
     }
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
     const outwardSpeedAttr = new THREE.BufferAttribute(outwardSpeeds, 1).setUsage(THREE.DynamicDrawUsage)
-    const colorMixAttr = new THREE.BufferAttribute(colorMixes, 1).setUsage(THREE.DynamicDrawUsage)
+    const colorAttr = new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage)
     const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
     const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
     geometry.setAttribute('aOutwardSpeed', outwardSpeedAttr)
-    geometry.setAttribute('aColorMix', colorMixAttr)
+    geometry.setAttribute('aColor', colorAttr)
     geometry.setAttribute('aSpawnTime', spawnTimeAttr)
     geometry.setAttribute('aLifetime', lifetimeAttr)
-    return { geometry, outwardSpeedAttr, colorMixAttr, spawnTimeAttr, lifetimeAttr }
+    return { geometry, outwardSpeedAttr, colorAttr, spawnTimeAttr, lifetimeAttr }
   }, [])
 
   const sparkleMaterial = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uSize: { value: 100 },
-      uColorA: { value: new THREE.Color(textColor) },
-      uColorB: { value: new THREE.Color(secondaryColor) },
       uTime: { value: 0 },
       uAttract: { value: SPARKLE_ATTRACT_RATE },
       uCenterY: { value: RING_Y },
@@ -364,18 +368,11 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
 
-    // Live palette colors (cheap in-place copy, no allocation). Sparkle (the
-    // pace-cycle-driven ring particles, not MorphC's slider-driven ones) uses
-    // a tertiary/primary blend in Box Breathing instead of the text/secondary
-    // blend used elsewhere -- new sparkles first appear with it right as the
-    // box's Inhale movement begins (spawn rate is 0 through Hold-out).
-    if (isBoxBreathing) {
-      sparkleMaterial.uniforms.uColorA.value.copy(colorTertiaryC)
-      sparkleMaterial.uniforms.uColorB.value.copy(colorPrimaryC)
-    } else {
-      sparkleMaterial.uniforms.uColorA.value.copy(colorTextC)
-      sparkleMaterial.uniforms.uColorB.value.copy(colorSecondaryC)
-    }
+    // Live palette colors (cheap in-place copy, no allocation). Sparkle's own
+    // birth-color source colors are chosen per-particle at spawn time below
+    // instead (see the spawn loop), since they depend on the live box phase
+    // and must stay fixed once baked in -- these uniforms remain for
+    // Inflow/Outflow only.
     inflowMaterial.uniforms.uColorA.value.copy(colorTextC)
     inflowMaterial.uniforms.uColorB.value.copy(colorSecondaryC)
     outflowMaterial.uniforms.uColorA.value.copy(colorTextC)
@@ -412,7 +409,15 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
     if (toSpawn > 0) {
       spawnAccumulatorRef.current -= toSpawn
       toSpawn = Math.min(toSpawn, MAX_SPAWN_PER_FRAME)
-      const { outwardSpeedAttr, colorMixAttr, spawnTimeAttr, lifetimeAttr } = sparkleAttrs
+      const { outwardSpeedAttr, colorAttr, spawnTimeAttr, lifetimeAttr } = sparkleAttrs
+      // Birth-color source pair for this instant: outside Box Breathing,
+      // text/secondary (unchanged); in Box Breathing, text/primary during
+      // Inhale+Hold-in, switching to tertiary/primary during Exhale+Hold-out.
+      // Baked into aColor per-particle below (not a live uniform blend) so a
+      // particle keeps the color it was born with even after `phase` flips.
+      const birthColorA = isBoxBreathing ? (phase === 'inhale' ? colorTextC : colorTertiaryC) : colorTextC
+      const birthColorB = isBoxBreathing ? colorPrimaryC : colorSecondaryC
+      const birthColor = birthColorScratchRef.current
       for (let k = 0; k < toSpawn; k++) {
         const idx = spawnCursorRef.current % SPARKLE_PARTICLE_COUNT
         spawnCursorRef.current += 1
@@ -421,12 +426,15 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
         // Biased toward small values with an occasional large outlier --
         // most sparkles stay subtle, a few pop out much further.
         outwardSpeedAttr.array[idx] = THREE.MathUtils.lerp(0.12, 1.3, Math.random() ** 2.2)
-        colorMixAttr.array[idx] = Math.random()
+        birthColor.copy(birthColorA).lerp(birthColorB, Math.random())
+        colorAttr.array[idx * 3] = birthColor.r
+        colorAttr.array[idx * 3 + 1] = birthColor.g
+        colorAttr.array[idx * 3 + 2] = birthColor.b
       }
       spawnTimeAttr.needsUpdate = true
       lifetimeAttr.needsUpdate = true
       outwardSpeedAttr.needsUpdate = true
-      colorMixAttr.needsUpdate = true
+      colorAttr.needsUpdate = true
     }
     sparkleMaterial.uniforms.uTime.value = now
 
