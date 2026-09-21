@@ -19,7 +19,7 @@ import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE, EXHALE_SCALE }
 //   next Inflow burst begins. Birth color: outside Box Breathing, a random
 //   blend of textColor/secondaryColor (unchanged). In Box Breathing, a
 //   random blend of textColor/primaryColor during Inhale+Hold-in, switching
-//   to tertiaryColor/primaryColor during Exhale+Hold-out -- baked in at
+//   to secondaryColor/tertiaryColor during Exhale+Hold-out -- baked in at
 //   spawn so particles born under one regime keep their color for their
 //   whole life even after the phase flips underneath them.
 // - Inflow: spawns on the real exhale ring for the first second of the
@@ -412,11 +412,22 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
       const { outwardSpeedAttr, colorAttr, spawnTimeAttr, lifetimeAttr } = sparkleAttrs
       // Birth-color source pair for this instant: outside Box Breathing,
       // text/secondary (unchanged); in Box Breathing, text/primary during
-      // Inhale+Hold-in, switching to tertiary/primary during Exhale+Hold-out.
+      // Inhale+Hold-in, switching to secondary/tertiary during Exhale+Hold-out.
       // Baked into aColor per-particle below (not a live uniform blend) so a
       // particle keeps the color it was born with even after `phase` flips.
-      const birthColorA = isBoxBreathing ? (phase === 'inhale' ? colorTextC : colorTertiaryC) : colorTextC
-      const birthColorB = isBoxBreathing ? colorPrimaryC : colorSecondaryC
+      let birthColorA, birthColorB
+      if (isBoxBreathing) {
+        if (phase === 'inhale') {
+          birthColorA = colorTextC
+          birthColorB = colorPrimaryC
+        } else {
+          birthColorA = colorSecondaryC
+          birthColorB = colorTertiaryC
+        }
+      } else {
+        birthColorA = colorTextC
+        birthColorB = colorSecondaryC
+      }
       const birthColor = birthColorScratchRef.current
       for (let k = 0; k < toSpawn; k++) {
         const idx = spawnCursorRef.current % SPARKLE_PARTICLE_COUNT
