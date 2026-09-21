@@ -30,32 +30,34 @@ function pulseAlpha(elapsed, interval) {
   return lerp(floor, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
-export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseCycleStartRef, pulseIntervalRef }) {
+export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseStartTimeRef, pulseIntervalRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
   // rAF loop writing straight to the DOM node, bypassing React state so this
   // doesn't trigger a re-render every frame. useLayoutEffect + an immediate
   // synchronous tick() avoids a one-frame flash before the loop's first paint.
-  // Timing is derived from pulseCycleStartRef -- a single timestamp stamped
-  // once when Box Breathing starts (never reset per-caption) -- via the same
-  // free-running 4-phase-modulo math GatesBoxBreathingD's own ring pulse
-  // uses, so the two stay in step even though they're computed independently
-  // (one on a rAF/performance.now clock, the other on R3F's per-frame delta).
+  // Timing is elapsed-since-this-caption-became-visible (pulseStartTimeRef,
+  // stamped fresh by showBoxText every time the caption changes) rather than
+  // a shared session-wide clock, since the caption's actual show/hide timing
+  // (driven by gate-crossing pre-roll) doesn't line up with any idealized
+  // fixed-phase clock -- using one caused the text to pop to/from arbitrary
+  // mid-pulse values instead of always fading in from 0 and easing out to 0.
+  // elapsed is clamped to `interval` so a caption lingering slightly past its
+  // nominal duration holds at its already-reached end-of-last-second value
+  // (0) instead of rolling into a spurious extra pulse.
   useLayoutEffect(() => {
     if (!pulseActive) return
     let raf
     const tick = () => {
-      const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
       const interval = Math.max(0.05, pulseIntervalRef.current)
-      const cycleT = totalElapsed % (4 * interval)
-      const phaseElapsed = cycleT % interval
-      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(phaseElapsed, interval))
+      const elapsed = Math.min(interval, Math.max(0, (performance.now() - pulseStartTimeRef.current) / 1000))
+      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(elapsed, interval))
       raf = requestAnimationFrame(tick)
     }
     tick()
     return () => cancelAnimationFrame(raf)
-  }, [pulseActive, pulseCycleStartRef, pulseIntervalRef])
+  }, [pulseActive, pulseStartTimeRef, pulseIntervalRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`
