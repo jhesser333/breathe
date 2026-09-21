@@ -834,7 +834,8 @@ export default function App() {
             Change Target Pace
           </button>
         )}
-        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity}
+          fadeMs={(tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale) ? 0 : tutorialFadeMs}
           pulseActive={mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale)}
           pulseCycleStartRef={boxCycleStartTimeRef} pulseIntervalRef={spawnIntervalRef} />
         {mode === 'timed' && (
