@@ -2,7 +2,7 @@ import { useRef, useLayoutEffect } from 'react'
 
 const PULSE_DURATION = 1.0
 const PULSE_FADE_IN = 0.2
-const PULSE_MID_FLOOR = 0.75
+const PULSE_MID_FLOOR = 0.5
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
