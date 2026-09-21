@@ -13,7 +13,6 @@ const PULSE_RING_SCALE = GATE_SCALE.map(v => v * INNER_EDGE_FACTOR)
 const TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
-const PULSE_RAMP_IN = 0.05   // seconds ramping in (linear) before ramping out (eased) for the remainder
 const PULSE_ALPHA_MIN = 0.2
 const PULSE_ALPHA_MAX = 0.4
 const PULSE_EMISSIVE_MIN = 0.2
@@ -22,8 +21,14 @@ const PULSE_EMISSIVE_MAX = 1
 const COUNT_RING_POOL_SIZE = 16      // generous cap; only the first numCountRings are ever shown
 const COUNT_RING_X_SCALE_MULT = 2    // starts at 2x the main ring's resting X scale
 
-const COUNT_RING_FADE_START_Y = 0.8   // world-space |Y - RING_Y| distance where the fade begins (fully opaque inside this)
-const COUNT_RING_FADE_END_Y = 1.6     // world-space |Y - RING_Y| distance where opacity reaches 0
+// Fade start/end expressed as a fraction of the ring's own middle-to-top/
+// bottom distance (its outer Y extent), so they scale automatically with
+// PULSE_RING_SCALE/BASE_TUBE instead of being hand-picked absolute numbers.
+const COUNT_RING_MAX_Y = PULSE_RING_SCALE[1] * (BASE_RADIUS + BASE_TUBE)
+const COUNT_RING_FADE_START_FRAC = 0.25   // fade begins 25% of the way from middle to top/bottom
+const COUNT_RING_FADE_END_FRAC = 0.75     // opacity reaches 0 at 75% of the way from middle to top/bottom
+const COUNT_RING_FADE_START_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_START_FRAC
+const COUNT_RING_FADE_END_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_END_FRAC
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -34,10 +39,11 @@ function lerp(a, b, t) {
   return a + (b - a) * t
 }
 
-// Linear ramp-in over PULSE_RAMP_IN, then eased ramp-out for the remainder of PULSE_DURATION.
+// Immediate step up to peak at the start of each pulse, then a single eased
+// ramp back down across the whole PULSE_DURATION (smoothstep is flat at both
+// ends, so the descent itself still eases in and out).
 function pulseEnvelope(tInPulse) {
-  if (tInPulse < PULSE_RAMP_IN) return tInPulse / PULSE_RAMP_IN
-  return 1 - smoothstep((tInPulse - PULSE_RAMP_IN) / (PULSE_DURATION - PULSE_RAMP_IN))
+  return 1 - smoothstep(tInPulse / PULSE_DURATION)
 }
 
 function makeSlot() {
@@ -183,9 +189,12 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
       const pulseIndex = Math.floor(phaseElapsed / PULSE_DURATION)
       const lastPulseIndex = Math.floor((interval - 1e-4) / PULSE_DURATION)
       const isLastPulse = isHold && pulseIndex === lastPulseIndex
-      const rampingOut = tInPulse >= PULSE_RAMP_IN
-      const alphaFloor = isLastPulse && rampingOut ? 0 : PULSE_ALPHA_MIN
-      const emissiveFloor = isLastPulse && rampingOut ? 0 : PULSE_EMISSIVE_MIN
+      // Safe to apply for the whole pulse (not just once past some ramp-in
+      // window): at tInPulse=0 the envelope is already 1, so the floor has
+      // zero weight in the lerp right at the step and only takes effect as
+      // the ramp-down actually approaches it.
+      const alphaFloor = isLastPulse ? 0 : PULSE_ALPHA_MIN
+      const emissiveFloor = isLastPulse ? 0 : PULSE_EMISSIVE_MIN
 
       // Inhale/Exhale movement phases: ease alpha/emissive 0 -> PULSE_ALPHA_MIN/
       // PULSE_EMISSIVE_MIN across the phase, arriving at the hold's own baseline
