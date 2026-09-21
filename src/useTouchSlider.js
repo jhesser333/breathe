@@ -29,7 +29,13 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
     function onTouchStart(e) {
       e.preventDefault()
       if (touchId.current !== null) return
-      const touch = e.changedTouches[0]
+      // changedTouches isn't scoped to this element -- when two fingers
+      // touch down in the same event batch (e.g. both slider thumbs at
+      // once), it can include a touch meant for the other slider. Only
+      // claim the touch whose target actually landed inside this slider's
+      // own hit area.
+      const touch = Array.from(e.changedTouches).find(t => el.contains(t.target))
+      if (!touch) return
       touchId.current = touch.identifier
       getValueFromPoint(touch.clientX, touch.clientY)
     }
