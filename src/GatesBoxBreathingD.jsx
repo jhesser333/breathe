@@ -12,7 +12,7 @@ const PULSE_RING_SCALE = GATE_SCALE.map(v => v * INNER_EDGE_FACTOR)
 const TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
-const PULSE_RAMP_IN = 0.2    // seconds ramping in before ramping out for the remainder
+const PULSE_RAMP_IN = 0.05   // seconds ramping in (linear) before ramping out (eased) for the remainder
 const PULSE_ALPHA_MIN = 0.2
 const PULSE_ALPHA_MAX = 0.4
 const PULSE_EMISSIVE_MIN = 0.2
@@ -30,9 +30,9 @@ function lerp(a, b, t) {
   return a + (b - a) * t
 }
 
-// Eased ramp-in over PULSE_RAMP_IN, then eased ramp-out for the remainder of PULSE_DURATION.
+// Linear ramp-in over PULSE_RAMP_IN, then eased ramp-out for the remainder of PULSE_DURATION.
 function pulseEnvelope(tInPulse) {
-  if (tInPulse < PULSE_RAMP_IN) return smoothstep(tInPulse / PULSE_RAMP_IN)
+  if (tInPulse < PULSE_RAMP_IN) return tInPulse / PULSE_RAMP_IN
   return 1 - smoothstep((tInPulse - PULSE_RAMP_IN) / (PULSE_DURATION - PULSE_RAMP_IN))
 }
 

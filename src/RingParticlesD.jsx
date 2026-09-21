@@ -208,7 +208,7 @@ function sampleTorusPositions(count, scale = GATE_SCALE) {
   return positions
 }
 
-export default function RingParticlesD({ textColor, secondaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef }) {
+export default function RingParticlesD({ textColor, secondaryColor, tertiaryColor, primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef }) {
   const spawnCursorRef = useRef(0)
   const spawnAccumulatorRef = useRef(0)
 
@@ -223,6 +223,8 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
 
   const colorTextC = useMemo(() => new THREE.Color(textColor), [textColor])
   const colorSecondaryC = useMemo(() => new THREE.Color(secondaryColor), [secondaryColor])
+  const colorTertiaryC = useMemo(() => new THREE.Color(tertiaryColor), [tertiaryColor])
+  const colorPrimaryC = useMemo(() => new THREE.Color(primaryColor), [primaryColor])
 
   const sparkleAttrs = useMemo(() => {
     const positions = sampleTorusPositions(SPARKLE_PARTICLE_COUNT)
@@ -362,9 +364,18 @@ export default function RingParticlesD({ textColor, secondaryColor, paceProgress
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
 
-    // Live palette colors (cheap in-place copy, no allocation).
-    sparkleMaterial.uniforms.uColorA.value.copy(colorTextC)
-    sparkleMaterial.uniforms.uColorB.value.copy(colorSecondaryC)
+    // Live palette colors (cheap in-place copy, no allocation). Sparkle (the
+    // pace-cycle-driven ring particles, not MorphC's slider-driven ones) uses
+    // a tertiary/primary blend in Box Breathing instead of the text/secondary
+    // blend used elsewhere -- new sparkles first appear with it right as the
+    // box's Inhale movement begins (spawn rate is 0 through Hold-out).
+    if (isBoxBreathing) {
+      sparkleMaterial.uniforms.uColorA.value.copy(colorTertiaryC)
+      sparkleMaterial.uniforms.uColorB.value.copy(colorPrimaryC)
+    } else {
+      sparkleMaterial.uniforms.uColorA.value.copy(colorTextC)
+      sparkleMaterial.uniforms.uColorB.value.copy(colorSecondaryC)
+    }
     inflowMaterial.uniforms.uColorA.value.copy(colorTextC)
     inflowMaterial.uniforms.uColorB.value.copy(colorSecondaryC)
     outflowMaterial.uniforms.uColorA.value.copy(colorTextC)
