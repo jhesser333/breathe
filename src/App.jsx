@@ -545,6 +545,12 @@ export default function App() {
   useEffect(() => {
     if (screen !== 'experience') return
     const id = setInterval(() => {
+      // Box Breathing's captions are fully choreographed by showBoxText/
+      // transitionBoxText on their own continuous ~4s cadence -- the user
+      // isn't expected to touch the sliders at all in this mode, so
+      // "stillness" is meaningless here and this poller would otherwise
+      // force-reshow the just-hidden caption during every transition gap.
+      if (mode === 'box') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
         awaitingMovementRef.current = true
@@ -554,7 +560,7 @@ export default function App() {
       }
     }, 500)
     return () => clearInterval(id)
-  }, [screen, sliderLayout])
+  }, [screen, sliderLayout, mode])
 
   useEffect(() => () => clearTimeout(tutorialTimerRef.current), [])
 

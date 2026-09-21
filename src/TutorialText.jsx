@@ -43,15 +43,18 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
   // (driven by gate-crossing pre-roll) doesn't line up with any idealized
   // fixed-phase clock -- using one caused the text to pop to/from arbitrary
   // mid-pulse values instead of always fading in from 0 and easing out to 0.
-  // elapsed is clamped to `interval` so a caption lingering slightly past its
-  // nominal duration holds at its already-reached end-of-last-second value
-  // (0) instead of rolling into a spurious extra pulse.
+  // elapsed is clamped just below `interval` (not to it exactly -- landing
+  // exactly on `interval` reads to pulseAlpha as the start of a brand new
+  // pulse, stepping to full opacity, instead of the end of the last one) so
+  // a caption lingering slightly past its nominal duration -- or a stale
+  // pulseStartTimeRef from some other code path re-showing it -- holds at
+  // its already-reached end-of-last-second value (0) instead of flashing.
   useLayoutEffect(() => {
     if (!pulseActive) return
     let raf
     const tick = () => {
       const interval = Math.max(0.05, pulseIntervalRef.current)
-      const elapsed = Math.min(interval, Math.max(0, (performance.now() - pulseStartTimeRef.current) / 1000))
+      const elapsed = Math.min(interval - 1e-4, Math.max(0, (performance.now() - pulseStartTimeRef.current) / 1000))
       if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(elapsed, interval))
       raf = requestAnimationFrame(tick)
     }
