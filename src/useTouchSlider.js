@@ -28,6 +28,13 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
 
     function onTouchStart(e) {
       e.preventDefault()
+      // Self-heal: don't let a stale id (missed touchend/touchcancel -- e.g.
+      // an OS edge-swipe gesture stealing a touch near the screen edge, where
+      // these sliders sit) block this slider forever. e.touches is the
+      // browser's own live list, so this is always accurate.
+      if (touchId.current !== null && !Array.from(e.touches).some(t => t.identifier === touchId.current)) {
+        touchId.current = null
+      }
       if (touchId.current !== null) return
       // changedTouches isn't scoped to this element -- when two fingers
       // touch down in the same event batch (e.g. both slider thumbs at
@@ -51,6 +58,16 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
       if (touch) touchId.current = null
     }
 
+    // The browser sends touchcancel (not touchend) when it decides a touch
+    // is being taken over by something else -- commonly an OS gesture (edge-
+    // swipe back, control center, etc). Without this, a cancelled touch near
+    // the screen edge (exactly where these sliders sit) leaves touchId stuck
+    // forever, freezing the slider until the self-heal check above catches it.
+    function onTouchCancel(e) {
+      const touch = Array.from(e.changedTouches).find(t => t.identifier === touchId.current)
+      if (touch) touchId.current = null
+    }
+
     // Mouse fallback for desktop testing
     let dragging = false
     function onMouseDown(e) { dragging = true; getValueFromPoint(e.clientX, e.clientY) }
@@ -60,6 +77,7 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
     el.addEventListener('touchstart', onTouchStart, { passive: false })
     el.addEventListener('touchmove', onTouchMove, { passive: false })
     el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchCancel)
     el.addEventListener('mousedown', onMouseDown)
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
@@ -68,6 +86,7 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchCancel)
       el.removeEventListener('mousedown', onMouseDown)
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
