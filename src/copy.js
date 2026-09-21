@@ -23,7 +23,7 @@ export const TEXTS = {
   slowingTextE: 'Keep Morph aligned with the targets to slow down your breathing.',
   slowingTextDAmbient: 'The background art will start moving at your pace and slow down over the next minute.',
   slowingTextEAmbient: 'Keep the center art in sync with the background.',
-  boxInhale:    'Inhale slowly',
+  boxInhale:    'Inhale',
   boxHold:      'Hold',
-  boxExhale:    'Exhale slowly',
+  boxExhale:    'Exhale',
 }

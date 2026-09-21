@@ -189,6 +189,10 @@ export default function App() {
   // Inhale/Hold-in/Exhale/Hold-out boundaries.
   const boxPhaseRef = useRef('exhale')
   const boxProgressRef = useRef(0)
+  // Timestamp (performance.now()) of when the currently-shown Box Breathing
+  // caption (Inhale/Hold/Exhale/Hold) started -- stamped in showBoxText,
+  // shape-agnostic, drives TutorialText's per-second pulse for these captions.
+  const boxTextStartTimeRef = useRef(0)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -214,6 +218,7 @@ export default function App() {
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     awaitingMovementRef.current = false
+    boxTextStartTimeRef.current = performance.now()
   }, [])
 
   const transitionBoxText = useCallback((text) => {
@@ -827,7 +832,8 @@ export default function App() {
             Change Target Pace
           </button>
         )}
-        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs} />
+        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+          pulseActive={mode === 'box' && tutorialVisible} pulseStartTimeRef={boxTextStartTimeRef} pulseIntervalRef={spawnIntervalRef} />
         {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}
