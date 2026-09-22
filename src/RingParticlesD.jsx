@@ -38,7 +38,11 @@ const SPARKLE_PARTICLE_COUNT = 1000
 const MAX_SPAWN_RATE = 440        // particles/sec
 const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
-const SPARKLE_ATTRACT_RATE = 1.1  // how quickly outward drift decays back toward the surface -- slow, floaty
+// Half of the original 1.1, paired with the halved outward-speed range below
+// (peak travel distance is speed/(attract*e) -- scaling both by the same
+// factor keeps that peak distance the same while roughly doubling the time
+// to reach it, reading as slower/calmer without traveling less far).
+const SPARKLE_ATTRACT_RATE = 0.55
 const NO_ATTRACT_CUTOFF = 1e6     // sentinel uAttractCutoff value meaning "no cutoff, decay normally" -- far beyond any real uTime
 const SPARKLE_FADE_OUT_DURATION = 3.0   // seconds: how long Sparkle takes to fade to invisible once Outflow starts (3x OUTFLOW_WINDOW)
 const SPARKLE_RATE_RAMP_UP_FRACTION = 0.8    // reaches max spawn rate at 80% of the way to full inhale
@@ -451,8 +455,9 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
         spawnTimeAttr.array[idx] = now
         lifetimeAttr.array[idx] = THREE.MathUtils.lerp(1.5, 3.0, Math.random())
         // Biased toward small values with an occasional large outlier --
-        // most sparkles stay subtle, a few pop out much further.
-        outwardSpeedAttr.array[idx] = THREE.MathUtils.lerp(0.12, 1.3, Math.random() ** 2.2)
+        // most sparkles stay subtle, a few pop out much further. Halved from
+        // 0.12/1.3 in lockstep with SPARKLE_ATTRACT_RATE (see its comment).
+        outwardSpeedAttr.array[idx] = THREE.MathUtils.lerp(0.06, 0.65, Math.random() ** 2.2)
         birthColor.copy(birthColorA).lerp(birthColorB, Math.random())
         colorAttr.array[idx * 3] = birthColor.r
         colorAttr.array[idx * 3 + 1] = birthColor.g
