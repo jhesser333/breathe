@@ -2,6 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
+import { BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
 
 const PARTICLE_COUNT = 1500       // system 1: static surface sparkle, no velocity
 const PARTICLE_COUNT_2 = 700      // system 2: blown-away / sucked-in, XZ velocity only
@@ -26,8 +27,12 @@ const BREATH_RING_COUNT = 5
 const BREATH_RING_Z = [-25, -20, -15, -10, -5]
 const BREATH_FADE_THRESHOLD = 0.75   // fraction of slider travel to lock a ring in
 const BREATH_MAX_ALPHA = 0.5
-const BREATH_RING_RADIUS = 1.0       // matches BackgroundRingsD.jsx's BASE_RADIUS
-const BREATH_RING_TUBE = 0.06        // matches BackgroundRingsD.jsx's BASE_TUBE
+// Same proportions/size as the pulse/hold ring in GatesBoxBreathingD.jsx
+// (that file's PULSE_RING_TUBE/PULSE_RING_SCALE aren't exported, so the
+// derivation is duplicated here from its exported inputs).
+const BREATH_RING_TUBE = 0.015
+const BREATH_RING_INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS
+const BREATH_RING_SCALE = GATE_SCALE.map(v => v * BREATH_RING_INNER_EDGE_FACTOR)
 const BREATH_REVERSAL_DEADBAND = 0.08  // matches the deadband used elsewhere (App.jsx, SlowingDownController)
 const BREATH_FALL_STAGGER_S = 0.2
 const BREATH_FALL_FADE_S = 1.0
@@ -179,7 +184,15 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
     Array.from({ length: BREATH_RING_COUNT }, () => ({ current: null }))
   ), [])
   const breathLockedCountRef = useRef(0)
-  const breathPostLockMaxRef = useRef(0)
+  // Deadband rise/fall tracker (same pattern as SlowingDownController /
+  // App.jsx's stroke counters) -- breathDirRef starts "falling" (-1) so the
+  // very first upward movement confirms a fresh rise. breathArmedRef only
+  // becomes true again once a confirmed rise-from-a-trough happens, which is
+  // what makes each lock require its own distinct Inhale instead of letting
+  // a single held-up slider cascade through all 5 rings at once.
+  const breathDirRef = useRef(-1)
+  const breathExtremeRef = useRef(0)
+  const breathArmedRef = useRef(true)
   const breathFallTriggeredRef = useRef(false)
   const breathFallStartTimesRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
   const breathFallSpinRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
@@ -519,43 +532,62 @@ float dissolveHash(vec3 p) {
       const raw = leftRawRef.current
 
       if (!breathFallTriggeredRef.current) {
-        if (breathLockedCountRef.current < BREATH_RING_COUNT) {
-          const activeIdx = breathLockedCountRef.current
-          const progress = THREE.MathUtils.clamp(raw / BREATH_FADE_THRESHOLD, 0, 1)
-          breathMaterials[activeIdx].opacity = BREATH_MAX_ALPHA * progress
-          if (progress >= 1) {
-            breathLockedCountRef.current += 1
-            breathPostLockMaxRef.current = raw
+        // Deadband rise/fall tracker: only a confirmed reversal from a real
+        // trough back to rising re-arms the next ring, so holding the
+        // slider up (or wobbling near the threshold) can't lock more than
+        // one ring per distinct Inhale.
+        if (breathDirRef.current >= 0) {
+          if (raw > breathExtremeRef.current) {
+            breathExtremeRef.current = raw
+          } else if (breathExtremeRef.current - raw > BREATH_REVERSAL_DEADBAND) {
+            breathDirRef.current = -1
+            breathExtremeRef.current = raw
           }
         } else {
-          // All 5 locked -- watch for the confirmed downward reversal that
-          // starts breath 5's exhale (same deadband-reversal pattern used
-          // elsewhere in the app, e.g. SlowingDownController).
-          breathPostLockMaxRef.current = Math.max(breathPostLockMaxRef.current, raw)
-          if (breathPostLockMaxRef.current - raw > BREATH_REVERSAL_DEADBAND) {
-            breathFallTriggeredRef.current = true
-            const order = [0, 1, 2, 3, 4]
-            for (let i = order.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1))
-              ;[order[i], order[j]] = [order[j], order[i]]
-            }
-            order.forEach((ringIdx, orderPos) => {
-              breathFallStartTimesRef.current[ringIdx] = now + orderPos * BREATH_FALL_STAGGER_S
-              breathFallSpinRef.current[ringIdx] = {
-                rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-                ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-                rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-              }
-            })
+          if (raw < breathExtremeRef.current) {
+            breathExtremeRef.current = raw
+          } else if (raw - breathExtremeRef.current > BREATH_REVERSAL_DEADBAND) {
+            breathDirRef.current = 1
+            breathExtremeRef.current = raw
+            breathArmedRef.current = true
+          }
+        }
 
-            const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
-            paletteLerpRef.current = {
-              fromTertiary: effectiveColorsRef.current.tertiary.clone(),
-              fromPrimary: effectiveColorsRef.current.primary.clone(),
-              fromSecondary: effectiveColorsRef.current.secondary.clone(),
-              toIndex,
-              startTime: now,
+        if (breathLockedCountRef.current < BREATH_RING_COUNT) {
+          if (breathArmedRef.current) {
+            const activeIdx = breathLockedCountRef.current
+            const progress = THREE.MathUtils.clamp(raw / BREATH_FADE_THRESHOLD, 0, 1)
+            breathMaterials[activeIdx].opacity = BREATH_MAX_ALPHA * progress
+            if (progress >= 1) {
+              breathLockedCountRef.current += 1
+              breathArmedRef.current = false
             }
+          }
+        } else if (breathDirRef.current === -1) {
+          // All 5 locked, and the tracker above just confirmed the downward
+          // reversal that starts breath 5's exhale -- trigger the fall-away.
+          breathFallTriggeredRef.current = true
+          const order = [0, 1, 2, 3, 4]
+          for (let i = order.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1))
+            ;[order[i], order[j]] = [order[j], order[i]]
+          }
+          order.forEach((ringIdx, orderPos) => {
+            breathFallStartTimesRef.current[ringIdx] = now + orderPos * BREATH_FALL_STAGGER_S
+            breathFallSpinRef.current[ringIdx] = {
+              rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+              ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+              rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+            }
+          })
+
+          const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
+          paletteLerpRef.current = {
+            fromTertiary: effectiveColorsRef.current.tertiary.clone(),
+            fromPrimary: effectiveColorsRef.current.primary.clone(),
+            fromSecondary: effectiveColorsRef.current.secondary.clone(),
+            toIndex,
+            startTime: now,
           }
         }
       } else {
@@ -577,7 +609,9 @@ float dissolveHash(vec3 p) {
         if (allDone) {
           breathFallTriggeredRef.current = false
           breathLockedCountRef.current = 0
-          breathPostLockMaxRef.current = 0
+          breathDirRef.current = -1
+          breathExtremeRef.current = raw
+          breathArmedRef.current = true
           for (let i = 0; i < BREATH_RING_COUNT; i++) {
             breathFallStartTimesRef.current[i] = null
             breathFallSpinRef.current[i] = null
@@ -641,8 +675,8 @@ float dissolveHash(vec3 p) {
           inherit the sphere's breathing scale. */}
       {breathGroupRefs.map((ref, i) => (
         <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, BREATH_RING_Z[i]]}>
-          <mesh>
-            <torusGeometry args={[BREATH_RING_RADIUS, BREATH_RING_TUBE, 16, 64]} />
+          <mesh scale={BREATH_RING_SCALE}>
+            <torusGeometry args={[BASE_RADIUS, BREATH_RING_TUBE, 16, 64]} />
             <primitive object={breathMaterials[i]} attach="material" />
           </mesh>
         </group>
