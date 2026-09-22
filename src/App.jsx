@@ -47,7 +47,6 @@ const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
-const BB_TEXT_LEAD_MS = 1600
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
 const TARGET_STROKES_B = 6  // 3 full up+down oscillations
@@ -189,10 +188,13 @@ export default function App() {
   // Inhale/Hold-in/Exhale/Hold-out boundaries.
   const boxPhaseRef = useRef('exhale')
   const boxProgressRef = useRef(0)
-  // Timestamp (performance.now()) of when the currently-shown Box Breathing
-  // caption (Inhale/Hold/Exhale/Hold) started -- stamped in showBoxText,
-  // shape-agnostic, drives TutorialText's per-second pulse for these captions.
-  const boxTextStartTimeRef = useRef(0)
+  // Timestamp (performance.now()) of the start of the whole Box Breathing
+  // session -- stamped once (never reset per-caption/per-phase), shape-
+  // agnostic. Both the caption poll below and TutorialText's per-second
+  // pulse derive phaseIndex/phaseElapsed from this same clock, so which
+  // caption shows and how it pulses can never disagree.
+  const boxClockStartRef = useRef(0)
+  const boxCaptionIndexRef = useRef(-1)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -211,52 +213,23 @@ export default function App() {
     lastMaxTimeRef.current = 0
   }, [])
 
-  const showBoxText = useCallback((text) => {
-    clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = text
-    setTutorialText(text)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
-    awaitingMovementRef.current = false
-    boxTextStartTimeRef.current = performance.now()
-  }, [])
-
-  const transitionBoxText = useCallback((text) => {
-    clearTimeout(tutorialTimerRef.current)
-    setTutorialVisible(false)
-    tutorialVisibleRef.current = false
-    tutorialTimerRef.current = setTimeout(() => {
-      if (!bbTutorialActiveRef.current) return
-      showBoxText(text)
-    }, BB_TEXT_LEAD_MS)
-  }, [showBoxText])
-
   const handleBBFirstGate = useCallback((type) => {
     // Inverted vs. GatesC's direct 'inhale'/'exhale' writes: this fires at
     // Hold-onset and holds until the opposite Hold begins, so writing the
     // opposite of type is what lines up with BackgroundA's exhale-means-
     // visible convention (visible during Hold-in, invisible during Hold-out).
     breathPhaseRef.current = type === 'inhale' ? 'exhale' : 'inhale'
-    if (!bbTutorialActiveRef.current) return
-    transitionBoxText(TEXTS.boxHold)
-  }, [transitionBoxText])
+  }, [])
 
   const handleBBLastGate = useCallback((type) => {
     if (!bbTutorialActiveRef.current) return
-    if (type === 'inhale') {
-      transitionBoxText(TEXTS.boxExhale)
-    } else {
+    if (type === 'exhale') {
       bbCycleRef.current++
-      if (bbCycleRef.current < 2) {
-        transitionBoxText(TEXTS.boxInhale)
-      } else {
+      if (bbCycleRef.current >= 2) {
         bbTutorialActiveRef.current = false
-        clearTimeout(tutorialTimerRef.current)
-        setTutorialVisible(false)
-        tutorialVisibleRef.current = false
       }
     }
-  }, [transitionBoxText])
+  }, [])
 
   const showTimedText = useCallback((text, duration = TEXT_C_DISPLAY_MS) => {
     if (!text) return
@@ -545,11 +518,8 @@ export default function App() {
   useEffect(() => {
     if (screen !== 'experience') return
     const id = setInterval(() => {
-      // Box Breathing's captions are fully choreographed by showBoxText/
-      // transitionBoxText on their own continuous ~4s cadence -- the user
-      // isn't expected to touch the sliders at all in this mode, so
-      // "stillness" is meaningless here and this poller would otherwise
-      // force-reshow the just-hidden caption during every transition gap.
+      // Box Breathing's captions are driven by their own clock-based poll
+      // below, not by user interaction -- "stillness" is meaningless here.
       if (mode === 'box') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
@@ -561,6 +531,39 @@ export default function App() {
     }, 500)
     return () => clearInterval(id)
   }, [screen, sliderLayout, mode])
+
+  // Box Breathing's captions: which of Inhale/Hold/Exhale/Hold shows, and
+  // when, is derived purely from boxClockStartRef + spawnIntervalRef -- the
+  // same clock TutorialText's pulse effect reads -- instead of the old
+  // gate-crossing-triggered show/hide sequence, so the two can never
+  // disagree about where in the cycle they are. Text stays continuously
+  // visible while the tutorial is active; content just swaps in place.
+  useEffect(() => {
+    if (mode !== 'box') return
+    const id = setInterval(() => {
+      if (!bbTutorialActiveRef.current) {
+        if (tutorialVisibleRef.current) {
+          setTutorialVisible(false)
+          tutorialVisibleRef.current = false
+        }
+        return
+      }
+      const interval = Math.max(0.05, spawnIntervalRef.current)
+      const totalElapsed = Math.max(0, (performance.now() - boxClockStartRef.current) / 1000)
+      const phaseIndex = Math.floor((totalElapsed % (4 * interval)) / interval)
+      if (phaseIndex !== boxCaptionIndexRef.current) {
+        boxCaptionIndexRef.current = phaseIndex
+        const nextText = [TEXTS.boxInhale, TEXTS.boxHold, TEXTS.boxExhale, TEXTS.boxHold][phaseIndex]
+        currentMainTextRef.current = nextText
+        setTutorialText(nextText)
+        if (!tutorialVisibleRef.current) {
+          setTutorialVisible(true)
+          tutorialVisibleRef.current = true
+        }
+      }
+    }, 100)
+    return () => clearInterval(id)
+  }, [mode])
 
   useEffect(() => () => clearTimeout(tutorialTimerRef.current), [])
 
@@ -669,13 +672,18 @@ export default function App() {
       bbCycleRef.current = 0
       bbTutorialActiveRef.current = true
       gatesEnabledRef.current = true
-      showBoxText(TEXTS.boxInhale)
+      boxClockStartRef.current = performance.now()
+      boxCaptionIndexRef.current = 0
+      currentMainTextRef.current = TEXTS.boxInhale
+      setTutorialText(TEXTS.boxInhale)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
     }
 
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, showSlowingTextC, showBoxText, sliderLayout])
+  }, [resetSlowingState, showGatesText, showSlowingTextC, sliderLayout])
 
   const handleRestart = useCallback(() => {
     handleSelectMode(mode)
@@ -838,10 +846,9 @@ export default function App() {
             Change Target Pace
           </button>
         )}
-        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity}
-          fadeMs={(tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale) ? 0 : tutorialFadeMs}
+        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           pulseActive={mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale)}
-          pulseStartTimeRef={boxTextStartTimeRef} pulseIntervalRef={spawnIntervalRef} />
+          pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} />
         {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}

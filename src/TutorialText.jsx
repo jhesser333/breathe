@@ -27,37 +27,32 @@ function pulseAlpha(elapsed) {
   return lerp(PULSE_MID_FLOOR, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
-export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseStartTimeRef, pulseIntervalRef }) {
+export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseCycleStartRef, pulseIntervalRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
   // rAF loop writing straight to the DOM node, bypassing React state so this
   // doesn't trigger a re-render every frame. useLayoutEffect + an immediate
   // synchronous tick() avoids a one-frame flash before the loop's first paint.
-  // Timing is elapsed-since-this-caption-became-visible (pulseStartTimeRef,
-  // stamped fresh by showBoxText every time the caption changes) rather than
-  // a shared session-wide clock, since the caption's actual show/hide timing
-  // (driven by gate-crossing pre-roll) doesn't line up with any idealized
-  // fixed-phase clock -- using one caused the text to pop to/from arbitrary
-  // mid-pulse values instead of always fading in from 0 and easing out to 0.
-  // elapsed is clamped just below `interval` (not to it exactly -- landing
-  // exactly on `interval` reads to pulseAlpha as the start of a brand new
-  // pulse, stepping to full opacity, instead of continuing the previous one)
-  // so a caption lingering slightly past its nominal duration -- or a stale
-  // pulseStartTimeRef from some other code path re-showing it -- holds at
-  // its already-reached value instead of flashing.
+  // Timing is derived from pulseCycleStartRef -- a single timestamp stamped
+  // once when Box Breathing starts (never reset per-caption) -- via the same
+  // free-running 4-phase-modulo math App.jsx's caption poll uses to decide
+  // which caption to show, so the two can never disagree about where in the
+  // cycle they are (no clamp needed -- `%` already keeps phaseElapsed inside
+  // [0, interval)).
   useLayoutEffect(() => {
     if (!pulseActive) return
     let raf
     const tick = () => {
       const interval = Math.max(0.05, pulseIntervalRef.current)
-      const elapsed = Math.min(interval - 1e-4, Math.max(0, (performance.now() - pulseStartTimeRef.current) / 1000))
-      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(elapsed))
+      const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
+      const phaseElapsed = (totalElapsed % (4 * interval)) % interval
+      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(phaseElapsed))
       raf = requestAnimationFrame(tick)
     }
     tick()
     return () => cancelAnimationFrame(raf)
-  }, [pulseActive, pulseStartTimeRef, pulseIntervalRef])
+  }, [pulseActive, pulseCycleStartRef, pulseIntervalRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`
