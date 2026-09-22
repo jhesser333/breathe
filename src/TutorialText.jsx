@@ -31,6 +31,17 @@ function fadeAlpha(phaseElapsed, interval) {
   return lerp(1, 0, smoothstep((t - FADE_IN_FRAC) / (1 - FADE_IN_FRAC)))
 }
 
+// Mirror image of Inhale/Exhale's fade-in (rise 0 -> 1 over the first
+// FADE_IN_FRAC of the phase): flat at 1 for the mirrored remainder, then
+// eases 1 -> 0 over the last FADE_IN_FRAC. Multiplied over Hold's per-second
+// pulse as an additional overall fade-out.
+function holdFadeMultiplier(phaseElapsed, interval) {
+  const t = interval > 0 ? phaseElapsed / interval : 0
+  const flatFrac = 1 - FADE_IN_FRAC
+  if (t < flatFrac) return 1
+  return 1 - smoothstep((t - flatFrac) / FADE_IN_FRAC)
+}
+
 export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef }) {
   const textRef = useRef(null)
 
@@ -51,7 +62,9 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
       const interval = Math.max(0.05, pulseIntervalRef.current)
       const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
       const phaseElapsed = (totalElapsed % (4 * interval)) % interval
-      const value = pulseMode === 'fade' ? fadeAlpha(phaseElapsed, interval) : pulseAlpha(phaseElapsed)
+      const value = pulseMode === 'fade'
+        ? fadeAlpha(phaseElapsed, interval)
+        : pulseAlpha(phaseElapsed) * holdFadeMultiplier(phaseElapsed, interval)
       if (textRef.current) textRef.current.style.opacity = String(value)
       raf = requestAnimationFrame(tick)
     }
