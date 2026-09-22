@@ -42,6 +42,19 @@ function holdFadeMultiplier(phaseElapsed, interval) {
   return 1 - smoothstep((t - flatFrac) / FADE_IN_FRAC)
 }
 
+const ROUND_ALPHA = [1, 1, 0.5, 0.15]   // per round (0-indexed): rounds 1-2 full, round 3 half, round 4 nearly gone
+
+// Overall fade-out across the whole 4-round tutorial, layered on top of the
+// per-caption envelopes. Uses the un-wrapped totalElapsed (not the
+// latched/wrapped phaseElapsed), so it keeps counting rounds correctly for
+// the whole session; it only changes at the Hold-out -> Inhale boundary,
+// the same instant the wrap-latch above already holds the base envelope
+// near 0, so any one-poll-tick staleness here is imperceptible.
+function roundAlphaMultiplier(totalElapsed, interval) {
+  const roundIndex = interval > 0 ? Math.floor(totalElapsed / (4 * interval)) : 0
+  return ROUND_ALPHA[roundIndex] ?? 1
+}
+
 export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef }) {
   const textRef = useRef(null)
 
@@ -72,9 +85,10 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
       if (prevPhaseElapsed !== null && phaseElapsed < prevPhaseElapsed) wrapped = true
       prevPhaseElapsed = phaseElapsed
       if (wrapped) phaseElapsed = interval - 1e-4
-      const value = pulseMode === 'fade'
+      const value = (pulseMode === 'fade'
         ? fadeAlpha(phaseElapsed, interval)
         : pulseAlpha(phaseElapsed) * holdFadeMultiplier(phaseElapsed, interval)
+      ) * roundAlphaMultiplier(totalElapsed, interval)
       if (textRef.current) textRef.current.style.opacity = String(value)
       raf = requestAnimationFrame(tick)
     }

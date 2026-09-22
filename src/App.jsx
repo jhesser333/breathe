@@ -231,7 +231,7 @@ export default function App() {
     if (!bbTutorialActiveRef.current) return
     if (type === 'exhale') {
       bbCycleRef.current++
-      if (bbCycleRef.current >= 2) {
+      if (bbCycleRef.current >= 4) {
         bbTutorialActiveRef.current = false
       }
     }
