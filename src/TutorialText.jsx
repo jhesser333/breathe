@@ -1,7 +1,6 @@
 import { useRef, useLayoutEffect } from 'react'
 
 const PULSE_DURATION = 1.0
-const PULSE_FADE_IN = 0.2
 const PULSE_MID_FLOOR = 0.5
 const FADE_IN_FRAC = 0.9   // Inhale/Exhale: fraction of the phase spent easing 0 -> 1
 
@@ -14,17 +13,12 @@ function lerp(a, b, t) {
   return a + (b - a) * t
 }
 
-// Per-second pulse used by Box Breathing's captions: the first second fades
-// in over PULSE_FADE_IN then eases to PULSE_MID_FLOOR for the rest of the
-// second; every other second (including the last) steps immediately to full
-// and eases back down to PULSE_MID_FLOOR across the whole second.
+// Per-second pulse used by Box Breathing's "Hold" caption: every second
+// (including the first and last) steps immediately to full and eases back
+// down to PULSE_MID_FLOOR across the whole second -- identical treatment
+// throughout, no special-cased first/last pulse.
 function pulseAlpha(elapsed) {
   const t = elapsed % PULSE_DURATION
-  const pulseIndex = Math.floor(elapsed / PULSE_DURATION)
-  if (pulseIndex === 0) {
-    if (t < PULSE_FADE_IN) return smoothstep(t / PULSE_FADE_IN)
-    return lerp(1, PULSE_MID_FLOOR, smoothstep((t - PULSE_FADE_IN) / (PULSE_DURATION - PULSE_FADE_IN)))
-  }
   return lerp(PULSE_MID_FLOOR, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
