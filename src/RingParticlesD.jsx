@@ -39,6 +39,7 @@ const MAX_SPAWN_RATE = 440        // particles/sec
 const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
 const SPARKLE_ATTRACT_RATE = 1.1  // how quickly outward drift decays back toward the surface -- slow, floaty
+const NO_ATTRACT_CUTOFF = 1e6     // sentinel uAttractCutoff value meaning "no cutoff, decay normally" -- far beyond any real uTime
 const SPARKLE_FADE_OUT_DURATION = 3.0   // seconds: how long Sparkle takes to fade to invisible once Outflow starts (3x OUTFLOW_WINDOW)
 const SPARKLE_RATE_RAMP_UP_FRACTION = 0.8    // reaches max spawn rate at 80% of the way to full inhale
 const SPARKLE_RATE_RAMP_DOWN_MIDPOINT = 0.5  // spawn rate reaches 0 halfway through the inhale->exhale return trip
@@ -71,6 +72,7 @@ attribute vec3 aColor;
 uniform float uTime;
 uniform float uSize;
 uniform float uAttract;
+uniform float uAttractCutoff;
 uniform float uCenterY;
 varying float vAlpha;
 varying float vSeed;
@@ -90,7 +92,15 @@ void main() {
   vec2 radial = vec2(position.x, position.y - uCenterY);
   float radialLen = length(radial);
   vec2 dirXY = radialLen > 0.0001 ? radial / radialLen : vec2(0.0);
-  float outward = aOutwardSpeed * age * exp(-uAttract * age);
+  // freezeAge locks the decay term's age at uAttractCutoff (Box Breathing's
+  // Hold-in -> Exhale flip) instead of letting it keep decaying -- matches
+  // the normal formula exactly up to the cutoff (no jump), then holds the
+  // decay factor constant while age keeps growing outside it, so the
+  // particle keeps drifting outward instead of curling back in. Outside Box
+  // Breathing uAttractCutoff stays at NO_ATTRACT_CUTOFF, so this clamps to
+  // age and is identical to the old formula.
+  float freezeAge = clamp(uAttractCutoff - aSpawnTime, 0.0, age);
+  float outward = aOutwardSpeed * age * exp(-uAttract * freezeAge);
 
   vec3 displaced = vec3(position.xy + dirXY * outward, position.z);
 
@@ -226,6 +236,7 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
 
   const prevPhaseRef = useRef('exhale')
   const phaseElapsedRef = useRef(Infinity)   // time since the pace phase last flipped
+  const attractCutoffTimeRef = useRef(NO_ATTRACT_CUTOFF)   // Box Breathing only: uTime of the last Hold-in -> Exhale flip, else NO_ATTRACT_CUTOFF
 
   const colorTextC = useMemo(() => new THREE.Color(textColor), [textColor])
   const colorSecondaryC = useMemo(() => new THREE.Color(secondaryColor), [secondaryColor])
@@ -265,6 +276,7 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
       uSize: { value: 100 },
       uTime: { value: 0 },
       uAttract: { value: SPARKLE_ATTRACT_RATE },
+      uAttractCutoff: { value: NO_ATTRACT_CUTOFF },
       uCenterY: { value: RING_Y },
       uGlobalFade: { value: 1 },
     },
@@ -398,6 +410,10 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
     if (phase === 'inhale') {
       const rampT = THREE.MathUtils.clamp(bp / SPARKLE_RATE_RAMP_UP_FRACTION, 0, 1)
       spawnRate = THREE.MathUtils.lerp(0, MAX_SPAWN_RATE, rampT)
+    } else if (isBoxBreathing) {
+      // Experiment: Box Breathing pops spawning straight to 0 the instant
+      // Hold-in ends, instead of the smooth ramp-down used elsewhere.
+      spawnRate = 0
     } else {
       const rampT = THREE.MathUtils.clamp((bp - SPARKLE_RATE_RAMP_DOWN_MIDPOINT) / (1 - SPARKLE_RATE_RAMP_DOWN_MIDPOINT), 0, 1)
       spawnRate = THREE.MathUtils.lerp(0, MAX_SPAWN_RATE, rampT)
@@ -448,12 +464,20 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
       colorAttr.needsUpdate = true
     }
     sparkleMaterial.uniforms.uTime.value = now
+    sparkleMaterial.uniforms.uAttractCutoff.value = attractCutoffTimeRef.current
 
     // Fixed-window timer for Inflow/Outflow below, also used to gate
     // Sparkle's global fade.
     if (phase !== prevPhaseRef.current) {
       prevPhaseRef.current = phase
       phaseElapsedRef.current = 0
+      // Experiment: Box Breathing freezes Sparkle's inward pull the instant
+      // Hold-in ends (see SPARKLE_VERTEX_SHADER's freezeAge), so already-alive
+      // particles keep drifting outward instead of curling back. Reset on the
+      // next inhale so fresh spawns decay normally again.
+      if (isBoxBreathing) {
+        attractCutoffTimeRef.current = phase === 'exhale' ? now : NO_ATTRACT_CUTOFF
+      }
     } else {
       phaseElapsedRef.current += delta
     }
