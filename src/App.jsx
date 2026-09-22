@@ -861,6 +861,7 @@ export default function App() {
         )}
         <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           pulseActive={mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale)}
+          pulseMode={tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}
           pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} />
         {mode === 'timed' && (
           <BreathLengthControl

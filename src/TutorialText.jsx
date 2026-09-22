@@ -3,6 +3,7 @@ import { useRef, useLayoutEffect } from 'react'
 const PULSE_DURATION = 1.0
 const PULSE_FADE_IN = 0.2
 const PULSE_MID_FLOOR = 0.5
+const FADE_IN_FRAC = 0.9   // Inhale/Exhale: fraction of the phase spent easing 0 -> 1
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -27,7 +28,16 @@ function pulseAlpha(elapsed) {
   return lerp(PULSE_MID_FLOOR, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
-export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseCycleStartRef, pulseIntervalRef }) {
+// Single fade spanning the whole phase, used by Inhale/Exhale instead of the
+// per-second pulse: eases 0 -> 1 over the first FADE_IN_FRAC of the phase,
+// then eases 1 -> 0 over the remainder.
+function fadeAlpha(phaseElapsed, interval) {
+  const t = interval > 0 ? phaseElapsed / interval : 0
+  if (t < FADE_IN_FRAC) return smoothstep(t / FADE_IN_FRAC)
+  return lerp(1, 0, smoothstep((t - FADE_IN_FRAC) / (1 - FADE_IN_FRAC)))
+}
+
+export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
@@ -47,12 +57,13 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
       const interval = Math.max(0.05, pulseIntervalRef.current)
       const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
       const phaseElapsed = (totalElapsed % (4 * interval)) % interval
-      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(phaseElapsed))
+      const value = pulseMode === 'fade' ? fadeAlpha(phaseElapsed, interval) : pulseAlpha(phaseElapsed)
+      if (textRef.current) textRef.current.style.opacity = String(value)
       raf = requestAnimationFrame(tick)
     }
     tick()
     return () => cancelAnimationFrame(raf)
-  }, [pulseActive, pulseCycleStartRef, pulseIntervalRef])
+  }, [pulseActive, pulseMode, pulseCycleStartRef, pulseIntervalRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`
