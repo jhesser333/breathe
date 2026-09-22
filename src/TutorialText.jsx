@@ -15,19 +15,16 @@ function lerp(a, b, t) {
 
 // Per-second pulse used by Box Breathing's captions: the first second fades
 // in over PULSE_FADE_IN then eases to PULSE_MID_FLOOR for the rest of the
-// second; every other second steps immediately to full and eases back down
-// across the whole second -- down to 0 (instead of PULSE_MID_FLOOR) on the
-// last second, so the caption is gone right before the next one's hidden gap.
-function pulseAlpha(elapsed, interval) {
+// second; every other second (including the last) steps immediately to full
+// and eases back down to PULSE_MID_FLOOR across the whole second.
+function pulseAlpha(elapsed) {
   const t = elapsed % PULSE_DURATION
   const pulseIndex = Math.floor(elapsed / PULSE_DURATION)
-  const lastPulseIndex = Math.floor((interval - 1e-4) / PULSE_DURATION)
   if (pulseIndex === 0) {
     if (t < PULSE_FADE_IN) return smoothstep(t / PULSE_FADE_IN)
     return lerp(1, PULSE_MID_FLOOR, smoothstep((t - PULSE_FADE_IN) / (PULSE_DURATION - PULSE_FADE_IN)))
   }
-  const floor = pulseIndex >= lastPulseIndex ? 0 : PULSE_MID_FLOOR
-  return lerp(floor, 1, 1 - smoothstep(t / PULSE_DURATION))
+  return lerp(PULSE_MID_FLOOR, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
 export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseStartTimeRef, pulseIntervalRef }) {
@@ -45,17 +42,17 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
   // mid-pulse values instead of always fading in from 0 and easing out to 0.
   // elapsed is clamped just below `interval` (not to it exactly -- landing
   // exactly on `interval` reads to pulseAlpha as the start of a brand new
-  // pulse, stepping to full opacity, instead of the end of the last one) so
-  // a caption lingering slightly past its nominal duration -- or a stale
+  // pulse, stepping to full opacity, instead of continuing the previous one)
+  // so a caption lingering slightly past its nominal duration -- or a stale
   // pulseStartTimeRef from some other code path re-showing it -- holds at
-  // its already-reached end-of-last-second value (0) instead of flashing.
+  // its already-reached value instead of flashing.
   useLayoutEffect(() => {
     if (!pulseActive) return
     let raf
     const tick = () => {
       const interval = Math.max(0.05, pulseIntervalRef.current)
       const elapsed = Math.min(interval - 1e-4, Math.max(0, (performance.now() - pulseStartTimeRef.current) / 1000))
-      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(elapsed, interval))
+      if (textRef.current) textRef.current.style.opacity = String(pulseAlpha(elapsed))
       raf = requestAnimationFrame(tick)
     }
     tick()
