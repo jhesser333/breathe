@@ -1,7 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
 
 const PARTICLE_COUNT = 1500       // system 1: static surface sparkle, no velocity
@@ -24,21 +23,29 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_RING_Z = [-25, -20, -15, -10, -5]
+const BREATH_RING_Z = [-42, -32, -22, -12, -2]
 const BREATH_FADE_THRESHOLD = 0.75   // fraction of slider travel to lock a ring in
 const BREATH_MAX_ALPHA = 0.5
-// Same proportions/size as the pulse/hold ring in GatesBoxBreathingD.jsx
-// (that file's PULSE_RING_TUBE/PULSE_RING_SCALE aren't exported, so the
-// derivation is duplicated here from its exported inputs).
-const BREATH_RING_TUBE = 0.015
+// Same proportions as the pulse/hold ring in GatesBoxBreathingD.jsx (that
+// file's PULSE_RING_TUBE/PULSE_RING_SCALE aren't exported, so the derivation
+// is duplicated here from its exported inputs), tube tripled for visibility
+// at these distances.
+const BREATH_RING_TUBE = 0.015 * 3
 const BREATH_RING_INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS
 const BREATH_RING_SCALE = GATE_SCALE.map(v => v * BREATH_RING_INNER_EDGE_FACTOR)
 const BREATH_REVERSAL_DEADBAND = 0.08  // matches the deadband used elsewhere (App.jsx, SlowingDownController)
 const BREATH_FALL_STAGGER_S = 0.2
 const BREATH_FALL_HOLD_S = 2.0       // seconds a ring keeps falling/rotating at full opacity before fading
 const BREATH_FALL_FADE_S = 1.0       // fade duration after the hold
-const BREATH_FALL_Y_SPEED = 0.3      // units/sec, straight down
+const BREATH_FALL_Y_SPEED = 0.6      // units/sec, straight down
 const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per ring per group
+// "Backlight" glow: rather than relying on transparent-object draw order
+// (which didn't reliably show the rings through the Morph's own surface),
+// each ring's position/intensity is fed into the Morph's own fragment
+// shader as a fake point-light term added straight to its emissive, so it
+// reads as light glowing through from behind regardless of depth/blend order.
+const BREATH_GLOW_STRENGTH = 3.0     // multiplies each ring's opacity (0-0.5) into an emissive contribution
+const BREATH_GLOW_FALLOFF = 0.15     // exponential distance falloff rate
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -162,7 +169,7 @@ function sampleSpherePositions(count) {
   return positions
 }
 
-export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRawRef, breathCountingEnabledRef }) {
+export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRawRef, breathCountingEnabledRef, livePaletteRef, onBreathPaletteCycle }) {
   const groupRef = useRef()
   const matRef = useRef()
 
@@ -197,17 +204,11 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathFallTriggeredRef = useRef(false)
   const breathFallStartTimesRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
   const breathFallSpinRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
-  const paletteCycleIndexRef = useRef(0)
-  const paletteLerpRef = useRef(null)
   // Set true when a group's fall-away triggers; consumed on the very next
-  // confirmed rise (breath 1's inhale of the next cycle), which is when the
-  // palette lerp actually starts.
+  // confirmed rise (breath 1's inhale of the next cycle), which is when
+  // onBreathPaletteCycle actually fires (App.jsx owns the lerp itself, since
+  // it now drives the whole app's palette, not just MorphC's own colors).
   const paletteLerpPendingRef = useRef(false)
-  const effectiveColorsRef = useRef({
-    tertiary: new THREE.Color(palette.tertiaryColor),
-    primary: new THREE.Color(palette.primaryColor),
-    secondary: new THREE.Color(palette.secondaryColor),
-  })
 
   const breathMaterials = useMemo(() => (
     Array.from({ length: BREATH_RING_COUNT }, () => new THREE.MeshStandardMaterial({
@@ -232,6 +233,10 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
       dissolveProgress: { value: 0 },
       dissolveScale:    { value: 80.0 },
       dissolveEdge:     { value: 0.12 },
+      uBreathGlowPos:       { value: Array.from({ length: BREATH_RING_COUNT }, () => new THREE.Vector3()) },
+      uBreathGlowIntensity: { value: new Float32Array(BREATH_RING_COUNT) },
+      uBreathGlowColor:     { value: new THREE.Color(palette.secondaryColor) },
+      uBreathGlowFalloff:   { value: BREATH_GLOW_FALLOFF },
     }
 
     const mat = new THREE.MeshStandardMaterial({
@@ -248,15 +253,17 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, fresnelUniforms)
 
-      // Pass view direction and local (unscaled) position from vertex to
-      // fragment via custom varyings -- local position drives the dissolve
-      // grain so dot size stays stable regardless of the mesh's breathing scale.
-      shader.vertexShader = 'varying vec3 vFresnelDir;\nvarying vec3 vDissolvePos;\n' + shader.vertexShader
+      // Pass view direction, local (unscaled) position, and world position
+      // from vertex to fragment via custom varyings -- local position drives
+      // the dissolve grain so dot size stays stable regardless of the mesh's
+      // breathing scale; world position drives the breath-ring backlight glow.
+      shader.vertexShader = 'varying vec3 vFresnelDir;\nvarying vec3 vDissolvePos;\nvarying vec3 vWorldPos;\n' + shader.vertexShader
       shader.vertexShader = shader.vertexShader.replace(
         '#include <project_vertex>',
         `#include <project_vertex>
         vFresnelDir = normalize(-mvPosition.xyz);
-        vDissolvePos = position;`
+        vDissolvePos = position;
+        vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
       )
 
       // Inject uniforms + varying declaration, then add Fresnel to emissive
@@ -266,8 +273,13 @@ uniform float fresnelIntensity;
 uniform float dissolveProgress;
 uniform float dissolveScale;
 uniform float dissolveEdge;
+uniform vec3 uBreathGlowPos[${BREATH_RING_COUNT}];
+uniform float uBreathGlowIntensity[${BREATH_RING_COUNT}];
+uniform vec3 uBreathGlowColor;
+uniform float uBreathGlowFalloff;
 varying vec3 vFresnelDir;
 varying vec3 vDissolvePos;
+varying vec3 vWorldPos;
 
 float dissolveHash(vec3 p) {
   p = fract(p * vec3(443.897, 441.423, 437.195));
@@ -282,6 +294,17 @@ float dissolveHash(vec3 p) {
         {
           float fr = pow(1.0 - max(dot(normalize(vNormal), vFresnelDir), 0.0), fresnelPower);
           totalEmissiveRadiance *= (1.0 - fr * fresnelIntensity);
+        }
+        {
+          // Breath-count rings "backlight" the Morph: faked as point-light-like
+          // additions to emissive based on distance, independent of actual
+          // transparent-object draw order/depth, so they read as glowing
+          // through the surface rather than being hidden behind it.
+          for (int i = 0; i < ${BREATH_RING_COUNT}; i++) {
+            float bd = length(vWorldPos - uBreathGlowPos[i]);
+            float bGlow = uBreathGlowIntensity[i] * exp(-bd * uBreathGlowFalloff);
+            totalEmissiveRadiance += uBreathGlowColor * bGlow;
+          }
         }`
       )
 
@@ -560,14 +583,7 @@ float dissolveHash(vec3 p) {
             breathArmedRef.current = true
             if (paletteLerpPendingRef.current) {
               paletteLerpPendingRef.current = false
-              const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
-              paletteLerpRef.current = {
-                fromTertiary: effectiveColorsRef.current.tertiary.clone(),
-                fromPrimary: effectiveColorsRef.current.primary.clone(),
-                fromSecondary: effectiveColorsRef.current.secondary.clone(),
-                toIndex,
-                startTime: now,
-              }
+              if (onBreathPaletteCycle) onBreathPaletteCycle(now)
             }
           }
         }
@@ -640,31 +656,34 @@ float dissolveHash(vec3 p) {
       }
     }
 
-    // Palette lerp for MorphC's own colors (sphere + particles + breath
-    // rings) only -- runs independently of the fall-away state machine above
-    // so the color transition keeps animating even after the rings finish
-    // resetting for the next group.
-    if (paletteLerpRef.current) {
-      const { fromTertiary, fromPrimary, fromSecondary, toIndex, startTime } = paletteLerpRef.current
-      const t = THREE.MathUtils.clamp((now - startTime) / BREATH_FALL_FADE_S, 0, 1)
-      const to = BREATH_CYCLE_PALETTES[toIndex]
-      const colors = effectiveColorsRef.current
-      colors.tertiary.copy(fromTertiary).lerp(new THREE.Color(to.tertiaryColor), t)
-      colors.primary.copy(fromPrimary).lerp(new THREE.Color(to.primaryColor), t)
-      colors.secondary.copy(fromSecondary).lerp(new THREE.Color(to.secondaryColor), t)
-
-      material.color.copy(colors.tertiary)
-      material.emissive.copy(colors.primary)
-      sparkleMaterial.uniforms.uColor.value.copy(colors.primary)
-      flowMaterial.uniforms.uColor.value.copy(colors.primary)
+    // Sync from the shared live palette (App.jsx owns the actual lerp, since
+    // it now drives the whole app's palette, not just MorphC's own colors) --
+    // cheap in-place copies every frame, no branching needed.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      material.color.copy(live.tertiary)
+      material.emissive.copy(live.primary)
+      sparkleMaterial.uniforms.uColor.value.copy(live.primary)
+      flowMaterial.uniforms.uColor.value.copy(live.primary)
+      fresnelUniforms.uBreathGlowColor.value.copy(live.secondary)
       breathMaterials.forEach((m) => {
-        m.color.copy(colors.tertiary)
-        m.emissive.copy(colors.secondary)
+        m.color.copy(live.tertiary)
+        m.emissive.copy(live.secondary)
       })
+    }
 
-      if (t >= 1) {
-        paletteCycleIndexRef.current = toIndex
-        paletteLerpRef.current = null
+    // Feed each breath ring's current world position/opacity into the
+    // Morph's backlight-glow uniforms (see BREATH_GLOW_* constants and the
+    // onBeforeCompile injection above).
+    {
+      const groupOffsetY = shapeOption === 'd' ? 0 : 0.25
+      const glowPos = fresnelUniforms.uBreathGlowPos.value
+      const glowIntensity = fresnelUniforms.uBreathGlowIntensity.value
+      for (let i = 0; i < BREATH_RING_COUNT; i++) {
+        const group = breathGroupRefs[i].current
+        const fallY = group ? group.position.y : 0
+        glowPos[i].set(0, groupOffsetY + fallY, BREATH_RING_Z[i])
+        glowIntensity[i] = breathMaterials[i].opacity * BREATH_GLOW_STRENGTH
       }
     }
   })

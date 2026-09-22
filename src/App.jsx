@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useEffect, useLayoutEffect } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 import MorphA from './MorphA'
 import MorphB from './MorphB'
 import MorphC from './MorphC'
@@ -30,6 +31,7 @@ import SlowingDownController from './SlowingDownController'
 import BreathLengthControl from './BreathLengthControl'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
+import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 
@@ -70,6 +72,36 @@ const CAMERA_BY_SHAPE = {
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
+
+// Breath-count palette cycle (see MorphC.jsx / breathCyclePalettes.js):
+// MorphC decides WHEN to cycle (breath 1's inhale of a new group) and calls
+// back up here; this drives the actual color lerp so it reaches every
+// palette-consuming piece of the live scene, not just MorphC's own colors.
+const PALETTE_LERP_DURATION = 1.0
+
+function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef }) {
+  useFrame((state) => {
+    if (!paletteLerpRef.current) return
+    const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, fromHeader, fromSubheader, toIndex, startTime } = paletteLerpRef.current
+    const now = state.clock.elapsedTime
+    const t = THREE.MathUtils.clamp((now - startTime) / PALETTE_LERP_DURATION, 0, 1)
+    const to = BREATH_CYCLE_PALETTES[toIndex]
+    const live = livePaletteRef.current
+    live.tertiary.copy(fromTertiary).lerp(new THREE.Color(to.tertiaryColor), t)
+    live.primary.copy(fromPrimary).lerp(new THREE.Color(to.primaryColor), t)
+    live.secondary.copy(fromSecondary).lerp(new THREE.Color(to.secondaryColor), t)
+    live.background.copy(fromBackground).lerp(new THREE.Color(to.background), t)
+    live.text.copy(fromText).lerp(new THREE.Color(to.textColor), t)
+    live.header.copy(fromHeader).lerp(new THREE.Color(to.headerColor), t)
+    live.subheader.copy(fromSubheader).lerp(new THREE.Color(to.subheaderColor), t)
+    if (state.scene.background) state.scene.background.copy(live.background)
+    if (t >= 1) {
+      paletteCycleIndexRef.current = toIndex
+      paletteLerpRef.current = null
+    }
+  })
+  return null
+}
 
 export default function App() {
   const leftVal = useRef(0)
@@ -163,6 +195,37 @@ export default function App() {
   // below) -- counting is purely slider-driven (leftRawRef), identical across
   // every mode, not tied to any mode's own phase clock.
   const breathCountingEnabledRef = useRef(false)
+
+  // App-wide breath-count palette cycle -- see PaletteLerpDriver above.
+  // livePaletteRef holds the live (possibly mid-lerp) THREE.Color for every
+  // palette field, read imperatively by MorphC/RingParticlesD/BackgroundRingsD
+  // and by the Canvas background (via PaletteLerpDriver) every frame.
+  const paletteCycleIndexRef = useRef(0)
+  const paletteLerpRef = useRef(null)
+  const livePaletteRef = useRef({
+    tertiary: new THREE.Color(PALETTES.teal.tertiaryColor),
+    primary: new THREE.Color(PALETTES.teal.primaryColor),
+    secondary: new THREE.Color(PALETTES.teal.secondaryColor),
+    background: new THREE.Color(PALETTES.teal.background),
+    text: new THREE.Color(PALETTES.teal.textColor),
+    header: new THREE.Color(PALETTES.teal.headerColor),
+    subheader: new THREE.Color(PALETTES.teal.subheaderColor),
+  })
+  const handleBreathPaletteCycle = useCallback((now) => {
+    const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
+    const live = livePaletteRef.current
+    paletteLerpRef.current = {
+      fromTertiary: live.tertiary.clone(),
+      fromPrimary: live.primary.clone(),
+      fromSecondary: live.secondary.clone(),
+      fromBackground: live.background.clone(),
+      fromText: live.text.clone(),
+      fromHeader: live.header.clone(),
+      fromSubheader: live.subheader.clone(),
+      toIndex,
+      startTime: now,
+    }
+  }, [])
 
   // Slowing Down breath-tracking state, lifted here so it survives
   // SlowingDownController unmounting/remounting (e.g. when visiting Personalize)
@@ -659,6 +722,15 @@ export default function App() {
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
     breathCountingEnabledRef.current = false
+    paletteCycleIndexRef.current = 0
+    paletteLerpRef.current = null
+    livePaletteRef.current.tertiary.set(PALETTES.teal.tertiaryColor)
+    livePaletteRef.current.primary.set(PALETTES.teal.primaryColor)
+    livePaletteRef.current.secondary.set(PALETTES.teal.secondaryColor)
+    livePaletteRef.current.background.set(PALETTES.teal.background)
+    livePaletteRef.current.text.set(PALETTES.teal.textColor)
+    livePaletteRef.current.header.set(PALETTES.teal.headerColor)
+    livePaletteRef.current.subheader.set(PALETTES.teal.subheaderColor)
 
     if (sliderLayout === 'diagonal') {
       stageRef.current = 'done'
@@ -787,10 +859,11 @@ export default function App() {
         <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
+        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} />
         {shapeOption === 'd' && <CameraVerticalShift />}
-        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} />
-        {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} />}
-        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} />}
+        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
+        {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
+        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />

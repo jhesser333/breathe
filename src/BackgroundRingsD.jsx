@@ -70,9 +70,10 @@ function pulseValue(elapsed) {
   return 0
 }
 
-export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef, paceProgressRef }) {
+export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhaseRef, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef, paceProgressRef, livePaletteRef }) {
   const matExhaleRef = useRef()
   const matInhaleRef = useRef()
+  const matHaloRef = useRef()
   const paceMeshRef = useRef()
   const paceMatRef = useRef()
 
@@ -81,6 +82,17 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
   const pulseExhaleElapsedRef = useRef(Infinity)    // time since the exhale ring's pulse last triggered
 
   useFrame((_, delta) => {
+    // Pull in the app-wide breath-count palette cycle (see App.jsx), if any.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      ;[matExhaleRef, matInhaleRef, matHaloRef, paceMatRef].forEach((r) => {
+        if (r.current) {
+          r.current.color.copy(live.background)
+          r.current.emissive.copy(live.secondary)
+        }
+      })
+    }
+
     const active = gatesEnabledRef?.current ?? false
     const activePhase = active ? (breathPhaseRef?.current ?? 'exhale') : 'exhale'
 
@@ -172,6 +184,7 @@ export default function BackgroundRingsD({ baseColor, emissiveColor, breathPhase
       <mesh position={[0, RING_Y, HALO_RING_Z]} scale={GATE_SCALE}>
         <torusGeometry args={[BASE_RADIUS, BASE_TUBE, 16, 64]} />
         <meshStandardMaterial
+          ref={matHaloRef}
           color={baseColor}
           emissive={emissiveColor}
           emissiveIntensity={0}

@@ -226,7 +226,7 @@ function sampleTorusPositions(count, scale = GATE_SCALE) {
   return positions
 }
 
-export default function RingParticlesD({ textColor, secondaryColor, tertiaryColor, primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef }) {
+export default function RingParticlesD({ textColor, secondaryColor, tertiaryColor, primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef, livePaletteRef }) {
   const spawnCursorRef = useRef(0)
   const spawnAccumulatorRef = useRef(0)
 
@@ -381,6 +381,16 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
 
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
+
+    // Pull in the app-wide breath-count palette cycle (see App.jsx), if any --
+    // cheap in-place copy, no allocation.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      colorTextC.copy(live.text)
+      colorSecondaryC.copy(live.secondary)
+      colorTertiaryC.copy(live.tertiary)
+      colorPrimaryC.copy(live.primary)
+    }
 
     // Live palette colors (cheap in-place copy, no allocation). Sparkle's own
     // birth-color source colors are chosen per-particle at spawn time below
