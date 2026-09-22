@@ -1,6 +1,7 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 
 const PARTICLE_COUNT = 1500       // system 1: static surface sparkle, no velocity
 const PARTICLE_COUNT_2 = 700      // system 2: blown-away / sucked-in, XZ velocity only
@@ -16,6 +17,22 @@ const OPTION_D_EXHALE_Z_SCALE = 0.25  // Option D only: replaces the shared 0.2 
 const OPTION_D_INHALE_X_SCALE = 2     // Option D only: replaces the shared 2.25 at full inhale
 const OPTION_D_INHALE_Y_SCALE = 3     // Option D only: replaces the shared 3.5 at full inhale
 const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 at full inhale
+
+// Breath-count rings: groups of 5 breaths, one ring fades in and locks per
+// completed Inhale, all 5 fall away together on the 5th Exhale. "Breath" here
+// means literal slider movement (leftRawRef), identical across every mode --
+// not any mode's own phase clock.
+const BREATH_RING_COUNT = 5
+const BREATH_RING_Z = [-25, -20, -15, -10, -5]
+const BREATH_FADE_THRESHOLD = 0.75   // fraction of slider travel to lock a ring in
+const BREATH_MAX_ALPHA = 0.5
+const BREATH_RING_RADIUS = 1.0       // matches BackgroundRingsD.jsx's BASE_RADIUS
+const BREATH_RING_TUBE = 0.06        // matches BackgroundRingsD.jsx's BASE_TUBE
+const BREATH_REVERSAL_DEADBAND = 0.08  // matches the deadband used elsewhere (App.jsx, SlowingDownController)
+const BREATH_FALL_STAGGER_S = 0.2
+const BREATH_FALL_FADE_S = 1.0
+const BREATH_FALL_Y_SPEED = 0.3      // units/sec, straight down
+const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per ring per group
 
 const SPARKLE_VERTEX_SHADER = `
 attribute float aSpawnTime;
@@ -139,7 +156,7 @@ function sampleSpherePositions(count) {
   return positions
 }
 
-export default function MorphC({ leftVal, rightVal, palette, shapeOption }) {
+export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRawRef, breathCountingEnabledRef }) {
   const groupRef = useRef()
   const matRef = useRef()
 
@@ -156,6 +173,36 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption }) {
   // (lv=0 is exhale, lv=1 is inhale -- opposite numeric convention from rv.)
   const prevLvRef = useRef(leftVal.current)
   const flowDirRef = useRef(1)
+
+  // Breath-count rings state (see module-level BREATH_* constants above).
+  const breathGroupRefs = useMemo(() => (
+    Array.from({ length: BREATH_RING_COUNT }, () => ({ current: null }))
+  ), [])
+  const breathLockedCountRef = useRef(0)
+  const breathPostLockMaxRef = useRef(0)
+  const breathFallTriggeredRef = useRef(false)
+  const breathFallStartTimesRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
+  const breathFallSpinRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
+  const paletteCycleIndexRef = useRef(0)
+  const paletteLerpRef = useRef(null)
+  const effectiveColorsRef = useRef({
+    tertiary: new THREE.Color(palette.tertiaryColor),
+    primary: new THREE.Color(palette.primaryColor),
+    secondary: new THREE.Color(palette.secondaryColor),
+  })
+
+  const breathMaterials = useMemo(() => (
+    Array.from({ length: BREATH_RING_COUNT }, () => new THREE.MeshStandardMaterial({
+      color: new THREE.Color(palette.tertiaryColor),
+      emissive: new THREE.Color(palette.secondaryColor),
+      emissiveIntensity: 1,
+      roughness: 1,
+      metalness: 0,
+      transparent: true,
+      opacity: 0,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [])
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
@@ -466,6 +513,112 @@ float dissolveHash(vec3 p) {
       swoopSpeedAttr.needsUpdate = true
     }
     flowMaterial.uniforms.uTime.value = now
+
+    // Breath-count rings (see module-level BREATH_* constants).
+    if (breathCountingEnabledRef && breathCountingEnabledRef.current) {
+      const raw = leftRawRef.current
+
+      if (!breathFallTriggeredRef.current) {
+        if (breathLockedCountRef.current < BREATH_RING_COUNT) {
+          const activeIdx = breathLockedCountRef.current
+          const progress = THREE.MathUtils.clamp(raw / BREATH_FADE_THRESHOLD, 0, 1)
+          breathMaterials[activeIdx].opacity = BREATH_MAX_ALPHA * progress
+          if (progress >= 1) {
+            breathLockedCountRef.current += 1
+            breathPostLockMaxRef.current = raw
+          }
+        } else {
+          // All 5 locked -- watch for the confirmed downward reversal that
+          // starts breath 5's exhale (same deadband-reversal pattern used
+          // elsewhere in the app, e.g. SlowingDownController).
+          breathPostLockMaxRef.current = Math.max(breathPostLockMaxRef.current, raw)
+          if (breathPostLockMaxRef.current - raw > BREATH_REVERSAL_DEADBAND) {
+            breathFallTriggeredRef.current = true
+            const order = [0, 1, 2, 3, 4]
+            for (let i = order.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1))
+              ;[order[i], order[j]] = [order[j], order[i]]
+            }
+            order.forEach((ringIdx, orderPos) => {
+              breathFallStartTimesRef.current[ringIdx] = now + orderPos * BREATH_FALL_STAGGER_S
+              breathFallSpinRef.current[ringIdx] = {
+                rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+                ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+                rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+              }
+            })
+
+            const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
+            paletteLerpRef.current = {
+              fromTertiary: effectiveColorsRef.current.tertiary.clone(),
+              fromPrimary: effectiveColorsRef.current.primary.clone(),
+              fromSecondary: effectiveColorsRef.current.secondary.clone(),
+              toIndex,
+              startTime: now,
+            }
+          }
+        }
+      } else {
+        let allDone = true
+        for (let i = 0; i < BREATH_RING_COUNT; i++) {
+          const start = breathFallStartTimesRef.current[i]
+          if (start === null || now < start) { allDone = false; continue }
+          const t = now - start
+          const group = breathGroupRefs[i].current
+          const spin = breathFallSpinRef.current[i]
+          if (group) {
+            group.position.y = -BREATH_FALL_Y_SPEED * t
+            group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
+          }
+          const fadeT = THREE.MathUtils.clamp(t / BREATH_FALL_FADE_S, 0, 1)
+          breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
+          if (fadeT < 1) allDone = false
+        }
+        if (allDone) {
+          breathFallTriggeredRef.current = false
+          breathLockedCountRef.current = 0
+          breathPostLockMaxRef.current = 0
+          for (let i = 0; i < BREATH_RING_COUNT; i++) {
+            breathFallStartTimesRef.current[i] = null
+            breathFallSpinRef.current[i] = null
+            const group = breathGroupRefs[i].current
+            if (group) {
+              group.position.y = 0
+              group.rotation.set(0, 0, 0)
+            }
+            breathMaterials[i].opacity = 0
+          }
+        }
+      }
+    }
+
+    // Palette lerp for MorphC's own colors (sphere + particles + breath
+    // rings) only -- runs independently of the fall-away state machine above
+    // so the color transition keeps animating even after the rings finish
+    // resetting for the next group.
+    if (paletteLerpRef.current) {
+      const { fromTertiary, fromPrimary, fromSecondary, toIndex, startTime } = paletteLerpRef.current
+      const t = THREE.MathUtils.clamp((now - startTime) / BREATH_FALL_FADE_S, 0, 1)
+      const to = BREATH_CYCLE_PALETTES[toIndex]
+      const colors = effectiveColorsRef.current
+      colors.tertiary.copy(fromTertiary).lerp(new THREE.Color(to.tertiaryColor), t)
+      colors.primary.copy(fromPrimary).lerp(new THREE.Color(to.primaryColor), t)
+      colors.secondary.copy(fromSecondary).lerp(new THREE.Color(to.secondaryColor), t)
+
+      material.color.copy(colors.tertiary)
+      material.emissive.copy(colors.primary)
+      sparkleMaterial.uniforms.uColor.value.copy(colors.primary)
+      flowMaterial.uniforms.uColor.value.copy(colors.primary)
+      breathMaterials.forEach((m) => {
+        m.color.copy(colors.tertiary)
+        m.emissive.copy(colors.secondary)
+      })
+
+      if (t >= 1) {
+        paletteCycleIndexRef.current = toIndex
+        paletteLerpRef.current = null
+      }
+    }
   })
 
   return (
@@ -484,6 +637,16 @@ float dissolveHash(vec3 p) {
       <points geometry={flowAttrs.geometry}>
         <primitive object={flowMaterial} attach="material" />
       </points>
+      {/* Breath-count rings -- also outside the scaled group so they don't
+          inherit the sphere's breathing scale. */}
+      {breathGroupRefs.map((ref, i) => (
+        <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, BREATH_RING_Z[i]]}>
+          <mesh>
+            <torusGeometry args={[BREATH_RING_RADIUS, BREATH_RING_TUBE, 16, 64]} />
+            <primitive object={breathMaterials[i]} attach="material" />
+          </mesh>
+        </group>
+      ))}
     </group>
   )
 }

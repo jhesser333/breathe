@@ -158,6 +158,12 @@ export default function App() {
   // slider's visual bounds. Used by SlowingDownController for breath timing.
   const leftRawRef = useRef(0)
 
+  // Morphing Sphere breath-count rings (MorphC only): true once the universal
+  // intro tutorial hands off to mode-specific text (see the two 'done' sites
+  // below) -- counting is purely slider-driven (leftRawRef), identical across
+  // every mode, not tied to any mode's own phase clock.
+  const breathCountingEnabledRef = useRef(false)
+
   // Slowing Down breath-tracking state, lifted here so it survives
   // SlowingDownController unmounting/remounting (e.g. when visiting Personalize)
   const prevRawRef = useRef(null)
@@ -388,6 +394,7 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       stageRef.current = 'done'
+      breathCountingEnabledRef.current = true
       if (pendingGatesFnRef.current !== null) {
         const fn = pendingGatesFnRef.current
         pendingGatesFnRef.current = null
@@ -423,6 +430,7 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       diagStageRef.current = 'done'
+      breathCountingEnabledRef.current = true
       if (pendingGatesFnRef.current !== null) {
         const fn = pendingGatesFnRef.current
         pendingGatesFnRef.current = null
@@ -650,6 +658,7 @@ export default function App() {
     clearTimeout(tutorialTimerRef.current)
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
+    breathCountingEnabledRef.current = false
 
     if (sliderLayout === 'diagonal') {
       stageRef.current = 'done'
@@ -779,7 +788,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         {shapeOption === 'd' && <CameraVerticalShift />}
-        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} />
+        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} />
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
