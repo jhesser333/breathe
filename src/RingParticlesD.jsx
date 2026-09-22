@@ -35,7 +35,7 @@ import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE, EXHALE_SCALE }
 // exactly along the ray to the corresponding point on the other ring.
 
 const SPARKLE_PARTICLE_COUNT = 1000
-const MAX_SPAWN_RATE = 440        // particles/sec
+const MAX_SPAWN_RATE = 220        // particles/sec -- halved from the original 440
 const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
 // Quarter of the original 1.1, paired with the equally-scaled outward-speed
@@ -453,7 +453,7 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
         const idx = spawnCursorRef.current % SPARKLE_PARTICLE_COUNT
         spawnCursorRef.current += 1
         spawnTimeAttr.array[idx] = now
-        lifetimeAttr.array[idx] = THREE.MathUtils.lerp(1.5, 3.0, Math.random())
+        lifetimeAttr.array[idx] = THREE.MathUtils.lerp(2.25, 4.5, Math.random())   // 1.5x the original 1.5/3.0 range
         // Biased toward small values with an occasional large outlier --
         // most sparkles stay subtle, a few pop out much further. Scaled down
         // from the original 0.12/1.3 in lockstep with SPARKLE_ATTRACT_RATE
