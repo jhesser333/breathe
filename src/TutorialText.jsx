@@ -31,15 +31,17 @@ function fadeAlpha(phaseElapsed, interval) {
   return lerp(1, 0, smoothstep((t - FADE_IN_FRAC) / (1 - FADE_IN_FRAC)))
 }
 
+const HOLD_FADE_MAX = 0.5   // caps Hold's mirrored fade-out multiplier so its peak brightness doesn't jar against Inhale/Exhale's fade-in
+
 // Mirror image of Inhale/Exhale's fade-in (rise 0 -> 1 over the first
-// FADE_IN_FRAC of the phase): flat at 1 for the mirrored remainder, then
-// eases 1 -> 0 over the last FADE_IN_FRAC. Multiplied over Hold's per-second
-// pulse as an additional overall fade-out.
+// FADE_IN_FRAC of the phase): flat at HOLD_FADE_MAX for the mirrored
+// remainder, then eases HOLD_FADE_MAX -> 0 over the last FADE_IN_FRAC.
+// Multiplied over Hold's per-second pulse as an additional overall fade-out.
 function holdFadeMultiplier(phaseElapsed, interval) {
   const t = interval > 0 ? phaseElapsed / interval : 0
   const flatFrac = 1 - FADE_IN_FRAC
-  if (t < flatFrac) return 1
-  return 1 - smoothstep((t - flatFrac) / FADE_IN_FRAC)
+  if (t < flatFrac) return HOLD_FADE_MAX
+  return lerp(HOLD_FADE_MAX, 0, smoothstep((t - flatFrac) / FADE_IN_FRAC))
 }
 
 const ROUND_ALPHA = [1, 1, 0.5, 0.15]   // per round (0-indexed): rounds 1-2 full, round 3 half, round 4 nearly gone
