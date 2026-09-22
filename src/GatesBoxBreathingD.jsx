@@ -14,7 +14,7 @@ const TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
 const PULSE_ALPHA_MIN = 0.2
-const PULSE_ALPHA_MAX = 0.4
+const PULSE_ALPHA_MAX = 0.3
 const PULSE_EMISSIVE_MIN = 0.2
 const PULSE_EMISSIVE_MAX = 1
 
