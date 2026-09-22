@@ -14,10 +14,9 @@ import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE, EXHALE_SCALE }
 //   away from the ring and decaying back -- a slow-motion "popcorn"/"sun
 //   ray" look, with most particles staying subtle and some popping out much
 //   further. Spawn rate is driven by `paceProgressRef` (dies out near full
-//   exhale rest). Its overall visibility also fades to 0 right as Outflow
-//   begins emitting (as if everything is flying away), recovering as the
-//   next Inflow burst begins. Birth color: outside Box Breathing, a random
-//   blend of textColor/secondaryColor (unchanged). In Box Breathing, a
+//   exhale rest); each particle simply fades per its own age-based envelope,
+//   with no additional global fade layered on top. Birth color: outside Box
+//   Breathing, a random blend of textColor/secondaryColor (unchanged). In Box Breathing, a
 //   random blend of textColor/primaryColor during Inhale+Hold-in, switching
 //   to secondaryColor/tertiaryColor during Exhale+Hold-out -- baked in at
 //   spawn so particles born under one regime keep their color for their
@@ -44,7 +43,6 @@ const SPAWN_SENTINEL = -1e4
 // time to reach it, reading as slower/calmer without traveling less far).
 const SPARKLE_ATTRACT_RATE = 0.275
 const NO_ATTRACT_CUTOFF = 1e6     // sentinel uAttractCutoff value meaning "no cutoff, decay normally" -- far beyond any real uTime
-const SPARKLE_FADE_OUT_DURATION = 3.0   // seconds: how long Sparkle takes to fade to invisible once Outflow starts (3x OUTFLOW_WINDOW)
 const SPARKLE_RATE_RAMP_UP_FRACTION = 0.8    // reaches max spawn rate at 80% of the way to full inhale
 const SPARKLE_RATE_RAMP_DOWN_MIDPOINT = 0.5  // spawn rate reaches 0 halfway through the inhale->exhale return trip
 
@@ -488,13 +486,11 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
       phaseElapsedRef.current += delta
     }
 
-    // Sparkle fades to invisible right as Outflow begins emitting (as if
-    // everything is flying away), and back in as the next Inflow burst
-    // begins -- spawning itself is untouched, only visibility.
-    const globalFade = phase === 'exhale'
-      ? 1 - THREE.MathUtils.smoothstep(phaseElapsedRef.current, 0, SPARKLE_FADE_OUT_DURATION)
-      : THREE.MathUtils.smoothstep(phaseElapsedRef.current, 0, INFLOW_WINDOW)
-    sparkleMaterial.uniforms.uGlobalFade.value = globalFade
+    // Experiment: no longer applying an extra global fade-out as Outflow
+    // begins (or fade-in as Inflow begins) -- uGlobalFade stays at its
+    // default 1, so Sparkle particles alive at the Hold-in -> Exhale
+    // transition now just die off on their own per-particle age envelope
+    // instead of also being dimmed by this additional multiplier.
 
     // Inflow: spawns on the exhale ring for the first second of the
     // exhale->inhale phase, converging onto the inhale ring.
