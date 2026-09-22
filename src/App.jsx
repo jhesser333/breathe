@@ -195,6 +195,12 @@ export default function App() {
   // caption shows and how it pulses can never disagree.
   const boxClockStartRef = useRef(0)
   const boxCaptionIndexRef = useRef(-1)
+  // True only once the Inhale/Hold/Exhale/Hold captions have actually begun
+  // (after the shared Text A/B or Diagonal A1/A2/B1/B2 intro finishes) --
+  // distinct from bbTutorialActiveRef, which is also false *before* the
+  // intro, so the caption poll can tell "hasn't started" from "already done"
+  // and not stomp on the intro sequence's own visibility management.
+  const boxCaptionsStartedRef = useRef(false)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -541,6 +547,11 @@ export default function App() {
   useEffect(() => {
     if (mode !== 'box') return
     const id = setInterval(() => {
+      // Don't touch tutorialVisible/tutorialText until the shared intro
+      // (Text A/B or the Diagonal A1/A2/B1/B2 sequence) has actually handed
+      // off -- bbTutorialActiveRef is also false during that intro, so
+      // checking only that would hide the intro text within one tick.
+      if (!boxCaptionsStartedRef.current) return
       if (!bbTutorialActiveRef.current) {
         if (tutorialVisibleRef.current) {
           setTutorialVisible(false)
@@ -634,6 +645,7 @@ export default function App() {
     if (m === 'slowing') resetSlowingState()
     bbCycleRef.current = 0
     bbTutorialActiveRef.current = false
+    boxCaptionsStartedRef.current = false
 
     clearTimeout(tutorialTimerRef.current)
     pendingGatesFnRef.current = null
@@ -671,6 +683,7 @@ export default function App() {
     if (m === 'box') pendingGatesFnRef.current = () => {
       bbCycleRef.current = 0
       bbTutorialActiveRef.current = true
+      boxCaptionsStartedRef.current = true
       gatesEnabledRef.current = true
       boxClockStartRef.current = performance.now()
       boxCaptionIndexRef.current = 0
