@@ -35,7 +35,8 @@ const BREATH_RING_INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS
 const BREATH_RING_SCALE = GATE_SCALE.map(v => v * BREATH_RING_INNER_EDGE_FACTOR)
 const BREATH_REVERSAL_DEADBAND = 0.08  // matches the deadband used elsewhere (App.jsx, SlowingDownController)
 const BREATH_FALL_STAGGER_S = 0.2
-const BREATH_FALL_FADE_S = 1.0
+const BREATH_FALL_HOLD_S = 2.0       // seconds a ring keeps falling/rotating at full opacity before fading
+const BREATH_FALL_FADE_S = 1.0       // fade duration after the hold
 const BREATH_FALL_Y_SPEED = 0.3      // units/sec, straight down
 const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per ring per group
 
@@ -198,6 +199,10 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathFallSpinRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
   const paletteCycleIndexRef = useRef(0)
   const paletteLerpRef = useRef(null)
+  // Set true when a group's fall-away triggers; consumed on the very next
+  // confirmed rise (breath 1's inhale of the next cycle), which is when the
+  // palette lerp actually starts.
+  const paletteLerpPendingRef = useRef(false)
   const effectiveColorsRef = useRef({
     tertiary: new THREE.Color(palette.tertiaryColor),
     primary: new THREE.Color(palette.primaryColor),
@@ -213,6 +218,9 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
       metalness: 0,
       transparent: true,
       opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [])
@@ -550,6 +558,17 @@ float dissolveHash(vec3 p) {
             breathDirRef.current = 1
             breathExtremeRef.current = raw
             breathArmedRef.current = true
+            if (paletteLerpPendingRef.current) {
+              paletteLerpPendingRef.current = false
+              const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
+              paletteLerpRef.current = {
+                fromTertiary: effectiveColorsRef.current.tertiary.clone(),
+                fromPrimary: effectiveColorsRef.current.primary.clone(),
+                fromSecondary: effectiveColorsRef.current.secondary.clone(),
+                toIndex,
+                startTime: now,
+              }
+            }
           }
         }
 
@@ -581,14 +600,9 @@ float dissolveHash(vec3 p) {
             }
           })
 
-          const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
-          paletteLerpRef.current = {
-            fromTertiary: effectiveColorsRef.current.tertiary.clone(),
-            fromPrimary: effectiveColorsRef.current.primary.clone(),
-            fromSecondary: effectiveColorsRef.current.secondary.clone(),
-            toIndex,
-            startTime: now,
-          }
+          // Palette lerp doesn't start yet -- queued for the next cycle's
+          // breath 1 inhale (see the rise-confirmation branch above).
+          paletteLerpPendingRef.current = true
         }
       } else {
         let allDone = true
@@ -602,7 +616,7 @@ float dissolveHash(vec3 p) {
             group.position.y = -BREATH_FALL_Y_SPEED * t
             group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
           }
-          const fadeT = THREE.MathUtils.clamp(t / BREATH_FALL_FADE_S, 0, 1)
+          const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
           breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
           if (fadeT < 1) allDone = false
         }
