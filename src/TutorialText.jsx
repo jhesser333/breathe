@@ -52,16 +52,26 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
   // Timing is derived from pulseCycleStartRef -- a single timestamp stamped
   // once when Box Breathing starts (never reset per-caption) -- via the same
   // free-running 4-phase-modulo math App.jsx's caption poll uses to decide
-  // which caption to show, so the two can never disagree about where in the
-  // cycle they are (no clamp needed -- `%` already keeps phaseElapsed inside
-  // [0, interval)).
+  // which caption to show. That poll only runs every 100ms though, so it can
+  // lag up to ~100ms behind the true phase boundary while this per-frame
+  // loop reacts immediately -- without a guard, the envelope would free-run
+  // into what looks like a fresh pulse (jumping back to full opacity) while
+  // the stale caption is still on screen. Once a wrap is detected (this
+  // frame's phaseElapsed < last frame's), latch at the end-of-phase value
+  // instead, so it stays faded out until the caption prop actually catches
+  // up and this effect re-runs fresh.
   useLayoutEffect(() => {
     if (!pulseActive) return
     let raf
+    let prevPhaseElapsed = null
+    let wrapped = false
     const tick = () => {
       const interval = Math.max(0.05, pulseIntervalRef.current)
       const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
-      const phaseElapsed = (totalElapsed % (4 * interval)) % interval
+      let phaseElapsed = (totalElapsed % (4 * interval)) % interval
+      if (prevPhaseElapsed !== null && phaseElapsed < prevPhaseElapsed) wrapped = true
+      prevPhaseElapsed = phaseElapsed
+      if (wrapped) phaseElapsed = interval - 1e-4
       const value = pulseMode === 'fade'
         ? fadeAlpha(phaseElapsed, interval)
         : pulseAlpha(phaseElapsed) * holdFadeMultiplier(phaseElapsed, interval)
