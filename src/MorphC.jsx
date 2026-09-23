@@ -42,6 +42,15 @@ const BREATH_FALL_HOLD_S = 2.0       // seconds a ring keeps falling/rotating at
 const BREATH_FALL_FADE_S = 1.0       // fade duration after the hold
 const BREATH_FALL_Y_SPEED = 0.6 * 1.5  // units/sec, straight down -- 50% faster
 const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per ring per group
+// Every other cycle (the second set of the leap-frogging pair) starts each
+// ring's slow random rotation the moment it first appears, instead of when it
+// falls, and keeps that same spin through the fall.
+const BREATH_SPIN_FROM_APPEAR_SET = 1
+const makeBreathSpin = () => ({
+  rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+  ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+  rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+})
 const BREATH_EMISSIVE_MULT = 10      // baseline emissive multiplier while fading in / persistent
 const BREATH_EMISSIVE_FALL_TARGET = 1  // ramped down to this over the first second of the fall
 const BREATH_EMISSIVE_FALL_RAMP_S = 1.0
@@ -213,6 +222,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathSetFallingRef = useRef(new Array(BREATH_SET_COUNT).fill(false))
   const breathFallStartTimesRef = useRef(new Array(BREATH_TOTAL).fill(null))
   const breathFallSpinRef = useRef(new Array(BREATH_TOTAL).fill(null))
+  const breathSpinStartRef = useRef(new Array(BREATH_TOTAL).fill(null))   // set when spin began on appearance (see BREATH_SPIN_FROM_APPEAR_SET)
   // Set true when a group's fall-away triggers; consumed on the very next
   // confirmed rise (breath 1's inhale of the next cycle), which is when
   // onBreathPaletteCycle actually fires (App.jsx owns the lerp itself, since
@@ -582,6 +592,7 @@ float dissolveHash(vec3 p) {
       for (let i = set * BREATH_RING_COUNT; i < (set + 1) * BREATH_RING_COUNT; i++) {
         breathFallStartTimesRef.current[i] = null
         breathFallSpinRef.current[i] = null
+        breathSpinStartRef.current[i] = null
         const group = breathGroupRefs[i].current
         if (group) {
           group.position.y = 0
@@ -604,6 +615,17 @@ float dissolveHash(vec3 p) {
     }
     breathCountingWasEnabledRef.current = countingEnabled
 
+    // Rings spinning since they appeared keep one continuous rotation,
+    // including while waiting for and during their fall.
+    for (let i = 0; i < BREATH_TOTAL; i++) {
+      const spinStart = breathSpinStartRef.current[i]
+      const group = breathGroupRefs[i].current
+      if (spinStart === null || !group) continue
+      const spin = breathFallSpinRef.current[i]
+      const ts = now - spinStart
+      group.rotation.set(spin.rx * ts, spin.ry * ts, spin.rz * ts)
+    }
+
     // Falling sets animate independently of counting.
     for (let s = 0; s < BREATH_SET_COUNT; s++) {
       if (!breathSetFallingRef.current[s]) continue
@@ -616,7 +638,7 @@ float dissolveHash(vec3 p) {
         const spin = breathFallSpinRef.current[i]
         if (group) {
           group.position.y = -BREATH_FALL_Y_SPEED * t
-          group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
+          if (breathSpinStartRef.current[i] === null) group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
         }
         const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
         breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
@@ -667,6 +689,10 @@ float dissolveHash(vec3 p) {
       if (breathLockedCountRef.current < BREATH_RING_COUNT) {
         if (breathArmedRef.current) {
           const activeIdx = base + breathLockedCountRef.current
+          if (breathActiveSetRef.current === BREATH_SPIN_FROM_APPEAR_SET && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
+            breathFallSpinRef.current[activeIdx] = makeBreathSpin()
+            breathSpinStartRef.current[activeIdx] = now
+          }
           const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
           // Slew-rate limited toward the slider-driven target instead of
           // snapping straight to it, so a fast Inhale still reads as a
@@ -696,11 +722,7 @@ float dissolveHash(vec3 p) {
         }
         order.forEach((ringIdx, orderPos) => {
           breathFallStartTimesRef.current[base + ringIdx] = now + orderPos * BREATH_FALL_STAGGER_S
-          breathFallSpinRef.current[base + ringIdx] = {
-            rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-            ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-            rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-          }
+          if (!breathFallSpinRef.current[base + ringIdx]) breathFallSpinRef.current[base + ringIdx] = makeBreathSpin()
         })
 
         // Palette lerp doesn't start yet -- queued for the next cycle's

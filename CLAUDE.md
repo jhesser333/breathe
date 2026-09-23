@@ -123,6 +123,7 @@ The Morph's 5-breath count rings start counting at a per-mode point (`introStart
 - **Box Breathing**: at the first Inhale of the first box cycle (the box `pendingGatesFnRef` thunk); Shape D counts from `boxProgressRef` (one ring per paced box cycle).
 - **Slowing Down**: at the first paced Inhale after recording. Shapes D/E: in `startPacedArt` (see Slowing Down → D/E hand-off); Shape D counts from `ringPaceProgressRef` (one ring per paced breath). Other shapes: `PacedBreathCountStarter` watches `gatesEnabledRef` + `breathPhaseRef`.
 MorphC resets its ring state whenever counting is enabled or disabled, so every start/restart begins at breath 1.
+Two ring sets leap-frog (cycles 1, 3, 5… use set 0; 2, 4, 6… use set 1). Set 1 (`BREATH_SPIN_FROM_APPEAR_SET`) starts each ring's slow random X/Y/Z rotation the moment it first appears and keeps that same spin through the fall; set 0 stays still until it falls. Depths: `BREATH_RING_Z` = [-89, -55, -21, -8, -3]. At z=-3 the nearest ring's tilted edge reaches about z=-1.44, well behind the Morph's deepest extent (about z=-0.6), so X rotation doesn't clip.
 
 ## Modes
 
