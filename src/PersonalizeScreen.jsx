@@ -20,7 +20,7 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
       gap: 16, padding: 32, paddingTop: 60, paddingBottom: 150,
       fontFamily: 'sans-serif',
     }}>
-      <h1 style={{ color: palette.headerColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
+      <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         ART OPTIONS
       </h1>
       <div style={{

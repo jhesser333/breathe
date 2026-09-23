@@ -24,7 +24,7 @@ export default function BreathPaceOptionsScreen({ selected, onSelect, onHome, pa
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <h1 style={{ color: palette.headerColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
+      <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Breath Pace Options
       </h1>
       {OPTIONS.map(opt => (

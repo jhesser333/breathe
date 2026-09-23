@@ -83,9 +83,9 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
           onPointerCancel={() => setStartPressed(false)}
           style={{
             width: 110, height: 110, borderRadius: '50%',
-            background: hexToRgba(palette.headerColor, startPressed ? 0.75 : 0.25),
-            border: `2px solid ${palette.headerColor}`,
-            color: palette.headerColor, fontSize: 20, fontWeight: 700,
+            background: hexToRgba(palette.primaryColor, startPressed ? 0.75 : 0.25),
+            border: `2px solid ${palette.primaryColor}`,
+            color: palette.primaryColor, fontSize: 20, fontWeight: 700,
             fontFamily: 'sans-serif', cursor: 'pointer',
           }}
         >
@@ -104,7 +104,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       </h1>
       <div style={{ transform: 'translateY(-96px)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <h2 style={{
-          color: palette.subheaderColor, fontSize: 24, fontWeight: 300,
+          color: palette.textColor, fontSize: 24, fontWeight: 300,
           letterSpacing: '0.1em', margin: '0 0 12px',
         }}>
           MODES

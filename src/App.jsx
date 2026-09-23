@@ -82,7 +82,7 @@ const PALETTE_LERP_DURATION = 1.0
 function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef }) {
   useFrame((state) => {
     if (!paletteLerpRef.current) return
-    const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, fromHeader, fromSubheader, toIndex, startTime } = paletteLerpRef.current
+    const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime } = paletteLerpRef.current
     const now = state.clock.elapsedTime
     const t = THREE.MathUtils.clamp((now - startTime) / PALETTE_LERP_DURATION, 0, 1)
     const to = BREATH_CYCLE_PALETTES[toIndex]
@@ -92,8 +92,6 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
     live.secondary.copy(fromSecondary).lerp(new THREE.Color(to.secondaryColor), t)
     live.background.copy(fromBackground).lerp(new THREE.Color(to.background), t)
     live.text.copy(fromText).lerp(new THREE.Color(to.textColor), t)
-    live.header.copy(fromHeader).lerp(new THREE.Color(to.headerColor), t)
-    live.subheader.copy(fromSubheader).lerp(new THREE.Color(to.subheaderColor), t)
     if (state.scene.background) state.scene.background.copy(live.background)
     if (t >= 1) {
       paletteCycleIndexRef.current = toIndex
@@ -208,8 +206,6 @@ export default function App() {
     secondary: new THREE.Color(PALETTES.teal.secondaryColor),
     background: new THREE.Color(PALETTES.teal.background),
     text: new THREE.Color(PALETTES.teal.textColor),
-    header: new THREE.Color(PALETTES.teal.headerColor),
-    subheader: new THREE.Color(PALETTES.teal.subheaderColor),
   })
   const handleBreathPaletteCycle = useCallback((now) => {
     const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
@@ -220,8 +216,6 @@ export default function App() {
       fromSecondary: live.secondary.clone(),
       fromBackground: live.background.clone(),
       fromText: live.text.clone(),
-      fromHeader: live.header.clone(),
-      fromSubheader: live.subheader.clone(),
       toIndex,
       startTime: now,
     }
@@ -729,8 +723,6 @@ export default function App() {
     livePaletteRef.current.secondary.set(PALETTES.teal.secondaryColor)
     livePaletteRef.current.background.set(PALETTES.teal.background)
     livePaletteRef.current.text.set(PALETTES.teal.textColor)
-    livePaletteRef.current.header.set(PALETTES.teal.headerColor)
-    livePaletteRef.current.subheader.set(PALETTES.teal.subheaderColor)
 
     if (sliderLayout === 'diagonal') {
       stageRef.current = 'done'

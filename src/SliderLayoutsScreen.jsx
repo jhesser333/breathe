@@ -25,7 +25,7 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, palett
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <h1 style={{ color: palette.headerColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
+      <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         Slider Layouts
       </h1>
       {OPTIONS.map(opt => (
