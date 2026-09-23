@@ -16,7 +16,9 @@ const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
 const PULSE_ALPHA_MIN = 0.2
 const PULSE_ALPHA_MAX = 0.3
 const PULSE_EMISSIVE_MIN = 0.2
-const PULSE_EMISSIVE_MAX = 1
+const PULSE_EMISSIVE_MAX = 2
+const PULSE_MOVE_ALPHA_TARGET = 1      // Inhale/Exhale: pulse/hold ring's own alpha ramp target
+const PULSE_MOVE_EMISSIVE_TARGET = 1   // Inhale/Exhale: pulse/hold ring's own emissive-intensity ramp target
 
 const COUNT_RING_POOL_SIZE = 16      // generous cap; only the first numCountRings are ever shown
 const COUNT_RING_X_SCALE_MULT = 2    // starts at 2x the count ring's own resting X scale
@@ -128,8 +130,8 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
   useFrame((_, delta) => {
     // Pull in the app-wide breath-count palette cycle (see App.jsx), if any --
     // kept in sync every frame regardless of enabled/disabled state.
-    if (livePaletteRef && livePaletteRef.current) {
-      const live = livePaletteRef.current
+    const live = livePaletteRef && livePaletteRef.current
+    if (live) {
       if (ringMatRef.current) {
         ringMatRef.current.color.copy(live.secondary)
         ringMatRef.current.emissive.copy(live.primary)
@@ -227,12 +229,13 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
 
       if (ringMeshRef.current) ringMeshRef.current.visible = true
       if (ringMatRef.current) {
+        if (live) ringMatRef.current.color.copy(isHold ? live.primary : live.secondary)
         ringMatRef.current.opacity = isHold
           ? lerp(alphaFloor, PULSE_ALPHA_MAX, pulse)
-          : lerp(0, PULSE_ALPHA_MIN, moveRamp)
+          : lerp(0, PULSE_MOVE_ALPHA_TARGET, moveRamp)
         ringMatRef.current.emissiveIntensity = isHold
           ? lerp(emissiveFloor, PULSE_EMISSIVE_MAX, pulse)
-          : lerp(0, PULSE_EMISSIVE_MIN, moveRamp)
+          : lerp(0, PULSE_MOVE_EMISSIVE_TARGET, moveRamp)
       }
 
       // Staggered "count" rings: one per second of the hold, each shrinking
