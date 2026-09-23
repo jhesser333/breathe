@@ -16,6 +16,7 @@ export const PINK = {
   textColor: '#dfc8c8',
 }
 
+// Kept in storage but not in the rotation below.
 export const RUST_PALE_YELLOW = {
   tertiaryColor: '#305173',
   primaryColor: '#63100b',
@@ -32,6 +33,7 @@ export const YELLOW_OCHRE = {
   textColor: '#e3d299',
 }
 
+// Kept in storage but not in the rotation below.
 export const RUST_ORANGE = {
   tertiaryColor: '#f4d100',
   primaryColor: '#63100b',
@@ -40,4 +42,4 @@ export const RUST_ORANGE = {
   textColor: '#fada92',
 }
 
-export const BREATH_CYCLE_PALETTES = [PALETTES.teal, BURNT_SIENNA, PINK, RUST_PALE_YELLOW, YELLOW_OCHRE, RUST_ORANGE]
+export const BREATH_CYCLE_PALETTES = [PALETTES.teal, BURNT_SIENNA, PINK, YELLOW_OCHRE]
