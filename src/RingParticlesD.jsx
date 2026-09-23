@@ -438,24 +438,11 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
       spawnAccumulatorRef.current -= toSpawn
       toSpawn = Math.min(toSpawn, MAX_SPAWN_PER_FRAME)
       const { outwardSpeedAttr, colorAttr, spawnTimeAttr, lifetimeAttr } = sparkleAttrs
-      // Birth-color source pair for this instant: outside Box Breathing,
-      // text/secondary (unchanged); in Box Breathing, text/primary during
-      // Inhale+Hold-in, switching to secondary/tertiary during Exhale+Hold-out.
-      // Baked into aColor per-particle below (not a live uniform blend) so a
-      // particle keeps the color it was born with even after `phase` flips.
-      let birthColorA, birthColorB
-      if (isBoxBreathing) {
-        if (phase === 'inhale') {
-          birthColorA = colorTextC
-          birthColorB = colorPrimaryC
-        } else {
-          birthColorA = colorSecondaryC
-          birthColorB = colorTertiaryC
-        }
-      } else {
-        birthColorA = colorTextC
-        birthColorB = colorSecondaryC
-      }
+      // Birth-color source pair: always primary/tertiary, in every mode and
+      // phase. Baked into aColor per-particle below (not a live uniform
+      // blend) so a particle keeps the color it was born with.
+      const birthColorA = colorPrimaryC
+      const birthColorB = colorTertiaryC
       const birthColor = birthColorScratchRef.current
       for (let k = 0; k < toSpawn; k++) {
         const idx = spawnCursorRef.current % SPARKLE_PARTICLE_COUNT
