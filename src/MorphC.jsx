@@ -23,7 +23,7 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_RING_Z = [-42, -32, -22, -12, -2]
+const BREATH_RING_Z = [-10, -20, -30, -40, -50]
 const BREATH_FADE_START = 0.25       // fraction of slider travel where fade-in begins (0 alpha before this)
 const BREATH_FADE_THRESHOLD = 0.90   // fraction of slider travel where alpha reaches full and the ring locks in
 const BREATH_MAX_ALPHA = 0.5
