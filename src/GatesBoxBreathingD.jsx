@@ -7,7 +7,7 @@ const POOL_SIZE = 28
 const SPAWN_Z = -6
 const DESPAWN_Z = 6
 
-const PULSE_RING_TUBE = 0.015   // thin line, ~1/4 of BASE_TUBE -- tune by eye
+const PULSE_RING_TUBE = 0.015 * 3   // matches MorphC's breath-count ring tube thickness
 const INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS   // 0.94: the sparkle ring's own inner edge
 const PULSE_RING_SCALE = GATE_SCALE.map(v => v * INNER_EDGE_FACTOR)
 const TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
