@@ -59,8 +59,11 @@ const COUNT_RING_FADE_END_FRAC = 0.75     // opacity reaches 0 at 75% of the way
 const COUNT_RING_FADE_START_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_START_FRAC
 const COUNT_RING_FADE_END_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_END_FRAC
 // Exhale ring: fade band pulled in toward the middle so its visible portion is half as tall.
-const EXHALE_RING_FADE_START_Y = COUNT_RING_FADE_START_Y * 0.5
-const EXHALE_RING_FADE_END_Y = COUNT_RING_FADE_END_Y * 0.5
+// Count rings' own fade band animates between their full size (touching the
+// inner Pulse/Hold ring) and this same half-height band (touching the Exhale ring).
+const EXHALE_RING_FADE_SCALE = 0.5
+const EXHALE_RING_FADE_START_Y = COUNT_RING_FADE_START_Y * EXHALE_RING_FADE_SCALE
+const EXHALE_RING_FADE_END_Y = COUNT_RING_FADE_END_Y * EXHALE_RING_FADE_SCALE
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -91,11 +94,14 @@ function makeYFadeMaterial(color, emissive, fadeStartY, fadeEndY) {
     depthTest: false,
     opacity: 0,
   })
-  mat.customProgramCacheKey = () => `pace-ring-yfade-${fadeStartY}-${fadeEndY}`
+  // Uniform objects live on userData so update() can animate the fade band per frame.
+  mat.userData.uFadeStartY = { value: fadeStartY }
+  mat.userData.uFadeEndY = { value: fadeEndY }
+  mat.customProgramCacheKey = () => 'pace-ring-yfade'
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFadeCenterY = { value: RING_Y }
-    shader.uniforms.uFadeStartY = { value: fadeStartY }
-    shader.uniforms.uFadeEndY = { value: fadeEndY }
+    shader.uniforms.uFadeStartY = mat.userData.uFadeStartY
+    shader.uniforms.uFadeEndY = mat.userData.uFadeEndY
 
     shader.vertexShader = 'varying float vFadeWorldY;\n' + shader.vertexShader
     shader.vertexShader = shader.vertexShader.replace(
@@ -200,6 +206,12 @@ export function usePaceRings({ gateColor, emissiveColor }) {
         ? lerp(COUNT_RING_MAX_X, COUNT_RING_MIN_SCALE[0], progress)
         : lerp(COUNT_RING_MIN_SCALE[0], COUNT_RING_MAX_X, progress)
       mesh.scale.set(x, COUNT_RING_MIN_SCALE[1], COUNT_RING_MIN_SCALE[2])
+      // Fade band tracks X position: full size at the inner ring, the Exhale
+      // ring's half-height band at the outer ring.
+      const xFrac = (x - COUNT_RING_MIN_SCALE[0]) / (COUNT_RING_MAX_X - COUNT_RING_MIN_SCALE[0])
+      const fadeScale = lerp(1, EXHALE_RING_FADE_SCALE, xFrac)
+      mat.userData.uFadeStartY.value = COUNT_RING_FADE_START_Y * fadeScale
+      mat.userData.uFadeEndY.value = COUNT_RING_FADE_END_Y * fadeScale
       mat.opacity = lerp(0, COUNT_RING_ALPHA_TARGET, progress)
       mat.emissiveIntensity = lerp(0, COUNT_RING_EMISSIVE_TARGET, progress)
       mesh.visible = true
