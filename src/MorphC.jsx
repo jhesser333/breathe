@@ -37,8 +37,13 @@ const BREATH_REVERSAL_DEADBAND = 0.08  // matches the deadband used elsewhere (A
 const BREATH_FALL_STAGGER_S = 0.2
 const BREATH_FALL_HOLD_S = 2.0       // seconds a ring keeps falling/rotating at full opacity before fading
 const BREATH_FALL_FADE_S = 1.0       // fade duration after the hold
-const BREATH_FALL_Y_SPEED = 0.6      // units/sec, straight down
+const BREATH_FALL_Y_SPEED = 0.6 * 1.5  // units/sec, straight down -- 50% faster
 const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per ring per group
+const BREATH_EMISSIVE_MULT = 3       // baseline emissive multiplier while fading in / persistent
+const BREATH_EMISSIVE_FALL_TARGET = 1  // ramped down to this over the first second of the fall
+const BREATH_EMISSIVE_FALL_RAMP_S = 1.0
+const BREATH_FADE_IN_DURATION_S = 1.5  // time to fade a ring from 0 to full opacity, independent of slider speed
+const BREATH_FADE_RATE = BREATH_MAX_ALPHA / BREATH_FADE_IN_DURATION_S  // alpha/sec, slew-rate limits opacity changes
 // "Backlight" glow: rather than relying on transparent-object draw order
 // (which didn't reliably show the rings through the Morph's own surface),
 // each ring's position/intensity is fed into the Morph's own fragment
@@ -214,7 +219,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
     Array.from({ length: BREATH_RING_COUNT }, () => new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.tertiaryColor),
       emissive: new THREE.Color(palette.secondaryColor),
-      emissiveIntensity: 1,
+      emissiveIntensity: BREATH_EMISSIVE_MULT,
       roughness: 1,
       metalness: 0,
       transparent: true,
@@ -588,11 +593,29 @@ float dissolveHash(vec3 p) {
           }
         }
 
+        // Already-locked rings keep easing toward full opacity at a capped
+        // rate too, in case a very fast Inhale locked one before its own
+        // fade-in visually caught up.
+        const maxDelta = BREATH_FADE_RATE * delta
+        for (let i = 0; i < breathLockedCountRef.current; i++) {
+          const cur = breathMaterials[i].opacity
+          if (cur < BREATH_MAX_ALPHA) breathMaterials[i].opacity = Math.min(BREATH_MAX_ALPHA, cur + maxDelta)
+        }
+
         if (breathLockedCountRef.current < BREATH_RING_COUNT) {
           if (breathArmedRef.current) {
             const activeIdx = breathLockedCountRef.current
             const progress = THREE.MathUtils.clamp(raw / BREATH_FADE_THRESHOLD, 0, 1)
-            breathMaterials[activeIdx].opacity = BREATH_MAX_ALPHA * progress
+            // Slew-rate limited toward the slider-driven target instead of
+            // snapping straight to it, so a fast Inhale still reads as a
+            // smooth fade in from 0 rather than an instant pop -- reversing
+            // before locking still fades the ring back out, just at the same
+            // capped rate rather than instantly.
+            const target = BREATH_MAX_ALPHA * progress
+            const cur = breathMaterials[activeIdx].opacity
+            breathMaterials[activeIdx].opacity = target > cur
+              ? Math.min(target, cur + maxDelta)
+              : Math.max(target, cur - maxDelta)
             if (progress >= 1) {
               breathLockedCountRef.current += 1
               breathArmedRef.current = false
@@ -634,6 +657,8 @@ float dissolveHash(vec3 p) {
           }
           const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
           breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
+          const emissiveT = THREE.MathUtils.clamp(t / BREATH_EMISSIVE_FALL_RAMP_S, 0, 1)
+          breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(BREATH_EMISSIVE_MULT, BREATH_EMISSIVE_FALL_TARGET, emissiveT)
           if (fadeT < 1) allDone = false
         }
         if (allDone) {
@@ -651,6 +676,7 @@ float dissolveHash(vec3 p) {
               group.rotation.set(0, 0, 0)
             }
             breathMaterials[i].opacity = 0
+            breathMaterials[i].emissiveIntensity = BREATH_EMISSIVE_MULT
           }
         }
       }
@@ -683,7 +709,10 @@ float dissolveHash(vec3 p) {
         const group = breathGroupRefs[i].current
         const fallY = group ? group.position.y : 0
         glowPos[i].set(0, groupOffsetY + fallY, BREATH_RING_Z[i])
-        glowIntensity[i] = breathMaterials[i].opacity * BREATH_GLOW_STRENGTH
+        // Scale by the ring's own emissive ratio too, so the backlight glow
+        // dims in step with its visible emissive during the fall-away.
+        const emissiveRatio = breathMaterials[i].emissiveIntensity / BREATH_EMISSIVE_MULT
+        glowIntensity[i] = breathMaterials[i].opacity * BREATH_GLOW_STRENGTH * emissiveRatio
       }
     }
   })
