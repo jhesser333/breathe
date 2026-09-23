@@ -22,7 +22,7 @@ import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
 import BreathPaceOptionsScreen from './BreathPaceOptionsScreen'
 import BackgroundB from './BackgroundB'
-import BackgroundRingsD from './BackgroundRingsD'
+import BackgroundRingsD, { computePhaseDurations } from './BackgroundRingsD'
 import RingParticlesD from './RingParticlesD'
 import SlowingDownPaceRingsD from './SlowingDownPaceRingsD'
 import CameraVerticalShift from './CameraVerticalShift'
@@ -125,6 +125,25 @@ function PacedBreathCountStarter({ gatesEnabledRef, breathPhaseRef, onStart }) {
   })
   return null
 }
+
+// Slowing Down (Shapes D/E): reports every paced breath-phase change while
+// the paced art is running, driving the Inhale/Exhale captions and Text E.
+function PacedPhaseWatcher({ gatesEnabledRef, breathPhaseRef, onPhaseChange }) {
+  const prevRef = useRef(null)
+  useFrame(() => {
+    if (!gatesEnabledRef.current) { prevRef.current = null; return }
+    const phase = breathPhaseRef.current
+    if (phase !== prevRef.current) {
+      prevRef.current = phase
+      onPhaseChange(phase)
+    }
+  })
+  return null
+}
+
+const PACED_CAPTION_BREATHS = 5
+const PACED_CAPTION_ALPHA = [1, 1, 1, 0.5, 0.15]   // per breath: last two fade out, like Box Breathing's ROUND_ALPHA
+const PACED_TEXT_E_BREATHS = 4
 
 export default function App() {
   const leftVal = useRef(0)
@@ -302,6 +321,15 @@ export default function App() {
   // and not stomp on the intro sequence's own visibility management.
   const boxCaptionsStartedRef = useRef(false)
 
+  // Slowing Down hand-off (Shapes D/E): after Text D fades, wait for the
+  // sliders to reach the bottom, then start the paced art on an Inhale with
+  // Inhale/Exhale captions for the first 5 breaths, then Text E.
+  const pacedWaitForBottomRef = useRef(false)
+  const pacedCueStageRef = useRef('off')   // 'off' | 'captions' | 'textE' | 'done'
+  const pacedBreathNumRef = useRef(0)
+  const pacedCaptionRef = useRef(null)     // { start, mult, getDuration } read by TutorialText
+  const [pacedCaptionsOn, setPacedCaptionsOn] = useState(false)
+
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
     directionRef.current = 0
@@ -415,6 +443,18 @@ export default function App() {
   }, [])
 
   const handleSlowingRecordingDone = useCallback(() => {
+    if (shapeRef.current === 'd' || shapeRef.current === 'e') {
+      // Art waits until Text D has been read and the sliders reach the
+      // bottom (see startPacedArt); hold the ramp at the recorded pace.
+      phase2StartRef.current = Infinity
+      clearTimeout(tutorialTimerRef.current)
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+      tutorialTimerRef.current = setTimeout(() => {
+        showSlowingTextD()
+      }, FADE_TRANSITION_MS)
+      return
+    }
     const t_done = Date.now() / 1000
     const P = avgBreathRef.current
     let d = 0
@@ -446,9 +486,61 @@ export default function App() {
     clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
+    const headless = shapeRef.current === 'd' || shapeRef.current === 'e'
     tutorialTimerRef.current = setTimeout(() => {
-      showSlowingTextE()
+      if (headless) pacedWaitForBottomRef.current = true
+      else showSlowingTextE()
     }, FADE_TRANSITION_MS)
+  }, [showSlowingTextE])
+
+  // Slowing Down (D/E): sliders reached the bottom after Text D -- start the
+  // paced art on an Inhale (GatesHeadless*'s startOnInhale) and the ramp.
+  const startPacedArt = useCallback(() => {
+    pacedWaitForBottomRef.current = false
+    breathPhaseRef.current = 'exhale'
+    phase2StartRef.current = Date.now() / 1000
+    pacedCueStageRef.current = 'captions'
+    pacedBreathNumRef.current = 0
+    breathCountSourceRef.current = shapeRef.current === 'd' ? ringPaceProgressRef : null
+    breathCountingEnabledRef.current = true
+    gatesEnabledRef.current = true
+  }, [])
+
+  const handlePacedPhase = useCallback((phase) => {
+    const stage = pacedCueStageRef.current
+    if (phase === 'inhale') pacedBreathNumRef.current++
+    const n = pacedBreathNumRef.current
+    if (stage === 'captions') {
+      if (n === 0) return
+      if (n > PACED_CAPTION_BREATHS) {
+        pacedCueStageRef.current = 'textE'
+        pacedCaptionRef.current = null
+        setPacedCaptionsOn(false)
+        showSlowingTextE()
+        return
+      }
+      pacedCaptionRef.current = {
+        start: performance.now(),
+        mult: PACED_CAPTION_ALPHA[n - 1],
+        getDuration: () => {
+          const d = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
+          return phase === 'inhale' ? d.inhaleDuration : d.exhaleDuration
+        },
+      }
+      const text = phase === 'inhale' ? TEXTS.boxInhale : TEXTS.boxExhale
+      clearTimeout(tutorialTimerRef.current)
+      awaitingMovementRef.current = false
+      currentMainTextRef.current = text
+      setTutorialText(text)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
+      setPacedCaptionsOn(true)
+    } else if (stage === 'textE' && n > PACED_CAPTION_BREATHS + PACED_TEXT_E_BREATHS) {
+      pacedCueStageRef.current = 'done'
+      clearTimeout(tutorialTimerRef.current)
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+    }
   }, [showSlowingTextE])
 
   const handleSlowingTextEDone = useCallback(() => {
@@ -629,6 +721,7 @@ export default function App() {
       // Box Breathing's captions are driven by their own clock-based poll
       // below, not by user interaction -- "stillness" is meaningless here.
       if (mode === 'box') return
+      if (mode === 'slowing' && pacedCueStageRef.current === 'captions') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
         awaitingMovementRef.current = true
@@ -692,8 +785,9 @@ export default function App() {
     leftVal.current = v
     lastMoveTime.current = Date.now()
     if (sliderLayout === 'diagonal') updateDiagonalSequence(v)
+    if (pacedWaitForBottomRef.current && v <= DIAG_EDGE_THRESHOLD) startPacedArt()
     handleMovement()
-  }, [handleMovement, sliderLayout, updateDiagonalSequence])
+  }, [handleMovement, sliderLayout, updateDiagonalSequence, startPacedArt])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
@@ -748,6 +842,11 @@ export default function App() {
     bbCycleRef.current = 0
     bbTutorialActiveRef.current = false
     boxCaptionsStartedRef.current = false
+    pacedWaitForBottomRef.current = false
+    pacedCueStageRef.current = 'off'
+    pacedBreathNumRef.current = 0
+    pacedCaptionRef.current = null
+    setPacedCaptionsOn(false)
 
     clearTimeout(tutorialTimerRef.current)
     pendingGatesFnRef.current = null
@@ -827,6 +926,11 @@ export default function App() {
 
   const handleBackFromExperience = useCallback(() => {
     gatesEnabledRef.current = false
+    pacedWaitForBottomRef.current = false
+    pacedCueStageRef.current = 'off'
+    pacedBreathNumRef.current = 0
+    pacedCaptionRef.current = null
+    setPacedCaptionsOn(false)
     clearTimeout(tutorialTimerRef.current)
     clearTimeout(gateEnableTimerRef.current)
     setTutorialVisible(false)
@@ -906,7 +1010,8 @@ export default function App() {
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} />}
-        {mode === 'slowing' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
+        {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
+        {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e') && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
         {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
@@ -922,6 +1027,7 @@ export default function App() {
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
             livePaletteRef={livePaletteRef}
+            startOnInhale={mode === 'slowing'}
           />
         )}
         {mode === 'box' && hasGates && (
@@ -949,7 +1055,7 @@ export default function App() {
             lastMaxTimeRef={lastMaxTimeRef}
             onGatesReady={handleSlowingRecordingDone}
             onTextDone={handleSlowingTextDDone}
-            onTextEDone={handleSlowingTextEDone}
+            onTextEDone={shapeOption === 'd' || shapeOption === 'e' ? () => {} : handleSlowingTextEDone}
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
             targetInhaleSeconds={targetPaceInfo.inhale}
@@ -998,9 +1104,10 @@ export default function App() {
                   }} />
         )}
         <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
-          pulseActive={mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale)}
-          pulseMode={tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}
-          pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} />
+          pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale))
+            || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
+          pulseMode={mode === 'slowing' ? 'paced' : tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}
+          pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef} />
         {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}

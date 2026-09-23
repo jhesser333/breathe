@@ -57,7 +57,7 @@ function roundAlphaMultiplier(totalElapsed, interval) {
   return ROUND_ALPHA[roundIndex] ?? 1
 }
 
-export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef }) {
+export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
@@ -81,6 +81,19 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
     let prevPhaseElapsed = null
     let wrapped = false
     const tick = () => {
+      // Slowing Down's Inhale/Exhale captions: same whole-phase fade as Box
+      // Breathing's, timed from the current paced phase's start (App.jsx
+      // restamps pacedCaptionRef on every phase change), times a per-breath
+      // multiplier that fades the last two breaths out.
+      if (pulseMode === 'paced') {
+        const cap = pacedCaptionRef?.current
+        const value = cap
+          ? fadeAlpha((performance.now() - cap.start) / 1000, Math.max(0.05, cap.getDuration())) * cap.mult
+          : 0
+        if (textRef.current) textRef.current.style.opacity = String(value)
+        raf = requestAnimationFrame(tick)
+        return
+      }
       const interval = Math.max(0.05, pulseIntervalRef.current)
       const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
       let phaseElapsed = (totalElapsed % (4 * interval)) % interval
@@ -96,7 +109,7 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
     }
     tick()
     return () => cancelAnimationFrame(raf)
-  }, [pulseActive, pulseMode, pulseCycleStartRef, pulseIntervalRef])
+  }, [pulseActive, pulseMode, pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`

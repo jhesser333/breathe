@@ -26,17 +26,17 @@ function computeExhaleSpawnZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRe
   return SPAWN_Z * ratio
 }
 
-export default function GatesHeadlessE({ gatesEnabledRef, spawnIntervalRef, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef }) {
+export default function GatesHeadlessE({ gatesEnabledRef, spawnIntervalRef, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, startOnInhale = false }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const slotsExhale = useRef(Array.from({ length: POOL_EXHALE }, makeSlot))
   const wasEnabled = useRef(false)
 
   useFrame((_, delta) => {
-    const spawnExhale = (speed) => {
+    const spawnExhale = (speed, z = computeExhaleSpawnZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)) => {
       const slot = slotsExhale.current.find(s => !s.active)
       if (!slot) return
       Object.assign(slot, makeSlot())
-      slot.z = computeExhaleSpawnZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
+      slot.z = z
       slot.speed = speed
       slot.active = true
     }
@@ -54,7 +54,18 @@ export default function GatesHeadlessE({ gatesEnabledRef, spawnIntervalRef, brea
 
     if (gatesEnabledRef.current && !wasEnabled.current) {
       wasEnabled.current = true
-      spawn()
+      if (startOnInhale) {
+        // Slowing Down: the paced cycle begins right on an Inhale (as if an
+        // inhale checkpoint just crossed), with an extra exhale checkpoint
+        // placed so the first Exhale lands exactly inhaleSeconds later.
+        if (breathPhaseRef) breathPhaseRef.current = 'inhale'
+        const P = spawnIntervalRef.current
+        const inhale = inhaleSecondsRef?.current ?? P / 2
+        spawn()
+        spawnExhale(Math.abs(SPAWN_Z) / P, SPAWN_Z * (inhale / P))
+      } else {
+        spawn()
+      }
     }
     if (!gatesEnabledRef.current) wasEnabled.current = false
 
