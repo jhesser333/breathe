@@ -145,7 +145,10 @@ export function usePaceRings({ gateColor, emissiveColor }) {
   // + Hold-out). sideElapsed runs continuously across the movement and the
   // hold that follows it. holdDuration 0 = no hold (Slowing Down).
   // fade: 0-1 overall multiplier (startup fade-in when the paced art first appears).
-  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live, fade = 1 }) {
+  // holdExhaleRing: pin the Exhale ring at its movement target (x fade) instead
+  // of its normal ramp -- Slowing Down's first breath, so the ring fades in with
+  // the first Inhale and stays through the first Exhale rather than flashing.
+  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live, fade = 1, holdExhaleRing = false }) {
     const inner = ringMatRef.current
     if (live) {
       if (inner) { inner.color.copy(live.secondary); inner.emissive.copy(live.primary) }
@@ -182,8 +185,8 @@ export function usePaceRings({ gateColor, emissiveColor }) {
       inner.emissiveIntensity = innerIsOwn ? ownEmissive : otherEmissive
       if (live && innerIsOwn && inHold) inner.color.copy(live.primary)
     }
-    exhaleMat.opacity = innerIsOwn ? otherAlpha : ownAlpha
-    exhaleMat.emissiveIntensity = innerIsOwn ? otherEmissive : ownEmissive
+    exhaleMat.opacity = holdExhaleRing ? fade * PULSE_MOVE_ALPHA_TARGET : innerIsOwn ? otherAlpha : ownAlpha
+    exhaleMat.emissiveIntensity = holdExhaleRing ? fade * PULSE_MOVE_EMISSIVE_TARGET : innerIsOwn ? otherEmissive : ownEmissive
     if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
 
     // Staggered count rings: instance i starts i seconds into the side and

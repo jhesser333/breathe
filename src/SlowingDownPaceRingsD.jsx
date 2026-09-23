@@ -18,6 +18,9 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
   const prevPhaseRef = useRef(null)
   const phaseElapsedRef = useRef(0)
   const sinceEnableRef = useRef(0)
+  // First-breath tracking for holdExhaleRing: 'pre' (before the first Inhale
+  // lands) -> 'inhale' -> 'exhale' -> 'done' (from the second Inhale on).
+  const firstBreathRef = useRef('pre')
 
   useFrame((_, delta) => {
     const live = livePaletteRef && livePaletteRef.current
@@ -25,6 +28,7 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
     if (!enabled) {
       prevPhaseRef.current = null
       sinceEnableRef.current = 0
+      firstBreathRef.current = 'pre'
       if (paceArtFadeRef) paceArtFadeRef.current = 0
       update({ enabled: false, live })
       return
@@ -34,6 +38,9 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
     if (phase !== prevPhaseRef.current) {
       prevPhaseRef.current = phase
       phaseElapsedRef.current = 0
+      const fb = firstBreathRef.current
+      if (phase === 'inhale') firstBreathRef.current = fb === 'pre' ? 'inhale' : 'done'
+      else if (fb === 'inhale') firstBreathRef.current = 'exhale'
     }
     phaseElapsedRef.current += delta
 
@@ -51,6 +58,7 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
       numCountRings: 1,
       live,
       fade,
+      holdExhaleRing: firstBreathRef.current === 'inhale' || firstBreathRef.current === 'exhale',
     })
   })
 

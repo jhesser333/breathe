@@ -144,7 +144,7 @@ function PacedPhaseWatcher({ gatesEnabledRef, breathPhaseRef, onPhaseChange }) {
 
 const PACED_CAPTION_BREATHS = 5
 const PACED_CAPTION_ALPHA = [1, 1, 1, 0.5, 0.15]   // per breath: last two fade out, like Box Breathing's ROUND_ALPHA
-const PACED_TEXT_E_BREATHS = 4
+const PACED_TEXT_E_FALLBACK_MS = 15000   // Text E hold if Text D's on-screen time wasn't measured
 
 export default function App() {
   const leftVal = useRef(0)
@@ -332,6 +332,8 @@ export default function App() {
   const pacedCueStageRef = useRef('off')   // 'off' | 'captions' | 'textE' | 'done'
   const pacedBreathNumRef = useRef(0)
   const pacedCaptionRef = useRef(null)     // { start, mult, getDuration } read by TutorialText
+  const textDShownAtRef = useRef(0)        // Text D (D/E) on-screen time is measured so Text E can match it
+  const textDDurationMsRef = useRef(0)
   const [pacedCaptionsOn, setPacedCaptionsOn] = useState(false)
 
   const resetSlowingState = useCallback(() => {
@@ -428,6 +430,7 @@ export default function App() {
 
   const showSlowingTextD = useCallback(() => {
     const text = (shapeRef.current === 'd' || shapeRef.current === 'e') ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextD
+    textDShownAtRef.current = Date.now()
     clearTimeout(tutorialTimerRef.current)
     currentMainTextRef.current = text
     setTutorialText(text)
@@ -491,6 +494,7 @@ export default function App() {
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
     const headless = shapeRef.current === 'd' || shapeRef.current === 'e'
+    if (textDShownAtRef.current) textDDurationMsRef.current = Date.now() - textDShownAtRef.current
     tutorialTimerRef.current = setTimeout(() => {
       if (headless) pacedWaitForBottomRef.current = true
       else showSlowingTextE()
@@ -517,10 +521,23 @@ export default function App() {
     if (stage === 'captions') {
       if (n === 0) return
       if (n > PACED_CAPTION_BREATHS) {
+        // Captions end: let the (already faded) caption settle hidden, then
+        // fade Text E in after the usual gap and hold it for as long as
+        // Text D was on screen.
         pacedCueStageRef.current = 'textE'
         pacedCaptionRef.current = null
         setPacedCaptionsOn(false)
-        showSlowingTextE()
+        clearTimeout(tutorialTimerRef.current)
+        setTutorialVisible(false)
+        tutorialVisibleRef.current = false
+        tutorialTimerRef.current = setTimeout(() => {
+          showSlowingTextE()
+          tutorialTimerRef.current = setTimeout(() => {
+            pacedCueStageRef.current = 'done'
+            setTutorialVisible(false)
+            tutorialVisibleRef.current = false
+          }, textDDurationMsRef.current || PACED_TEXT_E_FALLBACK_MS)
+        }, FADE_TRANSITION_MS)
         return
       }
       pacedCaptionRef.current = {
@@ -539,11 +556,6 @@ export default function App() {
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
       setPacedCaptionsOn(true)
-    } else if (stage === 'textE' && n > PACED_CAPTION_BREATHS + PACED_TEXT_E_BREATHS) {
-      pacedCueStageRef.current = 'done'
-      clearTimeout(tutorialTimerRef.current)
-      setTutorialVisible(false)
-      tutorialVisibleRef.current = false
     }
   }, [showSlowingTextE])
 
@@ -851,6 +863,8 @@ export default function App() {
     pacedBreathNumRef.current = 0
     pacedCaptionRef.current = null
     setPacedCaptionsOn(false)
+    textDShownAtRef.current = 0
+    textDDurationMsRef.current = 0
 
     clearTimeout(tutorialTimerRef.current)
     pendingGatesFnRef.current = null
@@ -936,6 +950,8 @@ export default function App() {
     pacedBreathNumRef.current = 0
     pacedCaptionRef.current = null
     setPacedCaptionsOn(false)
+    textDShownAtRef.current = 0
+    textDDurationMsRef.current = 0
     clearTimeout(tutorialTimerRef.current)
     clearTimeout(gateEnableTimerRef.current)
     setTutorialVisible(false)
