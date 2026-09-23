@@ -175,7 +175,7 @@ function sampleSpherePositions(count) {
   return positions
 }
 
-export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRawRef, breathCountingEnabledRef, livePaletteRef, onBreathPaletteCycle }) {
+export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRawRef, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle }) {
   const groupRef = useRef()
   const matRef = useRef()
 
@@ -215,6 +215,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   // onBreathPaletteCycle actually fires (App.jsx owns the lerp itself, since
   // it now drives the whole app's palette, not just MorphC's own colors).
   const paletteLerpPendingRef = useRef(false)
+  const breathCountingWasEnabledRef = useRef(false)
 
   const breathMaterials = useMemo(() => (
     Array.from({ length: BREATH_RING_COUNT }, () => new THREE.MeshStandardMaterial({
@@ -565,8 +566,34 @@ float dissolveHash(vec3 p) {
     flowMaterial.uniforms.uTime.value = now
 
     // Breath-count rings (see module-level BREATH_* constants).
-    if (breathCountingEnabledRef && breathCountingEnabledRef.current) {
-      const raw = leftRawRef.current
+    const countingEnabled = !!(breathCountingEnabledRef && breathCountingEnabledRef.current)
+    // Count source: the left slider, or (Box Breathing / Slowing Down) a paced
+    // 0 (exhale) -> 1 (inhale) progress ref chosen by App.jsx.
+    const countSource = breathCountSourceRef && breathCountSourceRef.current
+    const raw = countSource ? countSource.current : leftRawRef.current
+    if (countingEnabled !== breathCountingWasEnabledRef.current) {
+      // Counting just started (per-mode start point, see App.jsx) or stopped
+      // (mode restart): clear to a clean cycle so counting begins at breath 1.
+      breathFallTriggeredRef.current = false
+      breathLockedCountRef.current = 0
+      breathDirRef.current = -1
+      breathExtremeRef.current = raw
+      breathArmedRef.current = true
+      paletteLerpPendingRef.current = false
+      for (let i = 0; i < BREATH_RING_COUNT; i++) {
+        breathFallStartTimesRef.current[i] = null
+        breathFallSpinRef.current[i] = null
+        const group = breathGroupRefs[i].current
+        if (group) {
+          group.position.y = 0
+          group.rotation.set(0, 0, 0)
+        }
+        breathMaterials[i].opacity = 0
+        breathMaterials[i].emissiveIntensity = BREATH_EMISSIVE_MULT
+      }
+    }
+    breathCountingWasEnabledRef.current = countingEnabled
+    if (countingEnabled) {
 
       if (!breathFallTriggeredRef.current) {
         // Deadband rise/fall tracker: only a confirmed reversal from a real

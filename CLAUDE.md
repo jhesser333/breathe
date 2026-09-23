@@ -116,6 +116,13 @@ Shared hook `usePaceRings` drives three ring types, identical in both modes: **P
 - Edge contact via tube-ratio scale factors: count ring min inner edge touches inner ring's outer edge; count ring max outer edge lies on the Exhale ring's inner edge.
 - Box Breathing: `GatesBoxBreathingD` calls `update()` from its 4-phase clock (one staggered count ring per second of hold). Slowing Down: `SlowingDownPaceRingsD` (rendered when `mode === 'slowing' && shapeOption === 'd'`) drives it from `breathPhaseRef` + `computePhaseDurations`, no holds, one count ring per phase.
 
+## Breath-count rings start point (MorphC, Shapes C/D)
+The Morph's 5-breath count rings start counting at a per-mode point (`introStartsCountingRef` / `breathCountSourceRef` in App.jsx):
+- **Breathe at Your Own Pace / Paced Breathing**: at the intro text hand-off, counted from the left slider (unchanged).
+- **Box Breathing**: at the first Inhale of the first box cycle (the box `pendingGatesFnRef` thunk); Shape D counts from `boxProgressRef` (one ring per paced box cycle).
+- **Slowing Down**: at the first paced Inhale after recording (`PacedBreathCountStarter` watches `gatesEnabledRef` + `breathPhaseRef`); Shape D counts from `ringPaceProgressRef` (one ring per paced breath).
+MorphC resets its ring state whenever counting is enabled or disabled, so every start/restart begins at breath 1.
+
 ## Modes
 
 While any mode is playing, the current mode's display name (from `MODE_LABELS` in `copy.js`) appears as a small persistent uppercase caption at top-center of the experience screen (`top:16, left:'50%', transform:'translateX(-50%)'`, plain text, no background) — always on for the whole session, does not fade, distinct from `TutorialText` (`top:38%`) and `BreathLengthControl` (`top:16,left:16`).

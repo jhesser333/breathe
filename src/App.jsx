@@ -107,6 +107,25 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
   return null
 }
 
+// Slowing Down: fires onStart once, on the first paced Inhale crossing after
+// the paced gates/art enable (i.e. after recording) -- requires seeing a
+// non-inhale phase first so a stale 'inhale' can't start it early. Re-arms
+// whenever the gates are disabled again (mode restart).
+function PacedBreathCountStarter({ gatesEnabledRef, breathPhaseRef, onStart }) {
+  const startedRef = useRef(false)
+  const armedRef = useRef(false)   // saw a non-inhale phase while enabled, so the next 'inhale' is a real crossing, not a stale value
+  useFrame(() => {
+    if (!gatesEnabledRef.current) { startedRef.current = false; armedRef.current = false; return }
+    if (startedRef.current) return
+    if (breathPhaseRef.current !== 'inhale') armedRef.current = true
+    else if (armedRef.current) {
+      startedRef.current = true
+      onStart()
+    }
+  })
+  return null
+}
+
 export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
@@ -203,6 +222,14 @@ export default function App() {
   // below) -- counting is purely slider-driven (leftRawRef), identical across
   // every mode, not tied to any mode's own phase clock.
   const breathCountingEnabledRef = useRef(false)
+  // Where the breath-count rings start counting, per mode: Basic/Paced start
+  // at the intro hand-off (slider-driven, as before); Box Breathing starts at
+  // the first box Inhale and Slowing Down at the first paced Inhale after
+  // recording, both driven by the paced breath instead of the slider.
+  // breathCountSourceRef.current: null = left slider, else a ref holding a
+  // 0 (exhale) -> 1 (inhale) paced progress value for MorphC to count from.
+  const introStartsCountingRef = useRef(true)
+  const breathCountSourceRef = useRef(null)
 
   // App-wide breath-count palette cycle -- see PaletteLerpDriver above.
   // livePaletteRef holds the live (possibly mid-lerp) THREE.Color for every
@@ -461,7 +488,7 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       stageRef.current = 'done'
-      breathCountingEnabledRef.current = true
+      if (introStartsCountingRef.current) breathCountingEnabledRef.current = true
       if (pendingGatesFnRef.current !== null) {
         const fn = pendingGatesFnRef.current
         pendingGatesFnRef.current = null
@@ -497,7 +524,7 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       diagStageRef.current = 'done'
-      breathCountingEnabledRef.current = true
+      if (introStartsCountingRef.current) breathCountingEnabledRef.current = true
       if (pendingGatesFnRef.current !== null) {
         const fn = pendingGatesFnRef.current
         pendingGatesFnRef.current = null
@@ -726,6 +753,9 @@ export default function App() {
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
     breathCountingEnabledRef.current = false
+    introStartsCountingRef.current = m !== 'box' && m !== 'slowing'
+    breathCountSourceRef.current = null
+    breathPhaseRef.current = 'exhale'
     paletteCycleIndexRef.current = 0
     paletteLerpRef.current = null
     livePaletteRef.current.tertiary.set(PALETTES.teal.tertiaryColor)
@@ -770,6 +800,10 @@ export default function App() {
       gatesEnabledRef.current = true
       boxClockStartRef.current = performance.now()
       boxCaptionIndexRef.current = 0
+      // First Inhale of the first box: start counting, one ring per box cycle
+      // (Shape D's paced progress; other shapes fall back to the slider).
+      breathCountSourceRef.current = shapeRef.current === 'd' ? boxProgressRef : null
+      breathCountingEnabledRef.current = true
       currentMainTextRef.current = TEXTS.boxInhale
       setTutorialText(TEXTS.boxInhale)
       setTutorialVisible(true)
@@ -780,6 +814,12 @@ export default function App() {
     setModeKey(k => k + 1)
     setScreen('experience')
   }, [resetSlowingState, showGatesText, showSlowingTextC, sliderLayout])
+
+  // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
+  const handlePacedCountStart = useCallback(() => {
+    breathCountSourceRef.current = shapeRef.current === 'd' ? ringPaceProgressRef : null
+    breathCountingEnabledRef.current = true
+  }, [])
 
   const handleRestart = useCallback(() => {
     handleSelectMode(mode)
@@ -863,9 +903,10 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} />
         {shapeOption === 'd' && <CameraVerticalShift />}
-        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
+        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} />}
+        {mode === 'slowing' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
         {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
