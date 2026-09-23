@@ -110,7 +110,7 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
       padding: '0 80px',
     }}>
       <p ref={textRef} style={{
-        color: 'rgba(255,255,255,0.9)',
+        color: 'var(--live-text-color, rgba(255,255,255,0.9))',
         fontSize: 20,
         textAlign: 'center',
         fontFamily: 'sans-serif',

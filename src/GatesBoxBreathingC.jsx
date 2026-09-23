@@ -28,7 +28,7 @@ function makeSlot() {
   return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false }
 }
 
-export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate }) {
+export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, livePaletteRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -37,6 +37,17 @@ export default function GatesBoxBreathingC({ gatesEnabledRef, spawnIntervalRef, 
   const sphereMeshRefs = useRef([]); const sphereMatRefs = useRef([])
 
   useFrame((_, delta) => {
+    // Pull in the app-wide breath-count palette cycle (see App.jsx), if any.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      for (let i = 0; i < POOL_SIZE; i++) {
+        const tMat = torusMatRefs.current[i]
+        if (tMat) { tMat.color.copy(live.secondary); tMat.emissive.copy(live.primary) }
+        const sMat = sphereMatRefs.current[i]
+        if (sMat) { sMat.color.copy(live.secondary); sMat.emissive.copy(live.primary) }
+      }
+    }
+
     const ss = slots.current
     const enabled = gatesEnabledRef.current
 

@@ -115,7 +115,7 @@ function computeExhaleSpawnZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRe
   return SPAWN_Z * ratio
 }
 
-export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef }) {
+export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, livePaletteRef }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef(Array.from({ length: POOL }, () => null))
   const matRefs = useRef(Array.from({ length: POOL }, () => null))
@@ -161,6 +161,22 @@ export default function GatesC({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const preSeedRef = useRef({ elapsed: 0, needsInitial: true })
 
   useFrame((_, delta) => {
+    // Pull in the app-wide breath-count palette cycle (see App.jsx), if any.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      for (let i = 0; i < POOL; i++) {
+        const mat = matRefs.current[i]
+        if (mat) { mat.color.copy(live.secondary); mat.emissive.copy(live.primary) }
+      }
+      for (let i = 0; i < POOL_EXHALE; i++) {
+        const mat = matSphereRefs.current[i]
+        if (mat) { mat.color.copy(live.secondary); mat.emissive.copy(live.primary) }
+      }
+      previewMaterials.forEach((mat) => mat.color.copy(live.secondary))
+      trailingMaterials.forEach((mat) => mat.color.copy(live.secondary))
+      lerpMaterials.forEach((row) => row.forEach((mat) => mat.color.copy(live.secondary)))
+    }
+
     const spawnExhale = (speed) => {
       const slot = slotsExhale.current.find(s => !s.active)
       if (!slot) return

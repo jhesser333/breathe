@@ -66,7 +66,7 @@ function makeSlot() {
 // torus/sphere meshes. Instead, a second independent clock (below) tracks which of
 // the 4 named box-breathing phases is active and pulses a single thin, inset ring
 // during both Hold-in and Hold-out.
-export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, boxPhaseRef, boxProgressRef }) {
+export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, boxPhaseRef, boxProgressRef, livePaletteRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -126,6 +126,20 @@ uniform float uFadeEndY;\n` + shader.fragmentShader
   }, [gateColor, emissiveColor])
 
   useFrame((_, delta) => {
+    // Pull in the app-wide breath-count palette cycle (see App.jsx), if any --
+    // kept in sync every frame regardless of enabled/disabled state.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      if (ringMatRef.current) {
+        ringMatRef.current.color.copy(live.secondary)
+        ringMatRef.current.emissive.copy(live.primary)
+      }
+      countRingMaterials.forEach((mat) => {
+        mat.color.copy(live.secondary)
+        mat.emissive.copy(live.primary)
+      })
+    }
+
     const ss = slots.current
     const enabled = gatesEnabledRef.current
 

@@ -38,7 +38,7 @@ import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 const navPillStyle = {
   background: 'rgba(255,255,255,0.08)',
   border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 8, color: 'rgba(255,255,255,0.7)',
+  borderRadius: 8, color: 'var(--live-text-color, rgba(255,255,255,0.7))',
   padding: '8px 14px', fontSize: 13,
   cursor: 'pointer', fontFamily: 'sans-serif',
   letterSpacing: '0.03em', whiteSpace: 'nowrap',
@@ -79,24 +79,29 @@ const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 // palette-consuming piece of the live scene, not just MorphC's own colors.
 const PALETTE_LERP_DURATION = 1.0
 
-function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef }) {
+function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef }) {
   useFrame((state) => {
-    if (!paletteLerpRef.current) return
-    const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime } = paletteLerpRef.current
-    const now = state.clock.elapsedTime
-    const t = THREE.MathUtils.clamp((now - startTime) / PALETTE_LERP_DURATION, 0, 1)
-    const to = BREATH_CYCLE_PALETTES[toIndex]
-    const live = livePaletteRef.current
-    live.tertiary.copy(fromTertiary).lerp(new THREE.Color(to.tertiaryColor), t)
-    live.primary.copy(fromPrimary).lerp(new THREE.Color(to.primaryColor), t)
-    live.secondary.copy(fromSecondary).lerp(new THREE.Color(to.secondaryColor), t)
-    live.background.copy(fromBackground).lerp(new THREE.Color(to.background), t)
-    live.text.copy(fromText).lerp(new THREE.Color(to.textColor), t)
-    if (state.scene.background) state.scene.background.copy(live.background)
-    if (t >= 1) {
-      paletteCycleIndexRef.current = toIndex
-      paletteLerpRef.current = null
+    if (paletteLerpRef.current) {
+      const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime } = paletteLerpRef.current
+      const now = state.clock.elapsedTime
+      const t = THREE.MathUtils.clamp((now - startTime) / PALETTE_LERP_DURATION, 0, 1)
+      const to = BREATH_CYCLE_PALETTES[toIndex]
+      const live = livePaletteRef.current
+      live.tertiary.copy(fromTertiary).lerp(new THREE.Color(to.tertiaryColor), t)
+      live.primary.copy(fromPrimary).lerp(new THREE.Color(to.primaryColor), t)
+      live.secondary.copy(fromSecondary).lerp(new THREE.Color(to.secondaryColor), t)
+      live.background.copy(fromBackground).lerp(new THREE.Color(to.background), t)
+      live.text.copy(fromText).lerp(new THREE.Color(to.textColor), t)
+      if (t >= 1) {
+        paletteCycleIndexRef.current = toIndex
+        paletteLerpRef.current = null
+      }
     }
+    const live = livePaletteRef.current
+    if (state.scene.background) state.scene.background.copy(live.background)
+    // Reaches the DOM overlay's text (nav buttons, mode caption, tutorial
+    // captions) via CSS custom-property inheritance -- no prop drilling.
+    if (wrapperRef?.current) wrapperRef.current.style.setProperty('--live-text-color', '#' + live.text.getHexString())
   })
   return null
 }
@@ -104,6 +109,10 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
 export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
+  // Attached to the experience screen's outer wrapper div -- PaletteLerpDriver
+  // writes a CSS custom property here so the DOM overlay's text can track the
+  // live palette (see navPillStyle/mode-caption below and TutorialText.jsx).
+  const wrapperRef = useRef(null)
 
   const [screen, setScreen] = useState('selectMode')
   const [mode, setMode] = useState(null)
@@ -843,7 +852,7 @@ export default function App() {
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
 
   return (
-    <div key={modeKey} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div key={modeKey} ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <Canvas
         camera={CAMERA_BY_SHAPE[shapeOption] || DEFAULT_CAMERA}
         style={{ position: 'absolute', inset: 0 }}
@@ -851,7 +860,7 @@ export default function App() {
         <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
-        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} />
+        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
@@ -869,6 +878,7 @@ export default function App() {
             breathPhaseRef={breathPhaseRef}
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
+            livePaletteRef={livePaletteRef}
           />
         )}
         {mode === 'box' && hasGates && (
@@ -880,6 +890,7 @@ export default function App() {
             onFirstGate={handleBBFirstGate}
             onLastGate={handleBBLastGate}
             holdFlareRef={holdFlareRef}
+            livePaletteRef={livePaletteRef}
             boxPhaseRef={boxPhaseRef}
             boxProgressRef={boxProgressRef}
           />
@@ -921,7 +932,7 @@ export default function App() {
         </div>
         <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}>
           <span style={{
-            color: 'rgba(255,255,255,0.7)', fontSize: 13, fontFamily: 'sans-serif',
+            color: 'var(--live-text-color, rgba(255,255,255,0.7))', fontSize: 13, fontFamily: 'sans-serif',
             letterSpacing: '0.08em', textTransform: 'uppercase',
           }}>
             {MODE_LABELS[mode]}
