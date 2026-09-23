@@ -24,7 +24,8 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
 const BREATH_RING_Z = [-42, -32, -22, -12, -2]
-const BREATH_FADE_THRESHOLD = 0.75   // fraction of slider travel to lock a ring in
+const BREATH_FADE_START = 0.25       // fraction of slider travel where fade-in begins (0 alpha before this)
+const BREATH_FADE_THRESHOLD = 0.90   // fraction of slider travel where alpha reaches full and the ring locks in
 const BREATH_MAX_ALPHA = 0.5
 // Same proportions as the pulse/hold ring in GatesBoxBreathingD.jsx (that
 // file's PULSE_RING_TUBE/PULSE_RING_SCALE aren't exported, so the derivation
@@ -217,8 +218,8 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
 
   const breathMaterials = useMemo(() => (
     Array.from({ length: BREATH_RING_COUNT }, () => new THREE.MeshStandardMaterial({
-      color: new THREE.Color(palette.tertiaryColor),
-      emissive: new THREE.Color(palette.secondaryColor),
+      color: new THREE.Color(palette.primaryColor),
+      emissive: new THREE.Color(palette.primaryColor),
       emissiveIntensity: BREATH_EMISSIVE_MULT,
       roughness: 1,
       metalness: 0,
@@ -240,7 +241,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
       dissolveEdge:     { value: 0.12 },
       uBreathGlowPos:       { value: Array.from({ length: BREATH_RING_COUNT }, () => new THREE.Vector3()) },
       uBreathGlowIntensity: { value: new Float32Array(BREATH_RING_COUNT) },
-      uBreathGlowColor:     { value: new THREE.Color(palette.secondaryColor) },
+      uBreathGlowColor:     { value: new THREE.Color(palette.primaryColor) },
       uBreathGlowFalloff:   { value: BREATH_GLOW_FALLOFF },
     }
 
@@ -605,7 +606,7 @@ float dissolveHash(vec3 p) {
         if (breathLockedCountRef.current < BREATH_RING_COUNT) {
           if (breathArmedRef.current) {
             const activeIdx = breathLockedCountRef.current
-            const progress = THREE.MathUtils.clamp(raw / BREATH_FADE_THRESHOLD, 0, 1)
+            const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
             // Slew-rate limited toward the slider-driven target instead of
             // snapping straight to it, so a fast Inhale still reads as a
             // smooth fade in from 0 rather than an instant pop -- reversing
@@ -691,10 +692,10 @@ float dissolveHash(vec3 p) {
       material.emissive.copy(live.primary)
       sparkleMaterial.uniforms.uColor.value.copy(live.primary)
       flowMaterial.uniforms.uColor.value.copy(live.primary)
-      fresnelUniforms.uBreathGlowColor.value.copy(live.secondary)
+      fresnelUniforms.uBreathGlowColor.value.copy(live.primary)
       breathMaterials.forEach((m) => {
-        m.color.copy(live.tertiary)
-        m.emissive.copy(live.secondary)
+        m.color.copy(live.primary)
+        m.emissive.copy(live.primary)
       })
     }
 
