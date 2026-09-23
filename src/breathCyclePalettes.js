@@ -42,12 +42,4 @@ export const RUST_ORANGE = {
   textColor: '#fada92',
 }
 
-export const RUST_SKY_BLUE = {
-  tertiaryColor: '#ffe000',
-  primaryColor: '#63100b',
-  secondaryColor: '#e4c274',
-  background: '#c2dafb',
-  textColor: '#012a35',
-}
-
-export const BREATH_CYCLE_PALETTES = [PALETTES.teal, BURNT_SIENNA, PINK, YELLOW_OCHRE, RUST_SKY_BLUE]
+export const BREATH_CYCLE_PALETTES = [PALETTES.teal, BURNT_SIENNA, PINK, YELLOW_OCHRE]

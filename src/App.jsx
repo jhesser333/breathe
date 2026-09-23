@@ -984,10 +984,18 @@ export default function App() {
           </span>
         </div>
         {mode === 'slowing' && (
+          // Unlabeled dev-option button (Change Target Pace), styled to match
+          // SelectModeScreen's Slider Layouts square.
           <button onClick={() => setScreen('breathPaceOptions')}
-                  style={{ ...navPillStyle, position: 'absolute', top: 16, right: 16 }}>
-            Change Target Pace
-          </button>
+                  aria-label="Change Target Pace"
+                  style={{
+                    position: 'absolute', top: 16, left: 16,
+                    width: 28, height: 28, padding: 0,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6,
+                    cursor: 'pointer', pointerEvents: 'auto',
+                  }} />
         )}
         <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           pulseActive={mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale)}
