@@ -1,5 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './BackgroundRingsD'
 
@@ -46,6 +47,9 @@ const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per rin
 // ring's slow random rotation the moment it first appears, instead of when it
 // falls, and keeps that same spin through the fall.
 const BREATH_SPIN_FROM_APPEAR_SET = 1
+// TEMPORARY proportion reference: a 1-unit chamfered cube at world origin,
+// spinning like the count rings, in a visible count ring's material.
+const SHOW_REFERENCE_CUBE = true
 const makeBreathSpin = () => ({
   rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
   ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
@@ -245,6 +249,21 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [])
+  const refCubeRef = useRef()
+  const refCubeSpin = useMemo(() => makeBreathSpin(), [])
+  const refCubeMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+    color: new THREE.Color(palette.primaryColor),
+    emissive: new THREE.Color(palette.primaryColor),
+    emissiveIntensity: BREATH_EMISSIVE_MULT,
+    roughness: 1,
+    metalness: 0,
+    transparent: true,
+    opacity: BREATH_MAX_ALPHA,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [])
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
@@ -752,6 +771,12 @@ float dissolveHash(vec3 p) {
         m.color.copy(live.primary)
         m.emissive.copy(live.primary)
       })
+      refCubeMaterial.color.copy(live.primary)
+      refCubeMaterial.emissive.copy(live.primary)
+    }
+    if (refCubeRef.current) {
+      const t = state.clock.elapsedTime
+      refCubeRef.current.rotation.set(refCubeSpin.rx * t, refCubeSpin.ry * t, refCubeSpin.rz * t)
     }
 
     // Feed each breath ring's current world position/opacity into the
@@ -799,6 +824,10 @@ float dissolveHash(vec3 p) {
           </mesh>
         </group>
       ))}
+      {SHOW_REFERENCE_CUBE && (
+        <RoundedBox ref={refCubeRef} args={[1, 1, 1]} radius={0.1} smoothness={4}
+          position={[0, shapeOption === 'd' ? 0 : -0.25, 0]} material={refCubeMaterial} />
+      )}
     </group>
   )
 }
