@@ -30,10 +30,10 @@ const PULSE_EMISSIVE_MAX = 2
 const PULSE_MOVE_ALPHA_TARGET = 1      // Inhale/Exhale: pulse rings' own alpha ramp target
 const PULSE_MOVE_EMISSIVE_TARGET = 1   // Inhale/Exhale: pulse rings' own emissive-intensity ramp target
 
-const COUNT_RING_ALPHA_TARGET = 0.2      // count rings fade 0 -> this across their travel
-const COUNT_RING_EMISSIVE_TARGET = 0.2
+const COUNT_RING_ALPHA_TARGET = 0.5      // count rings fade 0 -> this across their travel
+const COUNT_RING_EMISSIVE_TARGET = 1
 const COUNT_RING_POOL_SIZE = 16      // generous cap; only the first numCountRings are ever shown
-const COUNT_RING_X_SCALE_MULT = 2    // max X scale is 2x the count ring's own resting (min) X scale
+const COUNT_RING_X_SCALE_MULT = 1.5    // max X scale is 1.5x the count ring's own resting (min) X scale
 
 // A torus's inner/outer tube edges at any revolve angle theta are just
 // scalar multiples of each other -- (R-tube)*(cos,sin) vs (R+tube)*(cos,sin)
