@@ -936,8 +936,10 @@ export default function App() {
           <span style={{
             color: 'var(--live-text-color, rgba(255,255,255,0.7))', fontSize: 13, fontFamily: 'sans-serif',
             letterSpacing: '0.08em', textTransform: 'uppercase',
+            display: 'block', textAlign: 'center', whiteSpace: 'pre',
           }}>
-            {MODE_LABELS[mode]}
+            {/* Break "Guided Breathing: X" after the colon; others stay on one line */}
+            {MODE_LABELS[mode]?.replace(': ', ':\n')}
           </span>
         </div>
         {mode === 'slowing' && (
