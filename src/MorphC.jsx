@@ -48,19 +48,27 @@ const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per rin
 // ring's slow random rotation the moment it first appears, instead of when it
 // falls, and keeps that same spin through the fall.
 const BREATH_SPIN_FROM_APPEAR_SET = 1
-// Count Cubes (set 2, every third cycle): random position/size/fixed
-// rotation, chosen up front for all 5 so they never intersect, sit fully in
-// the camera frame, and never overlap each other on screen.
+// Count Cubes (set 2, every third cycle): random depth/size/fixed rotation,
+// chosen up front for all 5 so that, seen from the camera, every cube sits
+// behind the Morph and entirely inside its full-Inhale outline, and no two
+// cubes touch or overlap on screen (which also rules out any 3D contact).
+//
+// The math: squash space by the Morph's inhale semi-axes (a, b, c) so it
+// becomes a unit sphere; a unit sphere seen from distance d hides a cone with
+// tan(theta) = 1/sqrt(d^2 - 1). Back in world units, a point at depth z is
+// inside the outline when sqrt((x/a)^2 + (y/b)^2) <= (d - z/c) / sqrt(d^2 - 1)
+// -- an ellipse of half-width a*k(z), half-height b*k(z). For Shape D
+// (a=1, b=1.5, c=1, camera d=10): k(z) = (10 - z) / 9.95, e.g. X +/-1.41,
+// Y +/-2.11 at z=-4 and X +/-2.21, Y +/-3.32 at z=-12. X/Y ranges are
+// therefore derived per depth; only depth and size are knobs.
 const CUBE_SET = 2
-const CUBE_SPAWN_X = [-5, 5]
-const CUBE_SPAWN_Y = [-8, 8]
-const CUBE_SPAWN_Z = [-10, -5]
+const CUBE_SPAWN_Z = [-12, -4]       // behind the Morph (its back is z=-1; a cube's half-diagonal is <= 0.87)
 const CUBE_SCALE = [0.5, 1]          // edge length, based on a 1-unit cube
+const CUBE_CONTOUR_INSET = 0.9       // cubes stay inside this fraction of the Morph's outline
+const CUBE_SCREEN_GAP = 0.02         // minimum on-screen gap between cubes (NDC height units)
 const CUBE_CHAMFER = 0.1             // RoundedBox radius on the 1-unit cube
 const CUBE_MAX_ALPHA = 0.5
-const CUBE_PLACE_TRIES = 300
-const CUBE_NDC_LIMIT = 0.95          // corners must project inside this NDC box
-const CUBE_SCREEN_GAP = 0.02         // NDC gap required between cubes' screen boxes
+const CUBE_PLACE_TRIES = 400
 // TEMPORARY for testing: cycle 1 uses Count Cubes too (normally still rings).
 const TEMP_FIRST_CYCLE_CUBES = true
 const setForCycle = (c) => (TEMP_FIRST_CYCLE_CUBES && c === 0 ? CUBE_SET : c % BREATH_SET_COUNT)
@@ -69,58 +77,118 @@ const maxAlphaFor = (i) => (Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? CUB
 const _corner = new THREE.Vector3()
 const _euler = new THREE.Euler()
 const _quat = new THREE.Quaternion()
-// Screen-space (NDC) bounding box of a cube, or null if any corner is behind
-// the camera or outside the CUBE_NDC_LIMIT frame.
-function cubeScreenBox(camera, x, y, z, rx, ry, rz, size) {
-  _quat.setFromEuler(_euler.set(rx, ry, rz))
-  const h = size / 2
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+
+function cubeCorners(c) {
+  _quat.setFromEuler(_euler.set(c.rx, c.ry, c.rz))
+  const h = c.s / 2
+  const out = []
   for (let k = 0; k < 8; k++) {
-    _corner.set(k & 1 ? h : -h, k & 2 ? h : -h, k & 4 ? h : -h).applyQuaternion(_quat).add({ x, y, z })
-    _corner.project(camera)
-    if (_corner.z < -1 || _corner.z > 1) return null
-    if (Math.abs(_corner.x) > CUBE_NDC_LIMIT || Math.abs(_corner.y) > CUBE_NDC_LIMIT) return null
-    minX = Math.min(minX, _corner.x); maxX = Math.max(maxX, _corner.x)
-    minY = Math.min(minY, _corner.y); maxY = Math.max(maxY, _corner.y)
+    out.push(new THREE.Vector3(k & 1 ? h : -h, k & 2 ? h : -h, k & 4 ? h : -h).applyQuaternion(_quat).add(c))
   }
-  return { minX, maxX, minY, maxY }
+  return out
+}
+
+// True when the Morph (ellipsoid at `center` with semi-axes `axes`) lies
+// entirely between the camera and point p -- i.e. p is behind the Morph and
+// inside its outline as seen from the camera.
+function hiddenBehindMorph(camPos, p, center, axes) {
+  const ox = (camPos.x - center.x) / axes.x, oy = (camPos.y - center.y) / axes.y, oz = (camPos.z - center.z) / axes.z
+  const dx = (p.x - camPos.x) / axes.x, dy = (p.y - camPos.y) / axes.y, dz = (p.z - camPos.z) / axes.z
+  const A = dx * dx + dy * dy + dz * dz
+  const B = 2 * (ox * dx + oy * dy + oz * dz)
+  const C = ox * ox + oy * oy + oz * oz - 1
+  const disc = B * B - 4 * A * C
+  if (disc < 0) return false
+  const sq = Math.sqrt(disc)
+  const t1 = (-B - sq) / (2 * A), t2 = (-B + sq) / (2 * A)
+  return t1 > 0 && t2 < 1
+}
+
+// Convex hull (monotone chain) of 2D points [{x, y}].
+function hull2D(pts) {
+  const p = pts.slice().sort((u, v) => u.x - v.x || u.y - v.y)
+  const cross = (o, u, v) => (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x)
+  const lower = [], upper = []
+  for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q) }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q) }
+  return lower.slice(0, -1).concat(upper.slice(0, -1))
+}
+
+// Separating-axis gap between two convex polygons (>= 0 means apart by at
+// least that much along some axis; negative means they overlap).
+function hullGap(h1, h2) {
+  let best = -Infinity
+  for (const h of [h1, h2]) {
+    for (let i = 0; i < h.length; i++) {
+      const u = h[i], v = h[(i + 1) % h.length]
+      let nx = -(v.y - u.y), ny = v.x - u.x
+      const len = Math.hypot(nx, ny) || 1
+      nx /= len; ny /= len
+      let min1 = Infinity, max1 = -Infinity, min2 = Infinity, max2 = -Infinity
+      for (const q of h1) { const d = q.x * nx + q.y * ny; min1 = Math.min(min1, d); max1 = Math.max(max1, d) }
+      for (const q of h2) { const d = q.x * nx + q.y * ny; min2 = Math.min(min2, d); max2 = Math.max(max2, d) }
+      best = Math.max(best, Math.max(min2 - max1, min1 - max2))
+    }
+  }
+  return best
 }
 
 // Rejection-sample 5 cube placements (local to MorphC's root group, whose
-// world y offset is rootY). Falls back to the best fully-visible candidate
-// (least overlap) if a clean one can't be found.
-function placeCountCubes(camera, rootY) {
+// world y offset is rootY). morphHalf = the Morph's full-Inhale semi-axes.
+// Falls back to the least-overlapping hidden candidate if no clean spot is
+// found, so a cube always shows.
+function placeCountCubesOnce(camera, rootY, morphHalf) {
   camera.updateMatrixWorld()
+  const aspect = camera.aspect || 1
+  const center = new THREE.Vector3(0, rootY, 0)
+  const axes = new THREE.Vector3(morphHalf[0], morphHalf[1], morphHalf[2]).multiplyScalar(CUBE_CONTOUR_INSET)
+  const camPos = camera.position
+  const dScaled = (camPos.z - center.z) / axes.z
+  const coneK = (z) => (dScaled - (z - center.z) / axes.z) / Math.sqrt(Math.max(1e-6, dScaled * dScaled - 1))
   const placed = []
   for (let n = 0; n < BREATH_RING_COUNT; n++) {
     let best = null, bestScore = -Infinity
     for (let t = 0; t < CUBE_PLACE_TRIES; t++) {
       const c = {
-        x: THREE.MathUtils.randFloat(...CUBE_SPAWN_X),
-        y: THREE.MathUtils.randFloat(...CUBE_SPAWN_Y),
         z: THREE.MathUtils.randFloat(...CUBE_SPAWN_Z),
+        s: THREE.MathUtils.randFloat(...CUBE_SCALE),
         rx: Math.random() * Math.PI * 2,
         ry: Math.random() * Math.PI * 2,
         rz: Math.random() * Math.PI * 2,
-        s: THREE.MathUtils.randFloat(...CUBE_SCALE),
       }
-      c.box = cubeScreenBox(camera, c.x, c.y + rootY, c.z, c.rx, c.ry, c.rz, c.s)
-      if (!c.box) continue
-      // Score = worst clearance against every placed cube, in 3D (bounding
-      // spheres) and on screen (NDC boxes); >= 0 means no clip/no overlap.
+      // Uniform point inside the depth's allowed ellipse, shrunk by the
+      // cube's half-diagonal; the exact corner test below has the final say.
+      const k = coneK(c.z)
+      const r = c.s * Math.sqrt(3) / 2
+      const hw = axes.x * k - r, hh = axes.y * k - r
+      if (hw <= 0 || hh <= 0) continue
+      const rho = Math.sqrt(Math.random()), ang = Math.random() * Math.PI * 2
+      c.x = center.x + hw * rho * Math.cos(ang)
+      c.y = hh * rho * Math.sin(ang)
+      const corners = cubeCorners({ x: c.x, y: c.y + rootY, z: c.z, rx: c.rx, ry: c.ry, rz: c.rz, s: c.s })
+      if (!corners.every((p) => hiddenBehindMorph(camPos, p, center, axes))) continue
+      c.hull = hull2D(corners.map((p) => { _corner.copy(p).project(camera); return { x: _corner.x * aspect, y: _corner.y } }))
       let score = Infinity
-      for (const o of placed) {
-        const d = Math.hypot(c.x - o.x, c.y - o.y, c.z - o.z) - (c.s + o.s) * Math.sqrt(3) / 2
-        const sx = Math.max(o.box.minX - c.box.maxX, c.box.minX - o.box.maxX) - CUBE_SCREEN_GAP
-        const sy = Math.max(o.box.minY - c.box.maxY, c.box.minY - o.box.maxY) - CUBE_SCREEN_GAP
-        score = Math.min(score, d, Math.max(sx, sy))
-      }
+      for (const o of placed) score = Math.min(score, hullGap(c.hull, o.hull) - CUBE_SCREEN_GAP)
       if (score > bestScore) { best = c; bestScore = score }
       if (score >= 0) break
     }
-    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[0], rx: 0, ry: 0, rz: 0, s: CUBE_SCALE[0], box: { minX: 0, maxX: 0, minY: 0, maxY: 0 } })
+    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[1], rx: 0, ry: 0, rz: 0, s: CUBE_SCALE[0], hull: [] })
+    placed.clean = (placed.clean ?? true) && bestScore >= 0
   }
   return placed
+}
+
+// A whole layout occasionally paints itself into a corner (~3% of the time
+// in simulation); retry the full 5-cube layout a few times before settling.
+const CUBE_LAYOUT_TRIES = 10
+function placeCountCubes(camera, rootY, morphHalf) {
+  let layout
+  for (let i = 0; i < CUBE_LAYOUT_TRIES; i++) {
+    layout = placeCountCubesOnce(camera, rootY, morphHalf)
+    if (layout.clean) break
+  }
+  return layout
 }
 const makeBreathSpin = () => ({
   rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
@@ -689,9 +757,12 @@ float dissolveHash(vec3 p) {
     // New random Count Cube layout, applied as their rest transforms.
     const activateBreathSet = (set) => {
       if (set === CUBE_SET) {
-        const placed = placeCountCubes(state.camera, shapeOption === 'd' ? 0 : 0.25)
+        const morphHalf = shapeOption === 'd'
+          ? [OPTION_D_INHALE_X_SCALE, OPTION_D_INHALE_Y_SCALE, OPTION_D_INHALE_Z_SCALE].map(v => v * SPHERE_RADIUS)
+          : [2.25, 3.5, 1.5].map(v => v * SPHERE_RADIUS)
+        const placed = placeCountCubes(state.camera, shapeOption === 'd' ? 0 : 0.25, morphHalf)
         placed.forEach((c, k) => {
-          const { box, ...b } = c
+          const { hull, ...b } = c
           breathBaseRef.current[CUBE_SET * BREATH_RING_COUNT + k] = b
         })
       }
