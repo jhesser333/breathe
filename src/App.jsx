@@ -103,6 +103,7 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
     // Reaches the DOM overlay's text (nav buttons, mode caption, tutorial
     // captions) via CSS custom-property inheritance -- no prop drilling.
     if (wrapperRef?.current) wrapperRef.current.style.setProperty('--live-text-color', '#' + live.text.getHexString())
+    if (wrapperRef?.current) wrapperRef.current.style.setProperty('--live-bg-color', '#' + live.background.getHexString())
   })
   return null
 }

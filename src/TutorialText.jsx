@@ -1,5 +1,13 @@
 import { useRef, useLayoutEffect } from 'react'
 
+const OUTLINE_COLOR = 'var(--live-bg-color, #1a1a3a)'
+const OUTLINE_PX = 2
+const OUTLINE_SHADOW = [
+  [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7],
+].map(([x, y]) => `${x * OUTLINE_PX}px ${y * OUTLINE_PX}px 0 ${OUTLINE_COLOR}`)
+  .concat(`0 0 6px ${OUTLINE_COLOR}`)
+  .join(', ')
+
 const PULSE_DURATION = 1.0
 const PULSE_MID_FLOOR = 0.5
 const FADE_IN_FRAC = 0.9   // Inhale/Exhale: fraction of the phase spent easing 0 -> 1
@@ -116,10 +124,11 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
   return (
     <div style={{
       position: 'absolute',
-      top: '38%', left: 0, right: 0,
+      top: '44%', left: 0, right: 0,   // in front of the Morph's lower third
       transform: 'translateY(-50%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
+      zIndex: 100,   // always above the canvas, sliders and nav buttons
       padding: '0 80px',
     }}>
       <p ref={textRef} style={{
@@ -131,6 +140,10 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
         lineHeight: 1.5,
         maxWidth: 280,
         whiteSpace: 'pre-line',
+        // Outline in the live background color so the text reads over both
+        // light and dark art (8-way shadow ring + soft halo; text-shadow is
+        // used instead of -webkit-text-stroke, which eats into the glyphs).
+        textShadow: OUTLINE_SHADOW,
         opacity: pulseActive ? undefined : alpha,
         transition,
         margin: 0,
