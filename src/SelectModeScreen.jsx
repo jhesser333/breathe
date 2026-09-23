@@ -96,7 +96,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
         </button>
       </div>
       <h1 style={{
-        color: palette.tertiaryColor, fontSize: 32, fontWeight: 700,
+        color: palette.primaryColor, fontSize: 32, fontWeight: 700,
         letterSpacing: '0.15em', margin: '0 0 8px',
         transform: 'translateY(-96px)',
       }}>
