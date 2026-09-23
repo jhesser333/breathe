@@ -26,10 +26,10 @@ export const RUST_PALE_YELLOW = {
 }
 
 export const YELLOW_OCHRE = {
-  tertiaryColor: '#142840',
+  tertiaryColor: '#305173',
   primaryColor: '#ccad2f',
   secondaryColor: '#453b12',
-  background: '#305173',
+  background: '#142840',
   textColor: '#e3d299',
 }
 
