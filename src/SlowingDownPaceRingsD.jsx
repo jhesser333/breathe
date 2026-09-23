@@ -11,16 +11,21 @@ import { computePhaseDurations } from './BackgroundRingsD'
 // ring instance playing. breathPhaseRef follows BackgroundRingsD's own
 // convention ('inhale' = the inhale movement phase), keeping these in sync
 // with the pace ring and sparkles.
-export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef, gateColor, emissiveColor, livePaletteRef }) {
+const START_FADE_FRAC = 0.9   // art fades in over the first 90% of the first Inhale, matching the "Inhale" caption
+
+export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef, gateColor, emissiveColor, livePaletteRef, paceArtFadeRef }) {
   const { elements, update } = usePaceRings({ gateColor, emissiveColor })
   const prevPhaseRef = useRef(null)
   const phaseElapsedRef = useRef(0)
+  const sinceEnableRef = useRef(0)
 
   useFrame((_, delta) => {
     const live = livePaletteRef && livePaletteRef.current
     const enabled = gatesEnabledRef?.current ?? false
     if (!enabled) {
       prevPhaseRef.current = null
+      sinceEnableRef.current = 0
+      if (paceArtFadeRef) paceArtFadeRef.current = 0
       update({ enabled: false, live })
       return
     }
@@ -33,6 +38,10 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
     phaseElapsedRef.current += delta
 
     const { inhaleDuration, exhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
+    sinceEnableRef.current += delta
+    const t = Math.min(1, sinceEnableRef.current / Math.max(0.05, START_FADE_FRAC * inhaleDuration))
+    const fade = t * t * (3 - 2 * t)
+    if (paceArtFadeRef) paceArtFadeRef.current = fade
     update({
       enabled: true,
       side: phase,
@@ -41,6 +50,7 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
       holdDuration: 0,
       numCountRings: 1,
       live,
+      fade,
     })
   })
 

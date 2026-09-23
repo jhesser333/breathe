@@ -226,7 +226,7 @@ function sampleTorusPositions(count, scale = GATE_SCALE) {
   return positions
 }
 
-export default function RingParticlesD({ textColor, secondaryColor, tertiaryColor, primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef, livePaletteRef }) {
+export default function RingParticlesD({ textColor, secondaryColor, tertiaryColor, primaryColor, paceProgressRef, breathPhaseRef, gatesEnabledRef, isBoxBreathing, boxPhaseRef, boxProgressRef, livePaletteRef, paceArtFadeRef }) {
   const spawnCursorRef = useRef(0)
   const spawnAccumulatorRef = useRef(0)
 
@@ -405,6 +405,12 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
     // Shared phase read, used below by the sparkle rate ramp and by the
     // fixed-window timer for Inflow/Outflow/Sparkle's global fade.
     const active = gatesEnabledRef?.current ?? false
+    // Startup fade-in of the paced art (written by GatesBoxBreathingD /
+    // SlowingDownPaceRingsD); 1 when no driver writes it.
+    const artFade = paceArtFadeRef ? paceArtFadeRef.current : 1
+    sparkleMaterial.uniforms.uGlobalFade.value = artFade
+    inflowMaterial.uniforms.uGlobalFade.value = artFade
+    outflowMaterial.uniforms.uGlobalFade.value = artFade
     // Box Breathing has its own clean phase/progress signal (written by
     // GatesBoxBreathingD from a ground-truth 4-phase clock) instead of
     // breathPhaseRef/paceProgressRef, whose Box-mode convention is inverted

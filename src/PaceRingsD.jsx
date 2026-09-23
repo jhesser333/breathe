@@ -144,7 +144,8 @@ export function usePaceRings({ gateColor, emissiveColor }) {
   // side: 'inhale' (Inhale movement + Hold-in) or 'exhale' (Exhale movement
   // + Hold-out). sideElapsed runs continuously across the movement and the
   // hold that follows it. holdDuration 0 = no hold (Slowing Down).
-  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live }) {
+  // fade: 0-1 overall multiplier (startup fade-in when the paced art first appears).
+  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live, fade = 1 }) {
     const inner = ringMatRef.current
     if (live) {
       if (inner) { inner.color.copy(live.secondary); inner.emissive.copy(live.primary) }
@@ -168,10 +169,10 @@ export function usePaceRings({ gateColor, emissiveColor }) {
     // Exhale): ramps 0 -> target across the movement, then pulses through the
     // hold. "Other" ring ramps target -> 0 across the movement (the own
     // curve reversed), then stays off through the hold.
-    const ownAlpha = inHold ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse) : lerp(0, PULSE_MOVE_ALPHA_TARGET, moveT)
-    const ownEmissive = inHold ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse) : lerp(0, PULSE_MOVE_EMISSIVE_TARGET, moveT)
-    const otherAlpha = inHold ? 0 : lerp(PULSE_MOVE_ALPHA_TARGET, 0, moveT)
-    const otherEmissive = inHold ? 0 : lerp(PULSE_MOVE_EMISSIVE_TARGET, 0, moveT)
+    const ownAlpha = fade * (inHold ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse) : lerp(0, PULSE_MOVE_ALPHA_TARGET, moveT))
+    const ownEmissive = fade * (inHold ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse) : lerp(0, PULSE_MOVE_EMISSIVE_TARGET, moveT))
+    const otherAlpha = fade * (inHold ? 0 : lerp(PULSE_MOVE_ALPHA_TARGET, 0, moveT))
+    const otherEmissive = fade * (inHold ? 0 : lerp(PULSE_MOVE_EMISSIVE_TARGET, 0, moveT))
 
     const innerIsOwn = side === 'inhale'
     if (ringMeshRef.current) ringMeshRef.current.visible = true
@@ -212,8 +213,8 @@ export function usePaceRings({ gateColor, emissiveColor }) {
       const fadeScale = lerp(1, EXHALE_RING_FADE_SCALE, xFrac)
       mat.userData.uFadeStartY.value = COUNT_RING_FADE_START_Y * fadeScale
       mat.userData.uFadeEndY.value = COUNT_RING_FADE_END_Y * fadeScale
-      mat.opacity = lerp(0, COUNT_RING_ALPHA_TARGET, progress)
-      mat.emissiveIntensity = lerp(0, COUNT_RING_EMISSIVE_TARGET, progress)
+      mat.opacity = fade * lerp(0, COUNT_RING_ALPHA_TARGET, progress)
+      mat.emissiveIntensity = fade * lerp(0, COUNT_RING_EMISSIVE_TARGET, progress)
       mesh.visible = true
     }
   }

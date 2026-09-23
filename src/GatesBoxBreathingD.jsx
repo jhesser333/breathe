@@ -7,6 +7,7 @@ const SPAWN_Z = -6
 const DESPAWN_Z = 6
 
 const PULSE_DURATION = 1.0   // one count ring per second of hold
+const START_FADE_FRAC = 0.9  // art fades in over the first 90% of the first Inhale -- same curve as the "Inhale" caption (TutorialText FADE_IN_FRAC)
 
 function makeSlot() {
   return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false }
@@ -18,7 +19,7 @@ function makeSlot() {
 // torus/sphere meshes. Instead, a second independent clock (below) tracks which of
 // the 4 named box-breathing phases is active and drives the shared pace-ring rig
 // (PaceRingsD: Pulse/Hold ring, Pulse/Hold Exhale ring, count rings).
-export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, boxPhaseRef, boxProgressRef, livePaletteRef }) {
+export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, boxPhaseRef, boxProgressRef, livePaletteRef, paceArtFadeRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -87,6 +88,9 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       const cycleT = totalElapsedRef.current % (4 * interval)
       const phaseIndex = Math.floor(cycleT / interval)
       const phaseElapsed = cycleT % interval
+      const t = Math.min(1, totalElapsedRef.current / (START_FADE_FRAC * interval))
+      const fade = t * t * (3 - 2 * t)
+      if (paceArtFadeRef) paceArtFadeRef.current = fade
 
       // Pulse/Hold ring, Pulse/Hold Exhale ring and count rings -- see
       // PaceRingsD. `sideElapsed` runs continuously across a movement phase
@@ -99,6 +103,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
         holdDuration: interval,
         numCountRings: Math.floor((interval - 1e-4) / PULSE_DURATION) + 1,
         live,
+        fade,
       })
 
       // Clean, ground-truth phase/progress pair for RingParticlesD's Sparkle
@@ -118,6 +123,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
       }
     } else {
       updatePaceRings({ enabled: false, live })
+      if (paceArtFadeRef) paceArtFadeRef.current = 0
       if (boxPhaseRef) boxPhaseRef.current = 'exhale'
       if (boxProgressRef) boxProgressRef.current = 0
     }

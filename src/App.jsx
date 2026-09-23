@@ -308,6 +308,9 @@ export default function App() {
   // Inhale/Hold-in/Exhale/Hold-out boundaries.
   const boxPhaseRef = useRef('exhale')
   const boxProgressRef = useRef(0)
+  // Shape D paced-art startup fade (0-1): written by GatesBoxBreathingD /
+  // SlowingDownPaceRingsD over the first Inhale, read by RingParticlesD.
+  const paceArtFadeRef = useRef(1)
   // Timestamp (performance.now()) of the start of the whole Box Breathing
   // session -- stamped once (never reset per-caption/per-phase), shape-
   // agnostic. Both the caption poll below and TutorialText's per-second
@@ -856,6 +859,7 @@ export default function App() {
     introStartsCountingRef.current = m !== 'box' && m !== 'slowing'
     breathCountSourceRef.current = null
     breathPhaseRef.current = 'exhale'
+    paceArtFadeRef.current = 1
     paletteCycleIndexRef.current = 0
     paletteLerpRef.current = null
     livePaletteRef.current.tertiary.set(PALETTES.teal.tertiaryColor)
@@ -1010,10 +1014,10 @@ export default function App() {
         {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
-        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} />}
+        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
         {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
         {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e') && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
-        {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} />}
+        {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
@@ -1043,6 +1047,7 @@ export default function App() {
             livePaletteRef={livePaletteRef}
             boxPhaseRef={boxPhaseRef}
             boxProgressRef={boxProgressRef}
+            paceArtFadeRef={paceArtFadeRef}
           />
         )}
         {shapeOption === 'e' && mode === 'box' && (
