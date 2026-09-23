@@ -33,8 +33,8 @@ import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE, EXHALE_SCALE }
 // the same center), so scaling a spawn position vector by a scalar moves it
 // exactly along the ray to the corresponding point on the other ring.
 
-const SPARKLE_PARTICLE_COUNT = 1000
-const MAX_SPAWN_RATE = 220        // particles/sec -- halved from the original 440
+const SPARKLE_PARTICLE_COUNT = 1500   // 1.5x, matching the raised spawn rate so particles aren't recycled before their lifetime ends
+const MAX_SPAWN_RATE = 330        // particles/sec -- 1.5x the previous 220
 const MAX_SPAWN_PER_FRAME = 100
 const SPAWN_SENTINEL = -1e4
 // Quarter of the original 1.1, paired with the equally-scaled outward-speed
@@ -558,7 +558,8 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
 
   return (
     <group>
-      <points geometry={sparkleAttrs.geometry}>
+      {/* renderOrder 2: draws on top of the PaceRingsD rings (renderOrder 1) */}
+      <points geometry={sparkleAttrs.geometry} renderOrder={2}>
         <primitive object={sparkleMaterial} attach="material" />
       </points>
       {SHOW_INFLOW_OUTFLOW && (
