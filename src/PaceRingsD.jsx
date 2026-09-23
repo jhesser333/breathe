@@ -25,11 +25,11 @@ const COUNT_TORUS_ARGS = [BASE_RADIUS, COUNT_RING_TUBE, 16, 64]
 const EXHALE_TORUS_ARGS = [BASE_RADIUS, EXHALE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
-const PULSE_ALPHA_MIN = 0.75   // hold pulse floor -- same as the end-of-movement level, so nothing jumps
+const PULSE_ALPHA_MIN = 0.5    // hold pulse floor -- same as the end-of-movement level, so nothing jumps
 const PULSE_ALPHA_MAX = 1
 const PULSE_EMISSIVE_MIN = 1
-const PULSE_EMISSIVE_MAX = 2
-const PULSE_MOVE_ALPHA_TARGET = 0.75   // Inhale/Exhale: pulse rings' own alpha ramp target
+const PULSE_EMISSIVE_MAX = 1.25
+const PULSE_MOVE_ALPHA_TARGET = 0.5    // Inhale/Exhale: pulse rings' own alpha ramp target
 const PULSE_MOVE_EMISSIVE_TARGET = 1   // Inhale/Exhale: pulse rings' own emissive-intensity ramp target
 
 const COUNT_RING_ALPHA_TARGET = 0.5      // count rings fade 0 -> this across their travel

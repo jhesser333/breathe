@@ -54,7 +54,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
         >
           <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)' }} strokeWidth={TRACK_THICKNESS + 3}
                 strokeLinecap="round" fill="none" />
-          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.15)' }} strokeWidth={TRACK_THICKNESS}
+          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)' }} strokeWidth={TRACK_THICKNESS}
                 strokeLinecap="round" fill="none" />
           <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.45)' }} strokeWidth={TRACK_THICKNESS}
                 strokeLinecap="round" fill="none"
