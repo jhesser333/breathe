@@ -16,11 +16,13 @@ import { HALO_RING_Z, RING_Y, BASE_RADIUS, BASE_TUBE, GATE_SCALE } from './Backg
 // and a child's useFrame callbacks.
 
 const PULSE_RING_TUBE = 0.015 * 3   // matches MorphC's breath-count ring tube thickness
-const COUNT_RING_TUBE = PULSE_RING_TUBE / 2   // count rings: half the pulse rings' line weight
+const COUNT_RING_TUBE = PULSE_RING_TUBE / 4   // count rings: a quarter of the inner pulse ring's line weight
+const EXHALE_RING_TUBE = PULSE_RING_TUBE / 2  // Pulse/Hold Exhale ring: half the inner pulse ring's line weight
 const INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS   // 0.94: the sparkle ring's own inner edge
 const PULSE_RING_SCALE = GATE_SCALE.map(v => v * INNER_EDGE_FACTOR)
 const PULSE_TORUS_ARGS = [BASE_RADIUS, PULSE_RING_TUBE, 16, 64]
 const COUNT_TORUS_ARGS = [BASE_RADIUS, COUNT_RING_TUBE, 16, 64]
+const EXHALE_TORUS_ARGS = [BASE_RADIUS, EXHALE_RING_TUBE, 16, 64]
 
 const PULSE_DURATION = 1.0   // seconds per pulse, one pulse per second of hold
 const PULSE_ALPHA_MIN = 1      // hold pulse floor -- same as the end-of-movement level, so nothing jumps
@@ -46,7 +48,7 @@ const COUNT_RING_MIN_SCALE = PULSE_RING_SCALE.map(v => v * (BASE_RADIUS + PULSE_
 const COUNT_RING_MAX_X = COUNT_RING_MIN_SCALE[0] * COUNT_RING_X_SCALE_MULT
 // Exhale ring: its inner edge lies on a max-X-scale count ring's outer edge.
 const EXHALE_RING_SCALE = [COUNT_RING_MAX_X, COUNT_RING_MIN_SCALE[1], COUNT_RING_MIN_SCALE[2]]
-  .map(v => v * (BASE_RADIUS + COUNT_RING_TUBE) / (BASE_RADIUS - PULSE_RING_TUBE))
+  .map(v => v * (BASE_RADIUS + COUNT_RING_TUBE) / (BASE_RADIUS - EXHALE_RING_TUBE))
 
 // Fade start/end expressed as a fraction of the count ring's own middle-to-
 // top/bottom distance (its outer Y extent), so they scale automatically with
@@ -56,6 +58,9 @@ const COUNT_RING_FADE_START_FRAC = 0.25   // fade begins 25% of the way from mid
 const COUNT_RING_FADE_END_FRAC = 0.75     // opacity reaches 0 at 75% of the way from middle to top/bottom
 const COUNT_RING_FADE_START_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_START_FRAC
 const COUNT_RING_FADE_END_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_END_FRAC
+// Exhale ring: fade band pulled in toward the middle so its visible portion is half as tall.
+const EXHALE_RING_FADE_START_Y = COUNT_RING_FADE_START_Y * 0.5
+const EXHALE_RING_FADE_END_Y = COUNT_RING_FADE_END_Y * 0.5
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -77,7 +82,7 @@ function pulseEnvelope(tInPulse) {
 // (top/bottom taper, symmetric about RING_Y) that plain meshStandardMaterial
 // can't express, so these are built by hand with an onBeforeCompile
 // injection -- same technique as the Fresnel glow in MorphA/MorphB.
-function makeYFadeMaterial(color, emissive) {
+function makeYFadeMaterial(color, emissive, fadeStartY, fadeEndY) {
   const mat = new THREE.MeshStandardMaterial({
     color,
     emissive,
@@ -86,11 +91,11 @@ function makeYFadeMaterial(color, emissive) {
     depthTest: false,
     opacity: 0,
   })
-  mat.customProgramCacheKey = () => 'count-ring-yfade'
+  mat.customProgramCacheKey = () => `pace-ring-yfade-${fadeStartY}-${fadeEndY}`
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFadeCenterY = { value: RING_Y }
-    shader.uniforms.uFadeStartY = { value: COUNT_RING_FADE_START_Y }
-    shader.uniforms.uFadeEndY = { value: COUNT_RING_FADE_END_Y }
+    shader.uniforms.uFadeStartY = { value: fadeStartY }
+    shader.uniforms.uFadeEndY = { value: fadeEndY }
 
     shader.vertexShader = 'varying float vFadeWorldY;\n' + shader.vertexShader
     shader.vertexShader = shader.vertexShader.replace(
@@ -124,9 +129,9 @@ export function usePaceRings({ gateColor, emissiveColor }) {
   const exhaleMeshRef = useRef()
   const countMeshesRef = useRef(Array(COUNT_RING_POOL_SIZE).fill(null))
 
-  const exhaleMat = useMemo(() => makeYFadeMaterial(gateColor, emissiveColor), [gateColor, emissiveColor])
+  const exhaleMat = useMemo(() => makeYFadeMaterial(gateColor, emissiveColor, EXHALE_RING_FADE_START_Y, EXHALE_RING_FADE_END_Y), [gateColor, emissiveColor])
   const countMats = useMemo(
-    () => Array.from({ length: COUNT_RING_POOL_SIZE }, () => makeYFadeMaterial(gateColor, emissiveColor)),
+    () => Array.from({ length: COUNT_RING_POOL_SIZE }, () => makeYFadeMaterial(gateColor, emissiveColor, COUNT_RING_FADE_START_Y, COUNT_RING_FADE_END_Y)),
     [gateColor, emissiveColor]
   )
 
@@ -209,7 +214,7 @@ export function usePaceRings({ gateColor, emissiveColor }) {
           color={gateColor} emissive={emissiveColor} transparent depthWrite={false} depthTest={false} opacity={0} />
       </mesh>
       <mesh ref={exhaleMeshRef} position={[0, RING_Y, HALO_RING_Z]} scale={EXHALE_RING_SCALE} visible={false} renderOrder={1}>
-        <torusGeometry args={PULSE_TORUS_ARGS} />
+        <torusGeometry args={EXHALE_TORUS_ARGS} />
         <primitive object={exhaleMat} attach="material" />
       </mesh>
       {countMats.map((mat, i) => (
