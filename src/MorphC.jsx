@@ -23,6 +23,8 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
+const BREATH_SET_COUNT = 2   // sets take turns so one can fall while the next counts
+const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-50, -40, -30, -20, -10]
 const BREATH_FADE_START = 0.25       // fraction of slider travel where fade-in begins (0 alpha before this)
 const BREATH_FADE_THRESHOLD = 0.90   // fraction of slider travel where alpha reaches full and the ring locks in
@@ -195,7 +197,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
 
   // Breath-count rings state (see module-level BREATH_* constants above).
   const breathGroupRefs = useMemo(() => (
-    Array.from({ length: BREATH_RING_COUNT }, () => ({ current: null }))
+    Array.from({ length: BREATH_TOTAL }, () => ({ current: null }))
   ), [])
   const breathLockedCountRef = useRef(0)
   // Deadband rise/fall tracker (same pattern as SlowingDownController /
@@ -207,9 +209,10 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathDirRef = useRef(-1)
   const breathExtremeRef = useRef(0)
   const breathArmedRef = useRef(true)
-  const breathFallTriggeredRef = useRef(false)
-  const breathFallStartTimesRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
-  const breathFallSpinRef = useRef(new Array(BREATH_RING_COUNT).fill(null))
+  const breathActiveSetRef = useRef(0)   // set currently counting
+  const breathSetFallingRef = useRef(new Array(BREATH_SET_COUNT).fill(false))
+  const breathFallStartTimesRef = useRef(new Array(BREATH_TOTAL).fill(null))
+  const breathFallSpinRef = useRef(new Array(BREATH_TOTAL).fill(null))
   // Set true when a group's fall-away triggers; consumed on the very next
   // confirmed rise (breath 1's inhale of the next cycle), which is when
   // onBreathPaletteCycle actually fires (App.jsx owns the lerp itself, since
@@ -218,7 +221,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathCountingWasEnabledRef = useRef(false)
 
   const breathMaterials = useMemo(() => (
-    Array.from({ length: BREATH_RING_COUNT }, () => new THREE.MeshStandardMaterial({
+    Array.from({ length: BREATH_TOTAL }, () => new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.primaryColor),
       emissive: new THREE.Color(palette.primaryColor),
       emissiveIntensity: BREATH_EMISSIVE_MULT,
@@ -240,8 +243,8 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
       dissolveProgress: { value: 0 },
       dissolveScale:    { value: 80.0 },
       dissolveEdge:     { value: 0.12 },
-      uBreathGlowPos:       { value: Array.from({ length: BREATH_RING_COUNT }, () => new THREE.Vector3()) },
-      uBreathGlowIntensity: { value: new Float32Array(BREATH_RING_COUNT) },
+      uBreathGlowPos:       { value: Array.from({ length: BREATH_TOTAL }, () => new THREE.Vector3()) },
+      uBreathGlowIntensity: { value: new Float32Array(BREATH_TOTAL) },
       uBreathGlowColor:     { value: new THREE.Color(palette.primaryColor) },
       uBreathGlowFalloff:   { value: BREATH_GLOW_FALLOFF },
     }
@@ -280,8 +283,8 @@ uniform float fresnelIntensity;
 uniform float dissolveProgress;
 uniform float dissolveScale;
 uniform float dissolveEdge;
-uniform vec3 uBreathGlowPos[${BREATH_RING_COUNT}];
-uniform float uBreathGlowIntensity[${BREATH_RING_COUNT}];
+uniform vec3 uBreathGlowPos[${BREATH_TOTAL}];
+uniform float uBreathGlowIntensity[${BREATH_TOTAL}];
 uniform vec3 uBreathGlowColor;
 uniform float uBreathGlowFalloff;
 varying vec3 vFresnelDir;
@@ -307,7 +310,7 @@ float dissolveHash(vec3 p) {
           // additions to emissive based on distance, independent of actual
           // transparent-object draw order/depth, so they read as glowing
           // through the surface rather than being hidden behind it.
-          for (int i = 0; i < ${BREATH_RING_COUNT}; i++) {
+          for (int i = 0; i < ${BREATH_TOTAL}; i++) {
             float bd = length(vWorldPos - uBreathGlowPos[i]);
             float bGlow = uBreathGlowIntensity[i] * exp(-bd * uBreathGlowFalloff);
             totalEmissiveRadiance += uBreathGlowColor * bGlow;
@@ -565,22 +568,18 @@ float dissolveHash(vec3 p) {
     }
     flowMaterial.uniforms.uTime.value = now
 
-    // Breath-count rings (see module-level BREATH_* constants).
+    // Breath-count rings (see module-level BREATH_* constants). Two sets of 5
+    // take turns: when the counting set's fall-away triggers, counting moves
+    // straight to the other set, so a breath taken while the previous cycle's
+    // rings are still falling is counted (and visible) immediately.
     const countingEnabled = !!(breathCountingEnabledRef && breathCountingEnabledRef.current)
     // Count source: the left slider, or (Box Breathing / Slowing Down) a paced
     // 0 (exhale) -> 1 (inhale) progress ref chosen by App.jsx.
     const countSource = breathCountSourceRef && breathCountSourceRef.current
     const raw = countSource ? countSource.current : leftRawRef.current
-    if (countingEnabled !== breathCountingWasEnabledRef.current) {
-      // Counting just started (per-mode start point, see App.jsx) or stopped
-      // (mode restart): clear to a clean cycle so counting begins at breath 1.
-      breathFallTriggeredRef.current = false
-      breathLockedCountRef.current = 0
-      breathDirRef.current = -1
-      breathExtremeRef.current = raw
-      breathArmedRef.current = true
-      paletteLerpPendingRef.current = false
-      for (let i = 0; i < BREATH_RING_COUNT; i++) {
+    const resetBreathSet = (set) => {
+      breathSetFallingRef.current[set] = false
+      for (let i = set * BREATH_RING_COUNT; i < (set + 1) * BREATH_RING_COUNT; i++) {
         breathFallStartTimesRef.current[i] = null
         breathFallSpinRef.current[i] = null
         const group = breathGroupRefs[i].current
@@ -592,121 +591,128 @@ float dissolveHash(vec3 p) {
         breathMaterials[i].emissiveIntensity = BREATH_EMISSIVE_MULT
       }
     }
+    if (countingEnabled !== breathCountingWasEnabledRef.current) {
+      // Counting just started (per-mode start point, see App.jsx) or stopped
+      // (mode restart): clear to a clean cycle so counting begins at breath 1.
+      breathActiveSetRef.current = 0
+      breathLockedCountRef.current = 0
+      breathDirRef.current = -1
+      breathExtremeRef.current = raw
+      breathArmedRef.current = true
+      paletteLerpPendingRef.current = false
+      for (let s = 0; s < BREATH_SET_COUNT; s++) resetBreathSet(s)
+    }
     breathCountingWasEnabledRef.current = countingEnabled
+
+    // Falling sets animate independently of counting.
+    for (let s = 0; s < BREATH_SET_COUNT; s++) {
+      if (!breathSetFallingRef.current[s]) continue
+      let allDone = true
+      for (let i = s * BREATH_RING_COUNT; i < (s + 1) * BREATH_RING_COUNT; i++) {
+        const start = breathFallStartTimesRef.current[i]
+        if (start === null || now < start) { allDone = false; continue }
+        const t = now - start
+        const group = breathGroupRefs[i].current
+        const spin = breathFallSpinRef.current[i]
+        if (group) {
+          group.position.y = -BREATH_FALL_Y_SPEED * t
+          group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
+        }
+        const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
+        breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
+        const emissiveT = THREE.MathUtils.clamp(t / BREATH_EMISSIVE_FALL_RAMP_S, 0, 1)
+        breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(BREATH_EMISSIVE_MULT, BREATH_EMISSIVE_FALL_TARGET, emissiveT)
+        if (fadeT < 1) allDone = false
+      }
+      if (allDone) resetBreathSet(s)
+    }
+
     if (countingEnabled) {
+      const base = breathActiveSetRef.current * BREATH_RING_COUNT
 
-      if (!breathFallTriggeredRef.current) {
-        // Deadband rise/fall tracker: only a confirmed reversal from a real
-        // trough back to rising re-arms the next ring, so holding the
-        // slider up (or wobbling near the threshold) can't lock more than
-        // one ring per distinct Inhale.
-        if (breathDirRef.current >= 0) {
-          if (raw > breathExtremeRef.current) {
-            breathExtremeRef.current = raw
-          } else if (breathExtremeRef.current - raw > BREATH_REVERSAL_DEADBAND) {
-            breathDirRef.current = -1
-            breathExtremeRef.current = raw
-          }
-        } else {
-          if (raw < breathExtremeRef.current) {
-            breathExtremeRef.current = raw
-          } else if (raw - breathExtremeRef.current > BREATH_REVERSAL_DEADBAND) {
-            breathDirRef.current = 1
-            breathExtremeRef.current = raw
-            breathArmedRef.current = true
-            if (paletteLerpPendingRef.current) {
-              paletteLerpPendingRef.current = false
-              if (onBreathPaletteCycle) onBreathPaletteCycle(now)
-            }
-          }
-        }
-
-        // Already-locked rings keep easing toward full opacity at a capped
-        // rate too, in case a very fast Inhale locked one before its own
-        // fade-in visually caught up.
-        const maxDelta = BREATH_FADE_RATE * delta
-        for (let i = 0; i < breathLockedCountRef.current; i++) {
-          const cur = breathMaterials[i].opacity
-          if (cur < BREATH_MAX_ALPHA) breathMaterials[i].opacity = Math.min(BREATH_MAX_ALPHA, cur + maxDelta)
-        }
-
-        if (breathLockedCountRef.current < BREATH_RING_COUNT) {
-          if (breathArmedRef.current) {
-            const activeIdx = breathLockedCountRef.current
-            const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
-            // Slew-rate limited toward the slider-driven target instead of
-            // snapping straight to it, so a fast Inhale still reads as a
-            // smooth fade in from 0 rather than an instant pop -- reversing
-            // before locking still fades the ring back out, just at the same
-            // capped rate rather than instantly.
-            const target = BREATH_MAX_ALPHA * progress
-            const cur = breathMaterials[activeIdx].opacity
-            breathMaterials[activeIdx].opacity = target > cur
-              ? Math.min(target, cur + maxDelta)
-              : Math.max(target, cur - maxDelta)
-            if (progress >= 1) {
-              breathLockedCountRef.current += 1
-              breathArmedRef.current = false
-            }
-          }
-        } else if (breathDirRef.current === -1) {
-          // All 5 locked, and the tracker above just confirmed the downward
-          // reversal that starts breath 5's exhale -- trigger the fall-away.
-          breathFallTriggeredRef.current = true
-          const order = [0, 1, 2, 3, 4]
-          for (let i = order.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1))
-            ;[order[i], order[j]] = [order[j], order[i]]
-          }
-          order.forEach((ringIdx, orderPos) => {
-            breathFallStartTimesRef.current[ringIdx] = now + orderPos * BREATH_FALL_STAGGER_S
-            breathFallSpinRef.current[ringIdx] = {
-              rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-              ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-              rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-            }
-          })
-
-          // Palette lerp doesn't start yet -- queued for the next cycle's
-          // breath 1 inhale (see the rise-confirmation branch above).
-          paletteLerpPendingRef.current = true
-        }
-      } else {
-        let allDone = true
-        for (let i = 0; i < BREATH_RING_COUNT; i++) {
-          const start = breathFallStartTimesRef.current[i]
-          if (start === null || now < start) { allDone = false; continue }
-          const t = now - start
-          const group = breathGroupRefs[i].current
-          const spin = breathFallSpinRef.current[i]
-          if (group) {
-            group.position.y = -BREATH_FALL_Y_SPEED * t
-            group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
-          }
-          const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
-          breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
-          const emissiveT = THREE.MathUtils.clamp(t / BREATH_EMISSIVE_FALL_RAMP_S, 0, 1)
-          breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(BREATH_EMISSIVE_MULT, BREATH_EMISSIVE_FALL_TARGET, emissiveT)
-          if (fadeT < 1) allDone = false
-        }
-        if (allDone) {
-          breathFallTriggeredRef.current = false
-          breathLockedCountRef.current = 0
+      // Deadband rise/fall tracker: only a confirmed reversal from a real
+      // trough back to rising re-arms the next ring, so holding the
+      // slider up (or wobbling near the threshold) can't lock more than
+      // one ring per distinct Inhale.
+      if (breathDirRef.current >= 0) {
+        if (raw > breathExtremeRef.current) {
+          breathExtremeRef.current = raw
+        } else if (breathExtremeRef.current - raw > BREATH_REVERSAL_DEADBAND) {
           breathDirRef.current = -1
           breathExtremeRef.current = raw
+        }
+      } else {
+        if (raw < breathExtremeRef.current) {
+          breathExtremeRef.current = raw
+        } else if (raw - breathExtremeRef.current > BREATH_REVERSAL_DEADBAND) {
+          breathDirRef.current = 1
+          breathExtremeRef.current = raw
           breathArmedRef.current = true
-          for (let i = 0; i < BREATH_RING_COUNT; i++) {
-            breathFallStartTimesRef.current[i] = null
-            breathFallSpinRef.current[i] = null
-            const group = breathGroupRefs[i].current
-            if (group) {
-              group.position.y = 0
-              group.rotation.set(0, 0, 0)
-            }
-            breathMaterials[i].opacity = 0
-            breathMaterials[i].emissiveIntensity = BREATH_EMISSIVE_MULT
+          if (paletteLerpPendingRef.current) {
+            paletteLerpPendingRef.current = false
+            if (onBreathPaletteCycle) onBreathPaletteCycle(now)
           }
         }
+      }
+
+      // Already-locked rings keep easing toward full opacity at a capped
+      // rate too, in case a very fast Inhale locked one before its own
+      // fade-in visually caught up.
+      const maxDelta = BREATH_FADE_RATE * delta
+      for (let i = 0; i < breathLockedCountRef.current; i++) {
+        const cur = breathMaterials[base + i].opacity
+        if (cur < BREATH_MAX_ALPHA) breathMaterials[base + i].opacity = Math.min(BREATH_MAX_ALPHA, cur + maxDelta)
+      }
+
+      if (breathLockedCountRef.current < BREATH_RING_COUNT) {
+        if (breathArmedRef.current) {
+          const activeIdx = base + breathLockedCountRef.current
+          const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
+          // Slew-rate limited toward the slider-driven target instead of
+          // snapping straight to it, so a fast Inhale still reads as a
+          // smooth fade in from 0 rather than an instant pop -- reversing
+          // before locking still fades the ring back out, just at the same
+          // capped rate rather than instantly.
+          const target = BREATH_MAX_ALPHA * progress
+          const cur = breathMaterials[activeIdx].opacity
+          breathMaterials[activeIdx].opacity = target > cur
+            ? Math.min(target, cur + maxDelta)
+            : Math.max(target, cur - maxDelta)
+          if (progress >= 1) {
+            breathLockedCountRef.current += 1
+            breathArmedRef.current = false
+          }
+        }
+      } else if (breathDirRef.current === -1) {
+        // All 5 locked, and the tracker above just confirmed the downward
+        // reversal that starts breath 5's exhale -- trigger this set's
+        // fall-away and hand counting to the other set.
+        const set = breathActiveSetRef.current
+        breathSetFallingRef.current[set] = true
+        const order = [0, 1, 2, 3, 4]
+        for (let i = order.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[order[i], order[j]] = [order[j], order[i]]
+        }
+        order.forEach((ringIdx, orderPos) => {
+          breathFallStartTimesRef.current[base + ringIdx] = now + orderPos * BREATH_FALL_STAGGER_S
+          breathFallSpinRef.current[base + ringIdx] = {
+            rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+            ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+            rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+          }
+        })
+
+        // Palette lerp doesn't start yet -- queued for the next cycle's
+        // breath 1 inhale (see the rise-confirmation branch above).
+        paletteLerpPendingRef.current = true
+
+        // Next cycle counts on the other set; the tracker is already heading
+        // down and unarmed, so the next confirmed rise arms its breath 1.
+        const next = (set + 1) % BREATH_SET_COUNT
+        if (breathSetFallingRef.current[next]) resetBreathSet(next)   // only with very fast breathing
+        breathActiveSetRef.current = next
+        breathLockedCountRef.current = 0
       }
     }
 
@@ -733,10 +739,10 @@ float dissolveHash(vec3 p) {
       const groupOffsetY = shapeOption === 'd' ? 0 : 0.25
       const glowPos = fresnelUniforms.uBreathGlowPos.value
       const glowIntensity = fresnelUniforms.uBreathGlowIntensity.value
-      for (let i = 0; i < BREATH_RING_COUNT; i++) {
+      for (let i = 0; i < BREATH_TOTAL; i++) {
         const group = breathGroupRefs[i].current
         const fallY = group ? group.position.y : 0
-        glowPos[i].set(0, groupOffsetY + fallY, BREATH_RING_Z[i])
+        glowPos[i].set(0, groupOffsetY + fallY, BREATH_RING_Z[i % BREATH_RING_COUNT])
         // Scale by the ring's own emissive ratio too, so the backlight glow
         // dims in step with its visible emissive during the fall-away.
         const emissiveRatio = breathMaterials[i].emissiveIntensity / BREATH_EMISSIVE_MULT
@@ -764,7 +770,7 @@ float dissolveHash(vec3 p) {
       {/* Breath-count rings -- also outside the scaled group so they don't
           inherit the sphere's breathing scale. */}
       {breathGroupRefs.map((ref, i) => (
-        <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, BREATH_RING_Z[i]]}>
+        <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, BREATH_RING_Z[i % BREATH_RING_COUNT]]}>
           <mesh scale={BREATH_RING_SCALE}>
             <torusGeometry args={[BASE_RADIUS, BREATH_RING_TUBE, 16, 64]} />
             <primitive object={breathMaterials[i]} attach="material" />
