@@ -48,45 +48,41 @@ const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per rin
 // ring's slow random rotation the moment it first appears, instead of when it
 // falls, and keeps that same spin through the fall.
 const BREATH_SPIN_FROM_APPEAR_SET = 1
-// Count Cubes (set 2, every third cycle): random depth/size/fixed rotation,
-// chosen up front for all 5 so that, seen from the camera, every cube sits
-// behind the Morph and entirely inside its full-Inhale outline, and no two
-// cubes touch or overlap on screen (which also rules out any 3D contact).
+// Count Cubes (set 2, every third cycle): a growing abstract sculpture. For
+// each cycle, all 5 get a random depth/size/starting angle up front, then
+// each spins slowly from the moment it appears (see BREATH_SPIN_FROM_APPEAR_SET)
+// until it falls. Seen from the camera, every cube stays behind the Morph and
+// inside its full-Inhale outline, whatever its spin angle. Cubes may intersect
+// and overlap, but each keeps at least CUBE_MIN_VISIBLE of its on-screen area
+// clear of the others.
 //
-// The math: squash space by the Morph's inhale semi-axes (a, b, c) so it
-// becomes a unit sphere; a unit sphere seen from distance d hides a cone with
-// tan(theta) = 1/sqrt(d^2 - 1). Back in world units, a point at depth z is
-// inside the outline when sqrt((x/a)^2 + (y/b)^2) <= (d - z/c) / sqrt(d^2 - 1)
+// The outline math: squash space by the Morph's inhale semi-axes (a, b, c) so
+// it becomes a unit sphere; a unit sphere seen from distance d hides a cone
+// with tan(theta) = 1/sqrt(d^2 - 1). Back in world units, a point at depth z
+// is inside the outline when sqrt((x/a)^2 + (y/b)^2) <= (d - z/c) / sqrt(d^2 - 1)
 // -- an ellipse of half-width a*k(z), half-height b*k(z). For Shape D
 // (a=1, b=1.5, c=1, camera d=10): k(z) = (10 - z) / 9.95, e.g. X +/-1.41,
-// Y +/-2.11 at z=-4 and X +/-2.21, Y +/-3.32 at z=-12. X/Y ranges are
+// Y +/-2.11 at z=-4 and X +/-1.91, Y +/-2.86 at z=-9. X/Y ranges are
 // therefore derived per depth; only depth and size are knobs.
 const CUBE_SET = 2
-const CUBE_SPAWN_Z = [-12, -4]       // behind the Morph (its back is z=-1; a cube's half-diagonal is <= 0.87)
-const CUBE_SCALE = [0.5, 1]          // edge length, based on a 1-unit cube
-const CUBE_CONTOUR_INSET = 0.9       // cubes stay inside this fraction of the Morph's outline
-const CUBE_SCREEN_GAP = 0.02         // minimum on-screen gap between cubes (NDC height units)
+const CUBE_SPAWN_Z = [-9, -5]        // behind the Morph (its back is z=-1); range tuned by simulation for reliable 5-cube layouts
+const CUBE_SCALE = [0.75, 1.5]       // edge length, based on a 1-unit cube
+const CUBE_CONTOUR_INSET = 1.0       // cubes' bounding spheres stay inside this fraction of the Morph's outline (spheres are already a margin around the cube)
+const CUBE_MIN_VISIBLE = 0.5         // each cube keeps at least this much of its on-screen area clear of the others
+const CUBE_DISK_RADIUS = Math.sqrt(1.5 / Math.PI)   // x edge length: circle with a cube's average silhouette area (1.5 s^2), so spinning doesn't matter
 const CUBE_CHAMFER = 0.1             // RoundedBox radius on the 1-unit cube
 const CUBE_MAX_ALPHA = 0.5
 const CUBE_PLACE_TRIES = 400
+const CUBE_LAYOUT_TRIES = 10
 // TEMPORARY for testing: cycle 1 uses Count Cubes too (normally still rings).
 const TEMP_FIRST_CYCLE_CUBES = true
 const setForCycle = (c) => (TEMP_FIRST_CYCLE_CUBES && c === 0 ? CUBE_SET : c % BREATH_SET_COUNT)
 const maxAlphaFor = (i) => (Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA)
 
-const _corner = new THREE.Vector3()
-const _euler = new THREE.Euler()
-const _quat = new THREE.Quaternion()
-
-function cubeCorners(c) {
-  _quat.setFromEuler(_euler.set(c.rx, c.ry, c.rz))
-  const h = c.s / 2
-  const out = []
-  for (let k = 0; k < 8; k++) {
-    out.push(new THREE.Vector3(k & 1 ? h : -h, k & 2 ? h : -h, k & 4 ? h : -h).applyQuaternion(_quat).add(c))
-  }
-  return out
-}
+const _p = new THREE.Vector3()
+const _u = new THREE.Vector3()
+const _v = new THREE.Vector3()
+const _view = new THREE.Vector3()
 
 // True when the Morph (ellipsoid at `center` with semi-axes `axes`) lies
 // entirely between the camera and point p -- i.e. p is behind the Morph and
@@ -104,39 +100,54 @@ function hiddenBehindMorph(camPos, p, center, axes) {
   return t1 > 0 && t2 < 1
 }
 
-// Convex hull (monotone chain) of 2D points [{x, y}].
-function hull2D(pts) {
-  const p = pts.slice().sort((u, v) => u.x - v.x || u.y - v.y)
-  const cross = (o, u, v) => (u.x - o.x) * (v.y - o.y) - (u.y - o.y) * (v.x - o.x)
-  const lower = [], upper = []
-  for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q) }
-  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q) }
-  return lower.slice(0, -1).concat(upper.slice(0, -1))
-}
-
-// Separating-axis gap between two convex polygons (>= 0 means apart by at
-// least that much along some axis; negative means they overlap).
-function hullGap(h1, h2) {
-  let best = -Infinity
-  for (const h of [h1, h2]) {
-    for (let i = 0; i < h.length; i++) {
-      const u = h[i], v = h[(i + 1) % h.length]
-      let nx = -(v.y - u.y), ny = v.x - u.x
-      const len = Math.hypot(nx, ny) || 1
-      nx /= len; ny /= len
-      let min1 = Infinity, max1 = -Infinity, min2 = Infinity, max2 = -Infinity
-      for (const q of h1) { const d = q.x * nx + q.y * ny; min1 = Math.min(min1, d); max1 = Math.max(max1, d) }
-      for (const q of h2) { const d = q.x * nx + q.y * ny; min2 = Math.min(min2, d); max2 = Math.max(max2, d) }
-      best = Math.max(best, Math.max(min2 - max1, min1 - max2))
-    }
+// A cube's bounding sphere (any spin angle) stays hidden behind the Morph:
+// test its front point plus a ring of points on its silhouette as seen from
+// the camera.
+const SILHOUETTE_POINTS = 24
+function sphereHiddenBehindMorph(camPos, q, r, center, axes) {
+  _view.subVectors(q, camPos)
+  const dist = _view.length()
+  if (dist <= r) return false
+  _view.divideScalar(dist)
+  if (!hiddenBehindMorph(camPos, _p.copy(q).addScaledVector(_view, -r), center, axes)) return false
+  _u.set(0, 1, 0).cross(_view)
+  if (_u.lengthSq() < 1e-6) _u.set(1, 0, 0).cross(_view)
+  _u.normalize()
+  _v.crossVectors(_view, _u)
+  const ringR = r * dist / Math.sqrt(dist * dist - r * r)   // widened so the ring projects onto the true silhouette
+  for (let k = 0; k < SILHOUETTE_POINTS; k++) {
+    const a = (k / SILHOUETTE_POINTS) * Math.PI * 2
+    _p.copy(q).addScaledVector(_u, Math.cos(a) * ringR).addScaledVector(_v, Math.sin(a) * ringR)
+    if (!hiddenBehindMorph(camPos, _p, center, axes)) return false
   }
-  return best
+  return true
 }
 
-// Rejection-sample 5 cube placements (local to MorphC's root group, whose
-// world y offset is rootY). morphHalf = the Morph's full-Inhale semi-axes.
-// Falls back to the least-overlapping hidden candidate if no clean spot is
-// found, so a cube always shows.
+// Fixed sunflower pattern of points in the unit disk, for area estimates.
+const DISK_SAMPLES = Array.from({ length: 200 }, (_, i) => {
+  const rho = Math.sqrt((i + 0.5) / 200), ang = i * 2.399963229728653
+  return { x: rho * Math.cos(ang), y: rho * Math.sin(ang) }
+})
+// Fraction of disk i's area not covered by any other disk.
+function visibleFraction(disks, i) {
+  const d = disks[i]
+  let clear = 0
+  for (const s of DISK_SAMPLES) {
+    const px = d.x + s.x * d.r, py = d.y + s.y * d.r
+    let covered = false
+    for (let j = 0; j < disks.length; j++) {
+      if (j === i) continue
+      const o = disks[j]
+      if ((px - o.x) ** 2 + (py - o.y) ** 2 < o.r * o.r) { covered = true; break }
+    }
+    if (!covered) clear++
+  }
+  return clear / DISK_SAMPLES.length
+}
+
+// One attempt at a 5-cube layout (local to MorphC's root group, whose world y
+// offset is rootY). morphHalf = the Morph's full-Inhale semi-axes. Keeps the
+// best candidate per cube; `clean` reports whether every rule was met.
 function placeCountCubesOnce(camera, rootY, morphHalf) {
   camera.updateMatrixWorld()
   const aspect = camera.aspect || 1
@@ -145,7 +156,9 @@ function placeCountCubesOnce(camera, rootY, morphHalf) {
   const camPos = camera.position
   const dScaled = (camPos.z - center.z) / axes.z
   const coneK = (z) => (dScaled - (z - center.z) / axes.z) / Math.sqrt(Math.max(1e-6, dScaled * dScaled - 1))
+  const q = new THREE.Vector3()
   const placed = []
+  placed.clean = true
   for (let n = 0; n < BREATH_RING_COUNT; n++) {
     let best = null, bestScore = -Infinity
     for (let t = 0; t < CUBE_PLACE_TRIES; t++) {
@@ -157,7 +170,7 @@ function placeCountCubesOnce(camera, rootY, morphHalf) {
         rz: Math.random() * Math.PI * 2,
       }
       // Uniform point inside the depth's allowed ellipse, shrunk by the
-      // cube's half-diagonal; the exact corner test below has the final say.
+      // bounding-sphere radius; the silhouette test below has the final say.
       const k = coneK(c.z)
       const r = c.s * Math.sqrt(3) / 2
       const hw = axes.x * k - r, hh = axes.y * k - r
@@ -165,23 +178,29 @@ function placeCountCubesOnce(camera, rootY, morphHalf) {
       const rho = Math.sqrt(Math.random()), ang = Math.random() * Math.PI * 2
       c.x = center.x + hw * rho * Math.cos(ang)
       c.y = hh * rho * Math.sin(ang)
-      const corners = cubeCorners({ x: c.x, y: c.y + rootY, z: c.z, rx: c.rx, ry: c.ry, rz: c.rz, s: c.s })
-      if (!corners.every((p) => hiddenBehindMorph(camPos, p, center, axes))) continue
-      c.hull = hull2D(corners.map((p) => { _corner.copy(p).project(camera); return { x: _corner.x * aspect, y: _corner.y } }))
+      q.set(c.x, c.y + rootY, c.z)
+      if (!sphereHiddenBehindMorph(camPos, q, r, center, axes)) continue
+      // On-screen disk (aspect-corrected NDC) with the cube's average silhouette area.
+      _p.copy(q).project(camera)
+      const sx = _p.x * aspect, sy = _p.y
+      _p.copy(q).add(_u.set(0, CUBE_DISK_RADIUS * c.s, 0)).project(camera)
+      c.disk = { x: sx, y: sy, r: Math.abs(_p.y - sy) }
+      // Every cube -- including ones already placed -- must stay at least
+      // CUBE_MIN_VISIBLE clear once this one is added.
+      const disks = placed.map((o) => o.disk).concat(c.disk)
       let score = Infinity
-      for (const o of placed) score = Math.min(score, hullGap(c.hull, o.hull) - CUBE_SCREEN_GAP)
+      for (let i = 0; i < disks.length; i++) score = Math.min(score, visibleFraction(disks, i) - CUBE_MIN_VISIBLE)
       if (score > bestScore) { best = c; bestScore = score }
       if (score >= 0) break
     }
-    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[1], rx: 0, ry: 0, rz: 0, s: CUBE_SCALE[0], hull: [] })
-    placed.clean = (placed.clean ?? true) && bestScore >= 0
+    if (!best || bestScore < 0) placed.clean = false
+    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[1], rx: 0, ry: 0, rz: 0, s: CUBE_SCALE[0], disk: { x: 0, y: 0, r: 0 } })
   }
   return placed
 }
 
-// A whole layout occasionally paints itself into a corner (~3% of the time
-// in simulation); retry the full 5-cube layout a few times before settling.
-const CUBE_LAYOUT_TRIES = 10
+// A layout occasionally paints itself into a corner; retry the full 5-cube
+// layout a few times before settling for the best-effort one.
 function placeCountCubes(camera, rootY, morphHalf) {
   let layout
   for (let i = 0; i < CUBE_LAYOUT_TRIES; i++) {
@@ -762,7 +781,7 @@ float dissolveHash(vec3 p) {
           : [2.25, 3.5, 1.5].map(v => v * SPHERE_RADIUS)
         const placed = placeCountCubes(state.camera, shapeOption === 'd' ? 0 : 0.25, morphHalf)
         placed.forEach((c, k) => {
-          const { hull, ...b } = c
+          const { disk, ...b } = c
           breathBaseRef.current[CUBE_SET * BREATH_RING_COUNT + k] = b
         })
       }
@@ -860,7 +879,7 @@ float dissolveHash(vec3 p) {
       if (breathLockedCountRef.current < BREATH_RING_COUNT) {
         if (breathArmedRef.current) {
           const activeIdx = base + breathLockedCountRef.current
-          if (breathActiveSetRef.current === BREATH_SPIN_FROM_APPEAR_SET && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
+          if ((breathActiveSetRef.current === BREATH_SPIN_FROM_APPEAR_SET || breathActiveSetRef.current === CUBE_SET) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
             breathFallSpinRef.current[activeIdx] = makeBreathSpin()
             breathSpinStartRef.current[activeIdx] = now
           }
