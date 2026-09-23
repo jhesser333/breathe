@@ -11,6 +11,7 @@ import * as THREE from 'three'
 // movement in architectural photography.
 const EXTRA_HEIGHT_FRACTION = 0.6  // how much taller the virtual frame is than the viewport; more headroom allows a bigger shift but narrows the effective FOV shown
 const SHIFT_FRACTION = 0.65        // how much of that headroom to use (0 = centered/no shift, 1 = maximum downward crop)
+const EXTRA_SHIFT_PX = 24          // additional fixed rise in CSS px (~1/4 inch) on top of SHIFT_FRACTION
 
 export default function CameraVerticalShift() {
   const { camera, size } = useThree()
@@ -19,7 +20,7 @@ export default function CameraVerticalShift() {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
     const fullHeight = size.height * (1 + EXTRA_HEIGHT_FRACTION)
     const extra = fullHeight - size.height
-    const yOffset = extra * SHIFT_FRACTION
+    const yOffset = Math.min(extra, extra * SHIFT_FRACTION + EXTRA_SHIFT_PX)
     camera.setViewOffset(size.width, fullHeight, 0, yOffset, size.width, size.height)
     camera.updateProjectionMatrix()
     return () => {

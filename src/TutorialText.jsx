@@ -124,7 +124,7 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
   return (
     <div style={{
       position: 'absolute',
-      top: '44%', left: 0, right: 0,   // in front of the Morph's lower third
+      top: 'calc(44% + 24px)', left: 0, right: 0,   // in front of the Morph's lower third, nudged down ~1/4 inch
       transform: 'translateY(-50%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
