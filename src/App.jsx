@@ -37,8 +37,8 @@ import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAG
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 
 const navPillStyle = {
-  background: 'rgba(255,255,255,0.08)',
-  border: '1px solid rgba(255,255,255,0.18)',
+  background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)',
+  border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.8)',
   borderRadius: 8, color: 'var(--live-text-color, rgba(255,255,255,0.7))',
   padding: '8px 14px', fontSize: 13,
   cursor: 'pointer', fontFamily: 'sans-serif',
@@ -104,6 +104,12 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
     // captions) via CSS custom-property inheritance -- no prop drilling.
     if (wrapperRef?.current) wrapperRef.current.style.setProperty('--live-text-color', '#' + live.text.getHexString())
     if (wrapperRef?.current) wrapperRef.current.style.setProperty('--live-bg-color', '#' + live.background.getHexString())
+    // Buttons/sliders: primary color as an "r, g, b" triple so each element can
+    // pick its own alpha via rgba(var(--live-primary-rgb), a).
+    if (wrapperRef?.current) {
+      const hex = live.primary.getHexString()
+      wrapperRef.current.style.setProperty('--live-primary-rgb', `${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)}`)
+    }
   })
   return null
 }
@@ -1172,8 +1178,8 @@ export default function App() {
                   style={{
                     position: 'absolute', top: 16, left: 16,
                     width: 28, height: 28, padding: 0,
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)',
+                    border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.8)',
                     borderRadius: 6,
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />

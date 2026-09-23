@@ -10,7 +10,7 @@ const BOTTOM_INSET = 16
 
 const labelStyle = {
   position: 'absolute',
-  color: 'rgba(255,255,255,0.35)',
+  color: 'var(--live-text-color, rgba(255,255,255,0.7))',
   fontSize: 11,
   fontFamily: 'sans-serif',
   fontWeight: 400,
@@ -52,11 +52,11 @@ function DiagonalTrack({ sliderRef, value, side }) {
           width={w} height={h} viewBox={`0 0 ${w} ${h}`}
           style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
         >
-          <path d={pathD} stroke="rgba(255,255,255,0.15)" strokeWidth={TRACK_THICKNESS + 3}
+          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)' }} strokeWidth={TRACK_THICKNESS + 3}
                 strokeLinecap="round" fill="none" />
-          <path d={pathD} stroke="rgba(255,255,255,0.08)" strokeWidth={TRACK_THICKNESS}
+          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.15)' }} strokeWidth={TRACK_THICKNESS}
                 strokeLinecap="round" fill="none" />
-          <path d={pathD} stroke="rgba(255,255,255,0.35)" strokeWidth={TRACK_THICKNESS}
+          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.45)' }} strokeWidth={TRACK_THICKNESS}
                 strokeLinecap="round" fill="none"
                 strokeDasharray={`${dashLength} ${totalLength}`} strokeDashoffset={0} />
         </svg>
@@ -66,8 +66,8 @@ function DiagonalTrack({ sliderRef, value, side }) {
           transform: 'translate(-50%, -50%)',
           width: THUMB_SIZE, height: THUMB_SIZE,
           borderRadius: '50%',
-          background: 'rgba(255,255,255,0.7)',
-          boxShadow: '0 0 8px rgba(255,255,255,0.4)',
+          background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.9)',
+          boxShadow: '0 0 8px rgba(var(--live-primary-rgb, 141, 177, 161), 0.5)',
           pointerEvents: 'none',
         }} />
       </div>

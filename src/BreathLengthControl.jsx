@@ -80,7 +80,7 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
       transition: 'opacity 2s',
     }}>
       <div style={{
-        color: 'rgba(255,255,255,0.55)',
+        color: 'var(--live-text-color, rgba(255,255,255,0.7))',
         fontFamily: 'sans-serif',
         fontSize: 14,
         letterSpacing: '0.03em',
@@ -92,7 +92,7 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
         <div>Length</div>
       </div>
       <span style={{
-        color: 'rgba(255,255,255,0.75)',
+        color: 'var(--live-text-color, rgba(255,255,255,0.7))',
         fontFamily: 'sans-serif',
         fontSize: 20,
         letterSpacing: '0.03em',
@@ -116,8 +116,8 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
         <div style={{
           flex: 1,
           borderRadius: 20,
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.15)',
+          border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)',
           position: 'relative',
         }}>
           <div style={{
@@ -128,8 +128,8 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
             width: THUMB_SIZE,
             height: THUMB_SIZE,
             borderRadius: '50%',
-            background: 'rgba(255,255,255,0.7)',
-            boxShadow: '0 0 8px rgba(255,255,255,0.4)',
+            background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.9)',
+            boxShadow: '0 0 8px rgba(var(--live-primary-rgb, 141, 177, 161), 0.5)',
             pointerEvents: 'none',
           }} />
         </div>
