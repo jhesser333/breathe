@@ -1,5 +1,5 @@
 export const MODE_LABELS = {
-  basic: 'Breath at Your Own Pace',
+  basic: 'Breathe at Your Own Pace',
   timed: 'Paced Breathing',
   slowing: 'Guided Breathing: Slowing Down',
   box: 'Guided Breathing: Box Breathing',
