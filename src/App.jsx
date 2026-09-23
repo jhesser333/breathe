@@ -144,7 +144,6 @@ function PacedPhaseWatcher({ gatesEnabledRef, breathPhaseRef, onPhaseChange }) {
 
 const PACED_CAPTION_BREATHS = 5
 const PACED_CAPTION_ALPHA = [1, 1, 1, 0.5, 0.15]   // per breath: last two fade out, like Box Breathing's ROUND_ALPHA
-const PACED_TEXT_E_FALLBACK_MS = 15000   // Text E hold if Text D's on-screen time wasn't measured
 
 export default function App() {
   const leftVal = useRef(0)
@@ -329,11 +328,15 @@ export default function App() {
   // sliders to reach the bottom, then start the paced art on an Inhale with
   // Inhale/Exhale captions for the first 5 breaths, then Text E.
   const pacedWaitForBottomRef = useRef(false)
-  const pacedCueStageRef = useRef('off')   // 'off' | 'captions' | 'textE' | 'done'
+  const pacedCueStageRef = useRef('off')   // 'off' | 'captions' | 'done'
   const pacedBreathNumRef = useRef(0)
   const pacedCaptionRef = useRef(null)     // { start, mult, getDuration } read by TutorialText
-  const textDShownAtRef = useRef(0)        // Text D (D/E) on-screen time is measured so Text E can match it
-  const textDDurationMsRef = useRef(0)
+  // Text D/E (D/E shapes) are timed like the Diagonal intro's Text B2: fade
+  // in, hold for one left-slider breath cycle, fade out.
+  const pacedTextStageRef = useRef('off')  // 'off' | 'D-pending' | 'D-hold' | 'E-pending' | 'E-hold'
+  const pacedTextDirRef = useRef(0)
+  const pacedTextExtremeRef = useRef(null)
+  const pacedTextStrokesRef = useRef(0)
   const [pacedCaptionsOn, setPacedCaptionsOn] = useState(false)
 
   const resetSlowingState = useCallback(() => {
@@ -430,7 +433,6 @@ export default function App() {
 
   const showSlowingTextD = useCallback(() => {
     const text = (shapeRef.current === 'd' || shapeRef.current === 'e') ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextD
-    textDShownAtRef.current = Date.now()
     clearTimeout(tutorialTimerRef.current)
     currentMainTextRef.current = text
     setTutorialText(text)
@@ -449,6 +451,67 @@ export default function App() {
     awaitingMovementRef.current = false
   }, [])
 
+  // Slowing Down (D/E): show Text D or E the way the Diagonal intro shows
+  // Text B2 -- 1s fade-in, then hold for one left-slider breath cycle.
+  const showPacedText = useCallback((which) => {
+    const text = which === 'D' ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextEAmbient
+    pacedTextStageRef.current = which + '-pending'
+    clearTimeout(tutorialTimerRef.current)
+    awaitingMovementRef.current = false
+    currentMainTextRef.current = text
+    setTutorialText(text)
+    setTutorialFadeMs(DIAG_FADE_IN_MS)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    tutorialTimerRef.current = setTimeout(() => {
+      pacedTextStageRef.current = which + '-hold'
+      pacedTextStrokesRef.current = 0
+      pacedTextDirRef.current = 0
+      pacedTextExtremeRef.current = leftVal.current
+    }, DIAG_FADE_IN_MS)
+  }, [])
+
+  // Called from setLeft: counts left-slider strokes during a D/E hold (same
+  // deadband reversal counting as the Diagonal B1/B2 hold); after one breath
+  // cycle, fades the text out over 2s and moves on (D -> E -> wait for the
+  // sliders at the bottom, see startPacedArt).
+  const updatePacedText = useCallback((v) => {
+    const stage = pacedTextStageRef.current
+    if (stage !== 'D-hold' && stage !== 'E-hold') return
+    const delta = v - pacedTextExtremeRef.current
+    if (pacedTextDirRef.current === 0) {
+      if (delta < -DIAG_DEADBAND) { pacedTextDirRef.current = -1; pacedTextExtremeRef.current = v; pacedTextStrokesRef.current = 1 }
+      else if (delta > DIAG_DEADBAND) { pacedTextDirRef.current = 1; pacedTextExtremeRef.current = v; pacedTextStrokesRef.current = 1 }
+      return
+    }
+    if (pacedTextDirRef.current === 1 && delta < -DIAG_DEADBAND) {
+      pacedTextDirRef.current = -1; pacedTextExtremeRef.current = v; pacedTextStrokesRef.current++
+    } else if (pacedTextDirRef.current === -1 && delta > DIAG_DEADBAND) {
+      pacedTextDirRef.current = 1; pacedTextExtremeRef.current = v; pacedTextStrokesRef.current++
+    } else if (pacedTextDirRef.current === 1 && v > pacedTextExtremeRef.current) {
+      pacedTextExtremeRef.current = v
+    } else if (pacedTextDirRef.current === -1 && v < pacedTextExtremeRef.current) {
+      pacedTextExtremeRef.current = v
+    }
+    if (pacedTextStrokesRef.current < DIAG_CYCLE_STROKES) return
+
+    const wasD = stage === 'D-hold'
+    pacedTextStageRef.current = wasD ? 'D-fadeout' : 'E-fadeout'
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialFadeMs(DIAG_FADE_OUT_MS)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialTimerRef.current = setTimeout(() => {
+      if (wasD) {
+        showPacedText('E')
+      } else {
+        pacedTextStageRef.current = 'off'
+        setTutorialFadeMs(FADE_TRANSITION_MS)
+        pacedWaitForBottomRef.current = true
+      }
+    }, DIAG_FADE_OUT_MS)
+  }, [showPacedText])
+
   const handleSlowingRecordingDone = useCallback(() => {
     if (shapeRef.current === 'd' || shapeRef.current === 'e') {
       // Art waits until Text D has been read and the sliders reach the
@@ -458,7 +521,7 @@ export default function App() {
       setTutorialVisible(false)
       tutorialVisibleRef.current = false
       tutorialTimerRef.current = setTimeout(() => {
-        showSlowingTextD()
+        showPacedText('D')
       }, FADE_TRANSITION_MS)
       return
     }
@@ -487,17 +550,14 @@ export default function App() {
     gateEnableTimerRef.current = setTimeout(() => {
       gatesEnabledRef.current = true
     }, d * 1000)
-  }, [showSlowingTextD])
+  }, [showSlowingTextD, showPacedText])
 
   const handleSlowingTextDDone = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
-    const headless = shapeRef.current === 'd' || shapeRef.current === 'e'
-    if (textDShownAtRef.current) textDDurationMsRef.current = Date.now() - textDShownAtRef.current
     tutorialTimerRef.current = setTimeout(() => {
-      if (headless) pacedWaitForBottomRef.current = true
-      else showSlowingTextE()
+      showSlowingTextE()
     }, FADE_TRANSITION_MS)
   }, [showSlowingTextE])
 
@@ -521,23 +581,15 @@ export default function App() {
     if (stage === 'captions') {
       if (n === 0) return
       if (n > PACED_CAPTION_BREATHS) {
-        // Captions end: let the (already faded) caption settle hidden, then
-        // fade Text E in after the usual gap and hold it for as long as
-        // Text D was on screen.
-        pacedCueStageRef.current = 'textE'
+        // Captions end (already faded out). If the user goes still, idle
+        // re-show brings back Text E ("Keep your breathing...").
+        pacedCueStageRef.current = 'done'
         pacedCaptionRef.current = null
         setPacedCaptionsOn(false)
         clearTimeout(tutorialTimerRef.current)
         setTutorialVisible(false)
         tutorialVisibleRef.current = false
-        tutorialTimerRef.current = setTimeout(() => {
-          showSlowingTextE()
-          tutorialTimerRef.current = setTimeout(() => {
-            pacedCueStageRef.current = 'done'
-            setTutorialVisible(false)
-            tutorialVisibleRef.current = false
-          }, textDDurationMsRef.current || PACED_TEXT_E_FALLBACK_MS)
-        }, FADE_TRANSITION_MS)
+        currentMainTextRef.current = TEXTS.slowingTextEAmbient
         return
       }
       pacedCaptionRef.current = {
@@ -557,7 +609,7 @@ export default function App() {
       tutorialVisibleRef.current = true
       setPacedCaptionsOn(true)
     }
-  }, [showSlowingTextE])
+  }, [])
 
   const handleSlowingTextEDone = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
@@ -801,9 +853,10 @@ export default function App() {
     leftVal.current = v
     lastMoveTime.current = Date.now()
     if (sliderLayout === 'diagonal') updateDiagonalSequence(v)
+    updatePacedText(v)
     if (pacedWaitForBottomRef.current && v <= DIAG_EDGE_THRESHOLD) startPacedArt()
     handleMovement()
-  }, [handleMovement, sliderLayout, updateDiagonalSequence, startPacedArt])
+  }, [handleMovement, sliderLayout, updateDiagonalSequence, startPacedArt, updatePacedText])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
@@ -863,8 +916,8 @@ export default function App() {
     pacedBreathNumRef.current = 0
     pacedCaptionRef.current = null
     setPacedCaptionsOn(false)
-    textDShownAtRef.current = 0
-    textDDurationMsRef.current = 0
+    pacedTextStageRef.current = 'off'
+    pacedTextStrokesRef.current = 0
 
     clearTimeout(tutorialTimerRef.current)
     pendingGatesFnRef.current = null
@@ -950,8 +1003,8 @@ export default function App() {
     pacedBreathNumRef.current = 0
     pacedCaptionRef.current = null
     setPacedCaptionsOn(false)
-    textDShownAtRef.current = 0
-    textDDurationMsRef.current = 0
+    pacedTextStageRef.current = 'off'
+    pacedTextStrokesRef.current = 0
     clearTimeout(tutorialTimerRef.current)
     clearTimeout(gateEnableTimerRef.current)
     setTutorialVisible(false)
@@ -1076,7 +1129,7 @@ export default function App() {
             recordingEnabledRef={recordingEnabledRef}
             lastMaxTimeRef={lastMaxTimeRef}
             onGatesReady={handleSlowingRecordingDone}
-            onTextDone={handleSlowingTextDDone}
+            onTextDone={shapeOption === 'd' || shapeOption === 'e' ? () => {} : handleSlowingTextDDone}
             onTextEDone={shapeOption === 'd' || shapeOption === 'e' ? () => {} : handleSlowingTextEDone}
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
