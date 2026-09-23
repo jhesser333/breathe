@@ -24,7 +24,8 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_SET_COUNT = 2   // sets take turns so one can fall while the next counts
+const BREATH_SET_COUNT = 3   // sets take turns so one can fall while the next counts: still rings, spinning rings, Count Cubes
+const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph backlight glow tracks rings only)
 const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-144, -55, -21, -8, -3]
 const BREATH_FADE_START = 0.25       // fraction of slider travel where fade-in begins (0 alpha before this)
@@ -47,9 +48,80 @@ const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per rin
 // ring's slow random rotation the moment it first appears, instead of when it
 // falls, and keeps that same spin through the fall.
 const BREATH_SPIN_FROM_APPEAR_SET = 1
-// TEMPORARY proportion reference: a 1-unit chamfered cube at world origin,
-// spinning like the count rings, in a visible count ring's material.
-const SHOW_REFERENCE_CUBE = true
+// Count Cubes (set 2, every third cycle): random position/size/fixed
+// rotation, chosen up front for all 5 so they never intersect, sit fully in
+// the camera frame, and never overlap each other on screen.
+const CUBE_SET = 2
+const CUBE_SPAWN_X = [-5, 5]
+const CUBE_SPAWN_Y = [-8, 8]
+const CUBE_SPAWN_Z = [-10, -5]
+const CUBE_SCALE = [0.5, 1]          // edge length, based on a 1-unit cube
+const CUBE_CHAMFER = 0.1             // RoundedBox radius on the 1-unit cube
+const CUBE_MAX_ALPHA = 0.5
+const CUBE_PLACE_TRIES = 300
+const CUBE_NDC_LIMIT = 0.95          // corners must project inside this NDC box
+const CUBE_SCREEN_GAP = 0.02         // NDC gap required between cubes' screen boxes
+// TEMPORARY for testing: cycle 1 uses Count Cubes too (normally still rings).
+const TEMP_FIRST_CYCLE_CUBES = true
+const setForCycle = (c) => (TEMP_FIRST_CYCLE_CUBES && c === 0 ? CUBE_SET : c % BREATH_SET_COUNT)
+const maxAlphaFor = (i) => (Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA)
+
+const _corner = new THREE.Vector3()
+const _euler = new THREE.Euler()
+const _quat = new THREE.Quaternion()
+// Screen-space (NDC) bounding box of a cube, or null if any corner is behind
+// the camera or outside the CUBE_NDC_LIMIT frame.
+function cubeScreenBox(camera, x, y, z, rx, ry, rz, size) {
+  _quat.setFromEuler(_euler.set(rx, ry, rz))
+  const h = size / 2
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (let k = 0; k < 8; k++) {
+    _corner.set(k & 1 ? h : -h, k & 2 ? h : -h, k & 4 ? h : -h).applyQuaternion(_quat).add({ x, y, z })
+    _corner.project(camera)
+    if (_corner.z < -1 || _corner.z > 1) return null
+    if (Math.abs(_corner.x) > CUBE_NDC_LIMIT || Math.abs(_corner.y) > CUBE_NDC_LIMIT) return null
+    minX = Math.min(minX, _corner.x); maxX = Math.max(maxX, _corner.x)
+    minY = Math.min(minY, _corner.y); maxY = Math.max(maxY, _corner.y)
+  }
+  return { minX, maxX, minY, maxY }
+}
+
+// Rejection-sample 5 cube placements (local to MorphC's root group, whose
+// world y offset is rootY). Falls back to the best fully-visible candidate
+// (least overlap) if a clean one can't be found.
+function placeCountCubes(camera, rootY) {
+  camera.updateMatrixWorld()
+  const placed = []
+  for (let n = 0; n < BREATH_RING_COUNT; n++) {
+    let best = null, bestScore = -Infinity
+    for (let t = 0; t < CUBE_PLACE_TRIES; t++) {
+      const c = {
+        x: THREE.MathUtils.randFloat(...CUBE_SPAWN_X),
+        y: THREE.MathUtils.randFloat(...CUBE_SPAWN_Y),
+        z: THREE.MathUtils.randFloat(...CUBE_SPAWN_Z),
+        rx: Math.random() * Math.PI * 2,
+        ry: Math.random() * Math.PI * 2,
+        rz: Math.random() * Math.PI * 2,
+        s: THREE.MathUtils.randFloat(...CUBE_SCALE),
+      }
+      c.box = cubeScreenBox(camera, c.x, c.y + rootY, c.z, c.rx, c.ry, c.rz, c.s)
+      if (!c.box) continue
+      // Score = worst clearance against every placed cube, in 3D (bounding
+      // spheres) and on screen (NDC boxes); >= 0 means no clip/no overlap.
+      let score = Infinity
+      for (const o of placed) {
+        const d = Math.hypot(c.x - o.x, c.y - o.y, c.z - o.z) - (c.s + o.s) * Math.sqrt(3) / 2
+        const sx = Math.max(o.box.minX - c.box.maxX, c.box.minX - o.box.maxX) - CUBE_SCREEN_GAP
+        const sy = Math.max(o.box.minY - c.box.maxY, c.box.minY - o.box.maxY) - CUBE_SCREEN_GAP
+        score = Math.min(score, d, Math.max(sx, sy))
+      }
+      if (score > bestScore) { best = c; bestScore = score }
+      if (score >= 0) break
+    }
+    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[0], rx: 0, ry: 0, rz: 0, s: CUBE_SCALE[0], box: { minX: 0, maxX: 0, minY: 0, maxY: 0 } })
+  }
+  return placed
+}
 const makeBreathSpin = () => ({
   rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
   ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
@@ -227,6 +299,12 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathFallStartTimesRef = useRef(new Array(BREATH_TOTAL).fill(null))
   const breathFallSpinRef = useRef(new Array(BREATH_TOTAL).fill(null))
   const breathSpinStartRef = useRef(new Array(BREATH_TOTAL).fill(null))   // set when spin began on appearance (see BREATH_SPIN_FROM_APPEAR_SET)
+  const breathCycleIndexRef = useRef(0)   // 5-breath cycles completed since counting started (picks each cycle's set)
+  // Per-object rest transform: rings sit on the axis at BREATH_RING_Z; Count
+  // Cubes get a fresh random placement each time their set becomes active.
+  const breathBaseRef = useRef(Array.from({ length: BREATH_TOTAL }, (_, i) => ({
+    x: 0, y: 0, z: BREATH_RING_Z[i % BREATH_RING_COUNT], rx: 0, ry: 0, rz: 0, s: 1,
+  })))
   // Set true when a group's fall-away triggers; consumed on the very next
   // confirmed rise (breath 1's inhale of the next cycle), which is when
   // onBreathPaletteCycle actually fires (App.jsx owns the lerp itself, since
@@ -249,21 +327,6 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [])
-  const refCubeRef = useRef()
-  const refCubeSpin = useMemo(() => makeBreathSpin(), [])
-  const refCubeMaterial = useMemo(() => new THREE.MeshStandardMaterial({
-    color: new THREE.Color(palette.primaryColor),
-    emissive: new THREE.Color(palette.primaryColor),
-    emissiveIntensity: BREATH_EMISSIVE_MULT,
-    roughness: 1,
-    metalness: 0,
-    transparent: true,
-    opacity: BREATH_MAX_ALPHA,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    depthTest: false,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [])
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
@@ -272,8 +335,8 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
       dissolveProgress: { value: 0 },
       dissolveScale:    { value: 80.0 },
       dissolveEdge:     { value: 0.12 },
-      uBreathGlowPos:       { value: Array.from({ length: BREATH_TOTAL }, () => new THREE.Vector3()) },
-      uBreathGlowIntensity: { value: new Float32Array(BREATH_TOTAL) },
+      uBreathGlowPos:       { value: Array.from({ length: BREATH_RING_TOTAL }, () => new THREE.Vector3()) },
+      uBreathGlowIntensity: { value: new Float32Array(BREATH_RING_TOTAL) },
       uBreathGlowColor:     { value: new THREE.Color(palette.primaryColor) },
       uBreathGlowFalloff:   { value: BREATH_GLOW_FALLOFF },
     }
@@ -312,8 +375,8 @@ uniform float fresnelIntensity;
 uniform float dissolveProgress;
 uniform float dissolveScale;
 uniform float dissolveEdge;
-uniform vec3 uBreathGlowPos[${BREATH_TOTAL}];
-uniform float uBreathGlowIntensity[${BREATH_TOTAL}];
+uniform vec3 uBreathGlowPos[${BREATH_RING_TOTAL}];
+uniform float uBreathGlowIntensity[${BREATH_RING_TOTAL}];
 uniform vec3 uBreathGlowColor;
 uniform float uBreathGlowFalloff;
 varying vec3 vFresnelDir;
@@ -339,7 +402,7 @@ float dissolveHash(vec3 p) {
           // additions to emissive based on distance, independent of actual
           // transparent-object draw order/depth, so they read as glowing
           // through the surface rather than being hidden behind it.
-          for (int i = 0; i < ${BREATH_TOTAL}; i++) {
+          for (int i = 0; i < ${BREATH_RING_TOTAL}; i++) {
             float bd = length(vWorldPos - uBreathGlowPos[i]);
             float bGlow = uBreathGlowIntensity[i] * exp(-bd * uBreathGlowFalloff);
             totalEmissiveRadiance += uBreathGlowColor * bGlow;
@@ -613,24 +676,39 @@ float dissolveHash(vec3 p) {
         breathFallSpinRef.current[i] = null
         breathSpinStartRef.current[i] = null
         const group = breathGroupRefs[i].current
+        const b = breathBaseRef.current[i]
         if (group) {
-          group.position.y = 0
-          group.rotation.set(0, 0, 0)
+          group.position.set(b.x, b.y, b.z)
+          group.rotation.set(b.rx, b.ry, b.rz)
+          group.scale.setScalar(b.s)
         }
         breathMaterials[i].opacity = 0
         breathMaterials[i].emissiveIntensity = BREATH_EMISSIVE_MULT
       }
     }
+    // New random Count Cube layout, applied as their rest transforms.
+    const activateBreathSet = (set) => {
+      if (set === CUBE_SET) {
+        const placed = placeCountCubes(state.camera, shapeOption === 'd' ? 0 : 0.25)
+        placed.forEach((c, k) => {
+          const { box, ...b } = c
+          breathBaseRef.current[CUBE_SET * BREATH_RING_COUNT + k] = b
+        })
+      }
+      resetBreathSet(set)
+      breathActiveSetRef.current = set
+    }
     if (countingEnabled !== breathCountingWasEnabledRef.current) {
       // Counting just started (per-mode start point, see App.jsx) or stopped
       // (mode restart): clear to a clean cycle so counting begins at breath 1.
-      breathActiveSetRef.current = 0
+      breathCycleIndexRef.current = 0
       breathLockedCountRef.current = 0
       breathDirRef.current = -1
       breathExtremeRef.current = raw
       breathArmedRef.current = true
       paletteLerpPendingRef.current = false
       for (let s = 0; s < BREATH_SET_COUNT; s++) resetBreathSet(s)
+      activateBreathSet(setForCycle(0))
     }
     breathCountingWasEnabledRef.current = countingEnabled
 
@@ -641,8 +719,9 @@ float dissolveHash(vec3 p) {
       const group = breathGroupRefs[i].current
       if (spinStart === null || !group) continue
       const spin = breathFallSpinRef.current[i]
+      const b = breathBaseRef.current[i]
       const ts = now - spinStart
-      group.rotation.set(spin.rx * ts, spin.ry * ts, spin.rz * ts)
+      group.rotation.set(b.rx + spin.rx * ts, b.ry + spin.ry * ts, b.rz + spin.rz * ts)
     }
 
     // Falling sets animate independently of counting.
@@ -656,11 +735,12 @@ float dissolveHash(vec3 p) {
         const group = breathGroupRefs[i].current
         const spin = breathFallSpinRef.current[i]
         if (group) {
-          group.position.y = -BREATH_FALL_Y_SPEED * t
-          if (breathSpinStartRef.current[i] === null) group.rotation.set(spin.rx * t, spin.ry * t, spin.rz * t)
+          const b = breathBaseRef.current[i]
+          group.position.y = b.y - BREATH_FALL_Y_SPEED * t
+          if (breathSpinStartRef.current[i] === null) group.rotation.set(b.rx + spin.rx * t, b.ry + spin.ry * t, b.rz + spin.rz * t)
         }
         const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
-        breathMaterials[i].opacity = BREATH_MAX_ALPHA * (1 - fadeT)
+        breathMaterials[i].opacity = maxAlphaFor(i) * (1 - fadeT)
         const emissiveT = THREE.MathUtils.clamp(t / BREATH_EMISSIVE_FALL_RAMP_S, 0, 1)
         breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(BREATH_EMISSIVE_MULT, BREATH_EMISSIVE_FALL_TARGET, emissiveT)
         if (fadeT < 1) allDone = false
@@ -670,6 +750,7 @@ float dissolveHash(vec3 p) {
 
     if (countingEnabled) {
       const base = breathActiveSetRef.current * BREATH_RING_COUNT
+      const maxAlpha = breathActiveSetRef.current === CUBE_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA
 
       // Deadband rise/fall tracker: only a confirmed reversal from a real
       // trough back to rising re-arms the next ring, so holding the
@@ -702,7 +783,7 @@ float dissolveHash(vec3 p) {
       const maxDelta = BREATH_FADE_RATE * delta
       for (let i = 0; i < breathLockedCountRef.current; i++) {
         const cur = breathMaterials[base + i].opacity
-        if (cur < BREATH_MAX_ALPHA) breathMaterials[base + i].opacity = Math.min(BREATH_MAX_ALPHA, cur + maxDelta)
+        if (cur < maxAlpha) breathMaterials[base + i].opacity = Math.min(maxAlpha, cur + maxDelta)
       }
 
       if (breathLockedCountRef.current < BREATH_RING_COUNT) {
@@ -718,7 +799,7 @@ float dissolveHash(vec3 p) {
           // smooth fade in from 0 rather than an instant pop -- reversing
           // before locking still fades the ring back out, just at the same
           // capped rate rather than instantly.
-          const target = BREATH_MAX_ALPHA * progress
+          const target = maxAlpha * progress
           const cur = breathMaterials[activeIdx].opacity
           breathMaterials[activeIdx].opacity = target > cur
             ? Math.min(target, cur + maxDelta)
@@ -750,9 +831,10 @@ float dissolveHash(vec3 p) {
 
         // Next cycle counts on the other set; the tracker is already heading
         // down and unarmed, so the next confirmed rise arms its breath 1.
-        const next = (set + 1) % BREATH_SET_COUNT
-        if (breathSetFallingRef.current[next]) resetBreathSet(next)   // only with very fast breathing
-        breathActiveSetRef.current = next
+        breathCycleIndexRef.current += 1
+        const next = setForCycle(breathCycleIndexRef.current)
+        breathSetFallingRef.current[next] = false   // only with very fast breathing: snap it back
+        activateBreathSet(next)
         breathLockedCountRef.current = 0
       }
     }
@@ -771,12 +853,6 @@ float dissolveHash(vec3 p) {
         m.color.copy(live.primary)
         m.emissive.copy(live.primary)
       })
-      refCubeMaterial.color.copy(live.primary)
-      refCubeMaterial.emissive.copy(live.primary)
-    }
-    if (refCubeRef.current) {
-      const t = state.clock.elapsedTime
-      refCubeRef.current.rotation.set(refCubeSpin.rx * t, refCubeSpin.ry * t, refCubeSpin.rz * t)
     }
 
     // Feed each breath ring's current world position/opacity into the
@@ -786,7 +862,7 @@ float dissolveHash(vec3 p) {
       const groupOffsetY = shapeOption === 'd' ? 0 : 0.25
       const glowPos = fresnelUniforms.uBreathGlowPos.value
       const glowIntensity = fresnelUniforms.uBreathGlowIntensity.value
-      for (let i = 0; i < BREATH_TOTAL; i++) {
+      for (let i = 0; i < BREATH_RING_TOTAL; i++) {
         const group = breathGroupRefs[i].current
         const fallY = group ? group.position.y : 0
         glowPos[i].set(0, groupOffsetY + fallY, BREATH_RING_Z[i % BREATH_RING_COUNT])
@@ -818,16 +894,16 @@ float dissolveHash(vec3 p) {
           inherit the sphere's breathing scale. */}
       {breathGroupRefs.map((ref, i) => (
         <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, BREATH_RING_Z[i % BREATH_RING_COUNT]]}>
-          <mesh scale={BREATH_RING_SCALE}>
-            <torusGeometry args={[BASE_RADIUS, BREATH_RING_TUBE, 16, 64]} />
-            <primitive object={breathMaterials[i]} attach="material" />
-          </mesh>
+          {Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? (
+            <RoundedBox args={[1, 1, 1]} radius={CUBE_CHAMFER} smoothness={4} material={breathMaterials[i]} />
+          ) : (
+            <mesh scale={BREATH_RING_SCALE}>
+              <torusGeometry args={[BASE_RADIUS, BREATH_RING_TUBE, 16, 64]} />
+              <primitive object={breathMaterials[i]} attach="material" />
+            </mesh>
+          )}
         </group>
       ))}
-      {SHOW_REFERENCE_CUBE && (
-        <RoundedBox ref={refCubeRef} args={[1, 1, 1]} radius={0.1} smoothness={4}
-          position={[0, shapeOption === 'd' ? 0 : -0.25, 0]} material={refCubeMaterial} />
-      )}
     </group>
   )
 }
