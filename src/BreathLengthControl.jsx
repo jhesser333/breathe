@@ -116,7 +116,7 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
         <div style={{
           flex: 1,
           borderRadius: 20,
-          background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)',
+          background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.4)',
           border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)',
           position: 'relative',
         }}>

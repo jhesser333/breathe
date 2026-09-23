@@ -43,17 +43,23 @@ const COUNT_RING_X_SCALE_MULT = 1.5    // max X scale is 1.5x the count ring's o
 // scale untouched. Scaling a ring's whole per-axis scale by such a factor
 // therefore makes one ring's inner edge land exactly on another's outer
 // edge, at every angle around the ellipse -- no per-axis tuning needed.
-// Count ring min: thin ring's inner edge touches the Pulse/Hold ring's outer edge.
-const COUNT_RING_MIN_SCALE = PULSE_RING_SCALE.map(v => v * (BASE_RADIUS + PULSE_RING_TUBE) / (BASE_RADIUS - COUNT_RING_TUBE))
-const COUNT_RING_MAX_X = COUNT_RING_MIN_SCALE[0] * COUNT_RING_X_SCALE_MULT
-// Exhale ring: its inner edge lies on a max-X-scale count ring's outer edge.
-const EXHALE_RING_SCALE = [COUNT_RING_MAX_X, COUNT_RING_MIN_SCALE[1], COUNT_RING_MIN_SCALE[2]]
+// Layout scale that places the Exhale ring (and the count rings' Y fade
+// bands): a thin ring just outside the Pulse/Hold ring, X-stretched by
+// COUNT_RING_X_SCALE_MULT, with the Exhale ring just outside that.
+const LAYOUT_MIN_SCALE = PULSE_RING_SCALE.map(v => v * (BASE_RADIUS + PULSE_RING_TUBE) / (BASE_RADIUS - COUNT_RING_TUBE))
+const LAYOUT_MAX_X = LAYOUT_MIN_SCALE[0] * COUNT_RING_X_SCALE_MULT
+const EXHALE_RING_SCALE = [LAYOUT_MAX_X, LAYOUT_MIN_SCALE[1], LAYOUT_MIN_SCALE[2]]
   .map(v => v * (BASE_RADIUS + COUNT_RING_TUBE) / (BASE_RADIUS - EXHALE_RING_TUBE))
+// Count rings overlap the pulse rings at each end of their travel:
+// min (Inhale end): count ring's outer edge on the Pulse/Hold ring's outer edge.
+const COUNT_RING_MIN_SCALE = PULSE_RING_SCALE.map(v => v * (BASE_RADIUS + PULSE_RING_TUBE) / (BASE_RADIUS + COUNT_RING_TUBE))
+// max (Exhale end, X only): count ring's inner edge on the Exhale ring's inner edge.
+const COUNT_RING_MAX_X = EXHALE_RING_SCALE[0] * (BASE_RADIUS - EXHALE_RING_TUBE) / (BASE_RADIUS - COUNT_RING_TUBE)
 
 // Fade start/end expressed as a fraction of the count ring's own middle-to-
 // top/bottom distance (its outer Y extent), so they scale automatically with
 // COUNT_RING_MIN_SCALE/BASE_TUBE instead of being hand-picked absolute numbers.
-const COUNT_RING_MAX_Y = COUNT_RING_MIN_SCALE[1] * (BASE_RADIUS + BASE_TUBE)
+const COUNT_RING_MAX_Y = LAYOUT_MIN_SCALE[1] * (BASE_RADIUS + BASE_TUBE)
 const COUNT_RING_FADE_START_FRAC = 0.25   // fade begins 25% of the way from middle to top/bottom
 const COUNT_RING_FADE_END_FRAC = 0.75     // opacity reaches 0 at 75% of the way from middle to top/bottom
 const COUNT_RING_FADE_START_Y = COUNT_RING_MAX_Y * COUNT_RING_FADE_START_FRAC

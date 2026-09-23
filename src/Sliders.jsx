@@ -8,7 +8,7 @@ const trackInner = {
   width: `${TRACK_WIDTH}px`,
   alignSelf: 'stretch',
   borderRadius: '28px',
-  background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)',
+  background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.4)',
   border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)',
   position: 'relative',
 }
