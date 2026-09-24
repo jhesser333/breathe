@@ -10,6 +10,11 @@ const RECORD_CYCLES      = 1   // record next N cycles to compute Initial Pace
 const TEXT_D_CYCLES       = 3   // dismiss Text D after N post-gate cycles
 const TEXT_E_CYCLES       = 4   // dismiss Text E after N more post-gate cycles
 const RAMP_SECONDS        = 60
+// If the starting pace is slower than the target, equal to it, or no more
+// than STRETCH_WITHIN_SECONDS faster, the target becomes STRETCH_FACTOR x the
+// starting pace (keeping the selected option's inhale/exhale proportion).
+const STRETCH_WITHIN_SECONDS = 2
+const STRETCH_FACTOR = 1.5
 
 export default function SlowingDownController({
   leftRawRef, spawnIntervalRef, recordingEnabledRef, lastMaxTimeRef,
@@ -129,9 +134,18 @@ export default function SlowingDownController({
 
     if (phaseRef.current === 'gates') {
       const t = Math.min(Math.max((now - phase2StartRef.current) / RAMP_SECONDS, 0), 1)
-      const startHalf = avgBreathRef.current / 2
-      inhaleSecondsRef.current = startHalf + (targetInhaleSecondsRef.current - startHalf) * t
-      exhaleSecondsRef.current = startHalf + (targetExhaleSecondsRef.current - startHalf) * t
+      const startPace = avgBreathRef.current
+      const startHalf = startPace / 2
+      let targetInhale = targetInhaleSecondsRef.current
+      let targetExhale = targetExhaleSecondsRef.current
+      const targetTotal = targetInhale + targetExhale
+      if (targetTotal > 0 && startPace >= targetTotal - STRETCH_WITHIN_SECONDS) {
+        const k = (STRETCH_FACTOR * startPace) / targetTotal
+        targetInhale *= k
+        targetExhale *= k
+      }
+      inhaleSecondsRef.current = startHalf + (targetInhale - startHalf) * t
+      exhaleSecondsRef.current = startHalf + (targetExhale - startHalf) * t
       spawnIntervalRef.current = inhaleSecondsRef.current + exhaleSecondsRef.current
     }
   })
