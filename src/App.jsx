@@ -35,10 +35,11 @@ import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
+import { UI_EDGE, UI_INTERIOR } from './uiColors'
 
 const navPillStyle = {
-  background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)',
-  border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.8)',
+  background: UI_INTERIOR,
+  border: `1px solid ${UI_EDGE}`,
   borderRadius: 8, color: 'var(--live-text-color, rgba(255,255,255,0.7))',
   padding: '8px 14px', fontSize: 13,
   cursor: 'pointer', fontFamily: 'sans-serif',
@@ -1178,8 +1179,8 @@ export default function App() {
                   style={{
                     position: 'absolute', top: 16, left: 16,
                     width: 28, height: 28, padding: 0,
-                    background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.25)',
-                    border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.8)',
+                    background: UI_INTERIOR,
+                    border: `1px solid ${UI_EDGE}`,
                     borderRadius: 6,
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />

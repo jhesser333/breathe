@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useTouchSlider } from './useTouchSlider'
+import { UI_EDGE, UI_INTERIOR, UI_FILL, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
 
 const TRACK_WIDTH = 62
 const HIT_WIDTH = 100
@@ -8,8 +9,8 @@ const trackInner = {
   width: `${TRACK_WIDTH}px`,
   alignSelf: 'stretch',
   borderRadius: '28px',
-  background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.1)',
-  border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)',
+  background: UI_INTERIOR,
+  border: `1px solid ${UI_EDGE}`,
   position: 'relative',
 }
 
@@ -35,8 +36,8 @@ function ThumbDot({ value }) {
       width: `${THUMB_SIZE}px`,
       height: `${THUMB_SIZE}px`,
       borderRadius: '50%',
-      background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.9)',
-      boxShadow: '0 0 8px rgba(var(--live-primary-rgb, 141, 177, 161), 0.5)',
+      background: UI_THUMB,
+      boxShadow: `0 0 8px ${UI_THUMB_GLOW}`,
       pointerEvents: 'none',
     }} />
   )
@@ -68,7 +69,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
             [fillFromTop ? 'top' : 'bottom']: 0,
             left: 0, right: 0,
             height: `${fillHeight}%`,
-            background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.45)',
+            background: UI_FILL,
             borderRadius: 28,
             pointerEvents: 'none',
           }} />

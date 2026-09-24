@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useTouchSlider } from './useTouchSlider'
+import { UI_EDGE, UI_INTERIOR, UI_FILL, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
 import {
   CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE,
   P0_FRAC, sampleCurve, getPathD, pointAtArcFrac,
@@ -25,6 +26,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
 
   const { totalLength } = useMemo(() => sampleCurve(side, w, h), [side])
   const pathD = useMemo(() => getPathD(side, w, h), [side])
+  const edgeMaskId = `slider-edge-${side}`
 
   const rawArcFrac = isLeft ? value : 1 - value
   const thumb = pointAtArcFrac(side, rawArcFrac, w, h)
@@ -52,11 +54,20 @@ function DiagonalTrack({ sliderRef, value, side }) {
           width={w} height={h} viewBox={`0 0 ${w} ${h}`}
           style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
         >
-          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)' }} strokeWidth={TRACK_THICKNESS + 3}
+          {/* Edge = a stroke 1px wider on each side than the track, with the
+              track itself masked out so the edge is only a thin outline (like
+              the buttons' border) and never stacks under the interior. */}
+          <defs>
+            <mask id={edgeMaskId} maskUnits="userSpaceOnUse" x={-w} y={-h} width={w * 3} height={h * 3}>
+              <rect x={-w} y={-h} width={w * 3} height={h * 3} fill="white" />
+              <path d={pathD} stroke="black" strokeWidth={TRACK_THICKNESS} strokeLinecap="round" fill="none" />
+            </mask>
+          </defs>
+          <path d={pathD} style={{ stroke: UI_EDGE }} strokeWidth={TRACK_THICKNESS + 2}
+                strokeLinecap="round" fill="none" mask={`url(#${edgeMaskId})`} />
+          <path d={pathD} style={{ stroke: UI_INTERIOR }} strokeWidth={TRACK_THICKNESS}
                 strokeLinecap="round" fill="none" />
-          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.1)' }} strokeWidth={TRACK_THICKNESS}
-                strokeLinecap="round" fill="none" />
-          <path d={pathD} style={{ stroke: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.45)' }} strokeWidth={TRACK_THICKNESS}
+          <path d={pathD} style={{ stroke: UI_FILL }} strokeWidth={TRACK_THICKNESS}
                 strokeLinecap="round" fill="none"
                 strokeDasharray={`${dashLength} ${totalLength}`} strokeDashoffset={0} />
         </svg>
@@ -66,8 +77,8 @@ function DiagonalTrack({ sliderRef, value, side }) {
           transform: 'translate(-50%, -50%)',
           width: THUMB_SIZE, height: THUMB_SIZE,
           borderRadius: '50%',
-          background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.9)',
-          boxShadow: '0 0 8px rgba(var(--live-primary-rgb, 141, 177, 161), 0.5)',
+          background: UI_THUMB,
+          boxShadow: `0 0 8px ${UI_THUMB_GLOW}`,
           pointerEvents: 'none',
         }} />
       </div>

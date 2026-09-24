@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
+import { UI_EDGE, UI_INTERIOR, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
 
 const MIN_S = 5
 const MAX_S = 24
@@ -116,8 +117,8 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
         <div style={{
           flex: 1,
           borderRadius: 20,
-          background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.1)',
-          border: '1px solid rgba(var(--live-primary-rgb, 141, 177, 161), 0.6)',
+          background: UI_INTERIOR,
+          border: `1px solid ${UI_EDGE}`,
           position: 'relative',
         }}>
           <div style={{
@@ -128,8 +129,8 @@ export default function BreathLengthControl({ breathLength, onChange, visible = 
             width: THUMB_SIZE,
             height: THUMB_SIZE,
             borderRadius: '50%',
-            background: 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.9)',
-            boxShadow: '0 0 8px rgba(var(--live-primary-rgb, 141, 177, 161), 0.5)',
+            background: UI_THUMB,
+            boxShadow: `0 0 8px ${UI_THUMB_GLOW}`,
             pointerEvents: 'none',
           }} />
         </div>
