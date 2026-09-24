@@ -43,8 +43,7 @@ const SPAWN_SENTINEL = -1e4
 // time to reach it, reading as slower/calmer without traveling less far).
 const SPARKLE_ATTRACT_RATE = 0.275
 const NO_ATTRACT_CUTOFF = 1e6     // sentinel uAttractCutoff value meaning "no cutoff, decay normally" -- far beyond any real uTime
-const SPARKLE_RATE_RAMP_UP_FRACTION = 0.8    // reaches max spawn rate at 80% of the way to full inhale
-const SPARKLE_RATE_RAMP_DOWN_MIDPOINT = 0.5  // spawn rate reaches 0 halfway through the inhale->exhale return trip
+const SPARKLE_RATE_RAMP_UP_FRACTION = 0.3    // reaches max spawn rate at 30% of the way to full inhale
 
 const SHOW_INFLOW_OUTFLOW = false   // temporarily hidden so Sparkle + the inhale ring can be tuned in isolation -- flip back to true when done
 
@@ -275,7 +274,7 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
 
   const sparkleMaterial = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
-      uSize: { value: 100 },
+      uSize: { value: 200 },   // 2x the inflow/outflow particles' 100
       uTime: { value: 0 },
       uAttract: { value: SPARKLE_ATTRACT_RATE },
       uAttractCutoff: { value: NO_ATTRACT_CUTOFF },
@@ -420,21 +419,16 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
 
     // Ring sparkle rate: ramps 0 -> max as the cycle moves from exhale to
     // inhale, reaching max at SPARKLE_RATE_RAMP_UP_FRACTION of the way to
-    // full inhale and holding there; ramps max -> 0 on the way back,
-    // reaching 0 at SPARKLE_RATE_RAMP_DOWN_MIDPOINT of that return trip and
-    // holding at 0 for the rest of exhale. Both branches agree at bp=1 (the
-    // phase boundary), so there's no jump when the phase flips.
+    // full inhale and holding there (through Box Breathing's Hold-in), then
+    // stops the instant the exhale side begins.
     let spawnRate
     if (phase === 'inhale') {
       const rampT = THREE.MathUtils.clamp(bp / SPARKLE_RATE_RAMP_UP_FRACTION, 0, 1)
       spawnRate = THREE.MathUtils.lerp(0, MAX_SPAWN_RATE, rampT)
-    } else if (isBoxBreathing) {
-      // Experiment: Box Breathing pops spawning straight to 0 the instant
-      // Hold-in ends, instead of the smooth ramp-down used elsewhere.
-      spawnRate = 0
     } else {
-      const rampT = THREE.MathUtils.clamp((bp - SPARKLE_RATE_RAMP_DOWN_MIDPOINT) / (1 - SPARKLE_RATE_RAMP_DOWN_MIDPOINT), 0, 1)
-      spawnRate = THREE.MathUtils.lerp(0, MAX_SPAWN_RATE, rampT)
+      // Every mode (was Box Breathing only): spawning stops the instant the
+      // exhale side begins, instead of ramping down.
+      spawnRate = 0
     }
 
     // Ring sparkle: surface points with a rise-then-decay outward drift.
@@ -478,13 +472,11 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
     if (phase !== prevPhaseRef.current) {
       prevPhaseRef.current = phase
       phaseElapsedRef.current = 0
-      // Experiment: Box Breathing freezes Sparkle's inward pull the instant
-      // Hold-in ends (see SPARKLE_VERTEX_SHADER's freezeAge), so already-alive
+      // Every mode freezes Sparkle's inward pull the instant the exhale side
+      // begins (see SPARKLE_VERTEX_SHADER's freezeAge), so already-alive
       // particles keep drifting outward instead of curling back. Reset on the
       // next inhale so fresh spawns decay normally again.
-      if (isBoxBreathing) {
-        attractCutoffTimeRef.current = phase === 'exhale' ? now : NO_ATTRACT_CUTOFF
-      }
+      attractCutoffTimeRef.current = phase === 'exhale' ? now : NO_ATTRACT_CUTOFF
     } else {
       phaseElapsedRef.current += delta
     }
