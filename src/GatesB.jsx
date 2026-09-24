@@ -115,16 +115,16 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   // ahead), toward where the next gate will eventually spawn. Scroll at
   // that checkpoint's own speed, fixed spacing.
   const previewMaterials = useMemo(
-    () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor)),
-    [gateColor]
+    () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(emissiveColor)),
+    [emissiveColor]
   )
   const previewRefs = useRef(makeTieRefArray())
 
   // Trailing-filler ties: continue past the backmost real checkpoint at the
   // same fixed spacing/speed, purely for visual continuity toward DESPAWN_Z.
   const trailingMaterials = useMemo(
-    () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor)),
-    [gateColor]
+    () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(emissiveColor)),
+    [emissiveColor]
   )
   const trailingRefs = useRef(makeTieRefArray())
 
@@ -132,8 +132,8 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   // gates" behavior, applied between every consecutive pair of real gates
   // regardless of whether they're A (exhale) or B (inhale) type.
   const lerpMaterials = useMemo(
-    () => Array.from({ length: LERP_SEGMENTS_MAX }, () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(gateColor))),
-    [gateColor]
+    () => Array.from({ length: LERP_SEGMENTS_MAX }, () => Array.from({ length: TIES_PER_SEGMENT }, () => createTieMaterial(emissiveColor))),
+    [emissiveColor]
   )
   const lerpRefs = useRef(Array.from({ length: LERP_SEGMENTS_MAX }, makeTieRefArray))
 
