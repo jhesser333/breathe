@@ -51,7 +51,6 @@ const BREATH_FALL_STAGGER_S = 0.2
 const BREATH_FALL_HOLD_S = 2.0       // seconds a ring keeps falling/rotating at full opacity before fading
 const BREATH_FALL_FADE_S = 1.0       // fade duration after the hold
 const BREATH_FALL_Y_SPEED = 0.6 * 1.5  // units/sec, straight down -- 50% faster
-const BREATH_FALL_ROT_SPEED = 0.5    // max rad/sec per axis, randomized per ring per group
 // Every other cycle (the second set of the leap-frogging pair) starts each
 // ring's slow random rotation the moment it first appears, instead of when it
 // falls, and keeps that same spin through the fall.
@@ -75,14 +74,15 @@ const BREATH_SPIN_FROM_APPEAR_SET = 1
 const CUBE_SET = 2
 const CUBE_SPAWN_Z = [-9, -5]        // behind the Morph (its back is z=-1); range tuned by simulation for reliable 5-cube layouts
 const CUBE_SCALE = [0.75, 1.5]       // edge length, based on a 1-unit cube
+const TETRA_SCALE = [1.25, 2.25]     // tetrahedron edge length (bigger than the cubes so they overlap more)
 const CUBE_CONTOUR_INSET = 1.0       // cubes' bounding spheres stay inside this fraction of the Morph's outline (spheres are already a margin around the cube)
 const CUBE_MIN_VISIBLE = 0.5         // each cube keeps at least this much of its on-screen area clear of the others
 const CUBE_DISK_RADIUS = Math.sqrt(1.5 / Math.PI)   // x edge length: circle with a cube's average silhouette area (1.5 s^2), so spinning doesn't matter
 // Per-shape sizes (per unit edge) for placement: bounding-sphere radius and
 // on-screen disk radius (average silhouette area = surface area / 4).
 const SCULPTURE_SHAPES = {
-  cube: { sphere: Math.sqrt(3) / 2, disk: CUBE_DISK_RADIUS },
-  tetra: { sphere: Math.sqrt(3 / 8), disk: Math.sqrt((Math.sqrt(3) / 4) / Math.PI) },
+  cube: { sphere: Math.sqrt(3) / 2, disk: CUBE_DISK_RADIUS, scale: CUBE_SCALE },
+  tetra: { sphere: Math.sqrt(3 / 8), disk: Math.sqrt((Math.sqrt(3) / 4) / Math.PI), scale: TETRA_SCALE },
 }
 const CUBE_CHAMFER = 0.1             // RoundedBox radius on the 1-unit cube
 const CUBE_MAX_ALPHA = 0.5
@@ -99,13 +99,16 @@ const isSculptureSet = (set) => set === CUBE_SET || set === TETRA_SET
 const SPHERE_ROW_SET = 5
 const SPHERE_ROW_RADIUS = 0.5
 const SPHERE_ROW_SPACING = SPHERE_ROW_RADIUS * 2 + SPHERE_ROW_RADIUS * 2   // center-to-center: one diameter of sphere + one diameter of gap
-const SPHERE_ROW_Z = [-30, -25, -20, -15, -10]
+const SPHERE_ROW_Z = [-100, -80, -60, -40, -20]
 const isSolidSet = (set) => set >= CUBE_SET
 // TEMPORARY for testing: the first cycles use these sets, then the normal
 // 5-cycle pattern (set = cycle % 5) takes over.
 const TEMP_FIRST_CYCLES = [SPHERE_ROW_SET, CUBE_STACK_SET, TETRA_SET]
 const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
-const maxAlphaFor = (i) => (isSolidSet(Math.floor(i / BREATH_RING_COUNT)) ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA)
+const maxAlphaFor = (i) => {
+  const set = Math.floor(i / BREATH_RING_COUNT)
+  return isSolidSet(set) || set === BREATH_SPIN_FROM_APPEAR_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA
+}
 
 // Cube stack series: 5 pieces in a vertical stack, the middle one at the
 // Morph's center, all the same height with a thin gap between them. The top
@@ -116,7 +119,8 @@ const maxAlphaFor = (i) => (isSolidSet(Math.floor(i / BREATH_RING_COUNT)) ? CUBE
 // they drop from the bottom up and start tumbling on all axes.
 const STACK_GAP = 0.05
 const STACK_FIT_MARGIN = 0.97
-const STACK_SPIN_SPEED = [BREATH_FALL_ROT_SPEED / 2, BREATH_FALL_ROT_SPEED]   // current per-axis max spin as the min, double it as the max
+const STACK_SPIN_SPEED = [0.3125, 0.625]   // rad/s magnitude, random direction (was 0.25-0.5, +25%)
+const randSpin = (range) => (Math.random() < 0.5 ? -1 : 1) * THREE.MathUtils.randFloat(...range)
 const CUBE_CORNERS = Array.from({ length: 8 }, (_, k) => [k & 1 ? 0.5 : -0.5, k & 2 ? 0.5 : -0.5, k & 4 ? 0.5 : -0.5])
 // Largest cube edge whose whole 5-cube stack fits in the ellipsoid
 // (x/a)^2 + (y/b)^2 + (z/c)^2 <= 1 (horizontal extent = each corner's distance
@@ -157,11 +161,11 @@ function layoutStack(morphHalf) {
 const makeZSpin = () => ({
   rx: 0,
   ry: 0,
-  rz: (Math.random() < 0.5 ? -1 : 1) * THREE.MathUtils.randFloat(...STACK_SPIN_SPEED),
+  rz: randSpin(STACK_SPIN_SPEED),
 })
 const makeStackSpin = () => ({
   rx: 0,
-  ry: (Math.random() < 0.5 ? -1 : 1) * THREE.MathUtils.randFloat(...STACK_SPIN_SPEED),
+  ry: randSpin(STACK_SPIN_SPEED),
   rz: 0,
 })
 // Regular tetrahedron with edge 1, centered on its centroid, with rounded
@@ -270,7 +274,7 @@ function placeCountCubesOnce(camera, rootY, morphHalf, shape) {
     for (let t = 0; t < CUBE_PLACE_TRIES; t++) {
       const c = {
         z: THREE.MathUtils.randFloat(...CUBE_SPAWN_Z),
-        s: THREE.MathUtils.randFloat(...CUBE_SCALE),
+        s: THREE.MathUtils.randFloat(...shape.scale),
         rx: Math.random() * Math.PI * 2,
         ry: Math.random() * Math.PI * 2,
         rz: Math.random() * Math.PI * 2,
@@ -300,7 +304,7 @@ function placeCountCubesOnce(camera, rootY, morphHalf, shape) {
       if (score >= 0) break
     }
     if (!best || bestScore < 0) placed.clean = false
-    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[1], rx: 0, ry: 0, rz: 0, s: CUBE_SCALE[0], disk: { x: 0, y: 0, r: 0 } })
+    placed.push(best || { x: 0, y: 0, z: CUBE_SPAWN_Z[1], rx: 0, ry: 0, rz: 0, s: shape.scale[0], disk: { x: 0, y: 0, r: 0 } })
   }
   return placed
 }
@@ -315,14 +319,21 @@ function placeCountCubes(camera, rootY, morphHalf, shape) {
   }
   return layout
 }
+// All-axis random spin: each axis gets a magnitude in BREATH_SPIN_SPEED with
+// a random direction, so no axis (and no object) ever sits at or near zero.
+// Was a symmetric +/-0.25 rad/s per axis (magnitude 0-0.25); now 0.125-0.3125.
+const BREATH_SPIN_SPEED = [0.125, 0.3125]
 const makeBreathSpin = () => ({
-  rx: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-  ry: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
-  rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
+  rx: randSpin(BREATH_SPIN_SPEED),
+  ry: randSpin(BREATH_SPIN_SPEED),
+  rz: randSpin(BREATH_SPIN_SPEED),
 })
 const BREATH_EMISSIVE_MULT = 10      // baseline emissive multiplier while fading in / persistent
 const CUBE_EMISSIVE_MULT = 2         // solid count shapes' baseline (cubes, stacks); rings use BREATH_EMISSIVE_MULT
-const emissiveMultFor = (i) => (isSolidSet(Math.floor(i / BREATH_RING_COUNT)) ? CUBE_EMISSIVE_MULT : BREATH_EMISSIVE_MULT)
+const emissiveMultFor = (i) => {
+  const set = Math.floor(i / BREATH_RING_COUNT)
+  return isSolidSet(set) || set === BREATH_SPIN_FROM_APPEAR_SET ? CUBE_EMISSIVE_MULT : BREATH_EMISSIVE_MULT
+}
 const BREATH_EMISSIVE_FALL_TARGET = 1  // ramped down to this over the first second of the fall
 const BREATH_EMISSIVE_FALL_RAMP_S = 1.0
 const BREATH_FADE_IN_DURATION_S = 1.5  // time to fade a ring from 0 to full opacity, independent of slider speed
@@ -969,7 +980,7 @@ float dissolveHash(vec3 p) {
 
     if (countingEnabled) {
       const base = breathActiveSetRef.current * BREATH_RING_COUNT
-      const maxAlpha = isSolidSet(breathActiveSetRef.current) ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA
+      const maxAlpha = maxAlphaFor(base)
 
       // Deadband rise/fall tracker: only a confirmed reversal from a real
       // trough back to rising re-arms the next ring, so holding the
@@ -1036,10 +1047,13 @@ float dissolveHash(vec3 p) {
         const set = breathActiveSetRef.current
         breathSetFallingRef.current[set] = true
         const order = [0, 1, 2, 3, 4]
-        if (set === CUBE_STACK_SET) {
-          // Cube stack falls from the bottom up, each piece starting to tumble.
-          order.sort((p, q) => breathBaseRef.current[base + p].y - breathBaseRef.current[base + q].y)
+        if (set === CUBE_STACK_SET || set === SPHERE_ROW_SET) {
+          // Each piece starts an all-axis tumble on top of the turn it had
+          // reached (see breathTumbleRef); the cube stack also falls bottom-up.
           order.forEach((k) => { breathTumbleRef.current[base + k] = makeBreathSpin() })
+        }
+        if (set === CUBE_STACK_SET) {
+          order.sort((p, q) => breathBaseRef.current[base + p].y - breathBaseRef.current[base + q].y)
         } else {
           for (let i = order.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1))
@@ -1094,7 +1108,7 @@ float dissolveHash(vec3 p) {
         glowPos[i].set(0, groupOffsetY + fallY, breathBaseRef.current[i].z)
         // Scale by the ring's own emissive ratio too, so the backlight glow
         // dims in step with its visible emissive during the fall-away.
-        const emissiveRatio = breathMaterials[i].emissiveIntensity / BREATH_EMISSIVE_MULT
+        const emissiveRatio = breathMaterials[i].emissiveIntensity / emissiveMultFor(i)
         glowIntensity[i] = breathMaterials[i].opacity * BREATH_GLOW_STRENGTH * emissiveRatio
       }
     }
