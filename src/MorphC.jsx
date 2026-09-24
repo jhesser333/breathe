@@ -36,8 +36,15 @@ const BREATH_MAX_ALPHA = 0.5
 // is duplicated here from its exported inputs), tube tripled for visibility
 // at these distances.
 const BREATH_RING_TUBE = 0.015 * 3
+// Spinning rings (set 1, see BREATH_SPIN_FROM_APPEAR_SET) have their own
+// depths and a chunkier shape: tube 3x thicker, and 3x deeper along their
+// own Z (= world/camera depth at rest; the shape tumbles with the spin).
+const SPIN_RING_Z = [-45, -35, -25, -15, -5]
+const SPIN_RING_TUBE = BREATH_RING_TUBE * 3
+const SPIN_RING_Z_SCALE = 3
 const BREATH_RING_INNER_EDGE_FACTOR = (BASE_RADIUS - BASE_TUBE) / BASE_RADIUS
 const BREATH_RING_SCALE = GATE_SCALE.map(v => v * BREATH_RING_INNER_EDGE_FACTOR)
+const SPIN_RING_MESH_SCALE = [BREATH_RING_SCALE[0], BREATH_RING_SCALE[1], BREATH_RING_SCALE[2] * SPIN_RING_Z_SCALE]
 const BREATH_REVERSAL_DEADBAND = 0.08  // matches the deadband used elsewhere (App.jsx, SlowingDownController)
 const BREATH_FALL_STAGGER_S = 0.2
 const BREATH_FALL_HOLD_S = 2.0       // seconds a ring keeps falling/rotating at full opacity before fading
@@ -215,6 +222,8 @@ const makeBreathSpin = () => ({
   rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
 })
 const BREATH_EMISSIVE_MULT = 10      // baseline emissive multiplier while fading in / persistent
+const CUBE_EMISSIVE_MULT = 5         // Count Cubes' own baseline (rings use BREATH_EMISSIVE_MULT)
+const emissiveMultFor = (i) => (Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? CUBE_EMISSIVE_MULT : BREATH_EMISSIVE_MULT)
 const BREATH_EMISSIVE_FALL_TARGET = 1  // ramped down to this over the first second of the fall
 const BREATH_EMISSIVE_FALL_RAMP_S = 1.0
 const BREATH_FADE_IN_DURATION_S = 1.5  // time to fade a ring from 0 to full opacity, independent of slider speed
@@ -390,7 +399,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   // Per-object rest transform: rings sit on the axis at BREATH_RING_Z; Count
   // Cubes get a fresh random placement each time their set becomes active.
   const breathBaseRef = useRef(Array.from({ length: BREATH_TOTAL }, (_, i) => ({
-    x: 0, y: 0, z: BREATH_RING_Z[i % BREATH_RING_COUNT], rx: 0, ry: 0, rz: 0, s: 1,
+    x: 0, y: 0, z: (Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_Z : BREATH_RING_Z)[i % BREATH_RING_COUNT], rx: 0, ry: 0, rz: 0, s: 1,
   })))
   // Set true when a group's fall-away triggers; consumed on the very next
   // confirmed rise (breath 1's inhale of the next cycle), which is when
@@ -400,10 +409,10 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathCountingWasEnabledRef = useRef(false)
 
   const breathMaterials = useMemo(() => (
-    Array.from({ length: BREATH_TOTAL }, () => new THREE.MeshStandardMaterial({
+    Array.from({ length: BREATH_TOTAL }, (_, i) => new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.primaryColor),
       emissive: new THREE.Color(palette.primaryColor),
-      emissiveIntensity: BREATH_EMISSIVE_MULT,
+      emissiveIntensity: emissiveMultFor(i),
       roughness: 1,
       metalness: 0,
       transparent: true,
@@ -770,7 +779,7 @@ float dissolveHash(vec3 p) {
           group.scale.setScalar(b.s)
         }
         breathMaterials[i].opacity = 0
-        breathMaterials[i].emissiveIntensity = BREATH_EMISSIVE_MULT
+        breathMaterials[i].emissiveIntensity = emissiveMultFor(i)
       }
     }
     // New random Count Cube layout, applied as their rest transforms.
@@ -832,7 +841,7 @@ float dissolveHash(vec3 p) {
         const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
         breathMaterials[i].opacity = maxAlphaFor(i) * (1 - fadeT)
         const emissiveT = THREE.MathUtils.clamp(t / BREATH_EMISSIVE_FALL_RAMP_S, 0, 1)
-        breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(BREATH_EMISSIVE_MULT, BREATH_EMISSIVE_FALL_TARGET, emissiveT)
+        breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(emissiveMultFor(i), BREATH_EMISSIVE_FALL_TARGET, emissiveT)
         if (fadeT < 1) allDone = false
       }
       if (allDone) resetBreathSet(s)
@@ -955,7 +964,7 @@ float dissolveHash(vec3 p) {
       for (let i = 0; i < BREATH_RING_TOTAL; i++) {
         const group = breathGroupRefs[i].current
         const fallY = group ? group.position.y : 0
-        glowPos[i].set(0, groupOffsetY + fallY, BREATH_RING_Z[i % BREATH_RING_COUNT])
+        glowPos[i].set(0, groupOffsetY + fallY, breathBaseRef.current[i].z)
         // Scale by the ring's own emissive ratio too, so the backlight glow
         // dims in step with its visible emissive during the fall-away.
         const emissiveRatio = breathMaterials[i].emissiveIntensity / BREATH_EMISSIVE_MULT
@@ -983,12 +992,12 @@ float dissolveHash(vec3 p) {
       {/* Breath-count rings -- also outside the scaled group so they don't
           inherit the sphere's breathing scale. */}
       {breathGroupRefs.map((ref, i) => (
-        <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, BREATH_RING_Z[i % BREATH_RING_COUNT]]}>
+        <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, breathBaseRef.current[i].z]}>
           {Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? (
             <RoundedBox args={[1, 1, 1]} radius={CUBE_CHAMFER} smoothness={4} material={breathMaterials[i]} />
           ) : (
-            <mesh scale={BREATH_RING_SCALE}>
-              <torusGeometry args={[BASE_RADIUS, BREATH_RING_TUBE, 16, 64]} />
+            <mesh scale={Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_MESH_SCALE : BREATH_RING_SCALE}>
+              <torusGeometry args={[BASE_RADIUS, Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_TUBE : BREATH_RING_TUBE, 16, 64]} />
               <primitive object={breathMaterials[i]} attach="material" />
             </mesh>
           )}
