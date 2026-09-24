@@ -40,7 +40,7 @@ const SILHOUETTE_RING_EMISSIVE = 1
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_SET_COUNT = 7   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons, sphere rows, sphere-tetra spiral
+const BREATH_SET_COUNT = 8   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons, sphere rows, sphere-tetra spiral, squash rings
 const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph backlight glow tracks rings only)
 const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-144, -55, -21, -8, -3]
@@ -123,10 +123,17 @@ const SPHERE_ROW_Z = [-30, -22, -16, -12, -10]
 // the later ones lag behind and the rows fan out into a spiral.
 const SPIRAL_SET = 6
 const SPIRAL_TETRA_SCALE = SPHERE_ROW_RADIUS / Math.sqrt(3 / 8)   // unit-edge tetra circumradius -> sphere radius
+// Squash rings: the Pulse/Hold ring shape (same torus/scale as the count
+// rings) on the axis at a shuffled SQUASH_RING_Z depth, turning about Z only.
+// As it turns, its own Y scale follows the angle: full when upright or upside
+// down, SQUASH_RING_MIN_Y of that when sideways (smooth cos 2θ in between).
+const SQUASH_RING_SET = 7
+const SQUASH_RING_Z = [-5, -6, -7, -8, -9]
+const SQUASH_RING_MIN_Y = 0.5
 const isSolidSet = (set) => set >= CUBE_SET
 // TEMPORARY for testing: the first cycles use these sets, then the normal
 // 5-cycle pattern (set = cycle % 5) takes over.
-const TEMP_FIRST_CYCLES = [SPIRAL_SET, SPHERE_ROW_SET, CUBE_STACK_SET]
+const TEMP_FIRST_CYCLES = [SQUASH_RING_SET, SPIRAL_SET, SPHERE_ROW_SET]
 const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
 const maxAlphaFor = (i) => {
   const set = Math.floor(i / BREATH_RING_COUNT)
@@ -543,6 +550,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathFallSpinRef = useRef(new Array(BREATH_TOTAL).fill(null))
   const breathSpinStartRef = useRef(new Array(BREATH_TOTAL).fill(null))   // set when spin began on appearance (see BREATH_SPIN_FROM_APPEAR_SET)
   const breathTumbleRef = useRef(new Array(BREATH_TOTAL).fill(null))   // cube stack: all-axis spin added once each piece starts falling
+  const squashMeshRefs = useMemo(() => Array.from({ length: BREATH_RING_COUNT }, () => ({ current: null })), [])
   const spiralZSpinRef = useRef(0)   // sphere-tetra spiral: one shared Z speed per series
   const spiralTetraRefs = useMemo(() => Array.from({ length: BREATH_RING_COUNT * 2 }, () => ({ current: null })), [])
   const spiralTetraSpinRef = useRef(Array.from({ length: BREATH_RING_COUNT * 2 }, () => null))
@@ -956,6 +964,16 @@ float dissolveHash(vec3 p) {
           breathBaseRef.current[set * BREATH_RING_COUNT + k] = { x: 0, y: 0, z, rx: 0, ry: 0, rz: Math.random() * Math.PI * 2, s: 1 }
         })
       }
+      if (set === SQUASH_RING_SET) {
+        const depths = SQUASH_RING_Z.slice()
+        for (let i = depths.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[depths[i], depths[j]] = [depths[j], depths[i]]
+        }
+        depths.forEach((z, k) => {
+          breathBaseRef.current[set * BREATH_RING_COUNT + k] = { x: 0, y: 0, z, rx: 0, ry: 0, rz: Math.random() * Math.PI * 2, s: 1 }
+        })
+      }
       if (set === SPIRAL_SET) {
         const angle0 = Math.random() * Math.PI * 2
         spiralZSpinRef.current = randSpin(STACK_SPIN_SPEED)
@@ -1013,6 +1031,15 @@ float dissolveHash(vec3 p) {
         const ts = now - spinStart
         group.rotation.set(b.rx + spin.rx * ts, b.ry + spin.ry * ts, b.rz + spin.rz * ts)
       }
+    }
+
+    // Squash rings: Y scale follows the current Z angle.
+    for (let k = 0; k < BREATH_RING_COUNT; k++) {
+      const group = breathGroupRefs[SQUASH_RING_SET * BREATH_RING_COUNT + k].current
+      const mesh = squashMeshRefs[k].current
+      if (!group || !mesh) continue
+      const f = (1 + SQUASH_RING_MIN_Y) / 2 + ((1 - SQUASH_RING_MIN_Y) / 2) * Math.cos(2 * group.rotation.z)
+      mesh.scale.y = BREATH_RING_SCALE[1] * f
     }
 
     // Sphere-tetra spiral: each child tetrahedron tumbles on its own local
@@ -1097,7 +1124,7 @@ float dissolveHash(vec3 p) {
           const activeSet = breathActiveSetRef.current
           if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
             breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin()
-              : activeSet === SPHERE_ROW_SET ? makeZSpin()
+              : activeSet === SPHERE_ROW_SET || activeSet === SQUASH_RING_SET ? makeZSpin()
               : activeSet === SPIRAL_SET ? { rx: 0, ry: 0, rz: spiralZSpinRef.current }
               : makeBreathSpin()
             breathSpinStartRef.current[activeIdx] = now
@@ -1125,7 +1152,7 @@ float dissolveHash(vec3 p) {
         const set = breathActiveSetRef.current
         breathSetFallingRef.current[set] = true
         const order = [0, 1, 2, 3, 4]
-        if (set === CUBE_STACK_SET || set === SPHERE_ROW_SET || set === SPIRAL_SET) {
+        if (set === CUBE_STACK_SET || set === SPHERE_ROW_SET || set === SPIRAL_SET || set === SQUASH_RING_SET) {
           // Each piece starts an all-axis tumble on top of the turn it had
           // reached (see breathTumbleRef); the cube stack also falls bottom-up.
           order.forEach((k) => { breathTumbleRef.current[base + k] = makeBreathSpin() })
@@ -1225,6 +1252,11 @@ float dissolveHash(vec3 p) {
             <RoundedBox args={[1, 1, 1]} radius={CUBE_CHAMFER} smoothness={4} material={breathMaterials[i]} />
           ) : Math.floor(i / BREATH_RING_COUNT) === TETRA_SET ? (
             <mesh geometry={tetraGeometry} material={breathMaterials[i]} />
+          ) : Math.floor(i / BREATH_RING_COUNT) === SQUASH_RING_SET ? (
+            <mesh ref={(obj) => { squashMeshRefs[i % BREATH_RING_COUNT].current = obj }} scale={BREATH_RING_SCALE}>
+              <torusGeometry args={[BASE_RADIUS, BREATH_RING_TUBE, 16, 64]} />
+              <primitive object={breathMaterials[i]} attach="material" />
+            </mesh>
           ) : Math.floor(i / BREATH_RING_COUNT) === SPIRAL_SET ? (
             <>
               <mesh geometry={sphereRowGeometry} material={breathMaterials[i]} />
