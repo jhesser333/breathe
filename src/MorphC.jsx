@@ -19,6 +19,21 @@ const OPTION_D_EXHALE_Z_SCALE = 0.25  // Option D only: replaces the shared 0.2 
 const OPTION_D_INHALE_X_SCALE = 2     // Option D only: replaces the shared 2.25 at full inhale
 const OPTION_D_INHALE_Y_SCALE = 3     // Option D only: replaces the shared 3.5 at full inhale
 const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 at full inhale
+// Silhouette ring (Shape D): a permanent, non-animated thin outline of the
+// fully-inhaled Morph as seen from the camera. The Morph's inhale half-axes
+// are SPHERE_RADIUS x OPTION_D_INHALE_*_SCALE; from Shape D's camera on the Z
+// axis at distance 10 (App.jsx CAMERA_BY_SHAPE.d), its outline crosses the
+// z=0 plane at those half-axes x d/sqrt(d^2 - 1).
+const SILHOUETTE_CAMERA_DIST = 10
+const SILHOUETTE_K = SILHOUETTE_CAMERA_DIST / Math.sqrt(SILHOUETTE_CAMERA_DIST ** 2 - 1)
+const SILHOUETTE_RING_SCALE = [
+  SPHERE_RADIUS * OPTION_D_INHALE_X_SCALE * SILHOUETTE_K,
+  SPHERE_RADIUS * OPTION_D_INHALE_Y_SCALE * SILHOUETTE_K,
+  1,
+]
+const SILHOUETTE_RING_TUBE = 0.045 / 4   // the thin count-ring line weight (PaceRingsD COUNT_RING_TUBE)
+const SILHOUETTE_RING_ALPHA = 0.1
+const SILHOUETTE_RING_EMISSIVE = 1
 
 // Breath-count rings: groups of 5 breaths, one ring fades in and locks per
 // completed Inhale, all 5 fall away together on the 5th Exhale. "Breath" here
@@ -545,6 +560,16 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathCountingWasEnabledRef = useRef(false)
 
   const tetraGeometry = useMemo(() => makeTetraGeometry(), [])
+  const silhouetteMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+    color: new THREE.Color(palette.secondaryColor),
+    emissive: new THREE.Color(palette.secondaryColor),
+    emissiveIntensity: SILHOUETTE_RING_EMISSIVE,
+    transparent: true,
+    opacity: SILHOUETTE_RING_ALPHA,
+    depthWrite: false,
+    depthTest: false,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [])
   const sphereRowGeometry = useMemo(() => new THREE.SphereGeometry(SPHERE_ROW_RADIUS, 32, 16), [])
   const breathMaterials = useMemo(() => (
     Array.from({ length: BREATH_TOTAL }, (_, i) => new THREE.MeshStandardMaterial({
@@ -1146,6 +1171,8 @@ float dissolveHash(vec3 p) {
         m.color.copy(live.primary)
         m.emissive.copy(live.primary)
       })
+      silhouetteMaterial.color.copy(live.secondary)
+      silhouetteMaterial.emissive.copy(live.secondary)
     }
 
     // Feed each breath ring's current world position/opacity into the
@@ -1183,6 +1210,13 @@ float dissolveHash(vec3 p) {
       <points geometry={flowAttrs.geometry}>
         <primitive object={flowMaterial} attach="material" />
       </points>
+      {/* Silhouette ring: drawn first (lowest renderOrder, no depth test) so
+          everything else draws over it. */}
+      {shapeOption === 'd' && (
+        <mesh renderOrder={-1000} scale={SILHOUETTE_RING_SCALE} material={silhouetteMaterial}>
+          <torusGeometry args={[BASE_RADIUS, SILHOUETTE_RING_TUBE, 16, 128]} />
+        </mesh>
+      )}
       {/* Breath-count rings -- also outside the scaled group so they don't
           inherit the sphere's breathing scale. */}
       {breathGroupRefs.map((ref, i) => (

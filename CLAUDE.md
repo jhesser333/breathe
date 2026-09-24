@@ -117,6 +117,9 @@ Shared hook `usePaceRings` drives three ring types, identical in both modes: **P
 - **Startup fade-in**: when the paced art first starts (Box Breathing's first Inhale; Slowing Down D's first paced Inhale), `update()`'s `fade` multiplier (0→1, smoothstep over the first 90% of that Inhale — the same curve as the "Inhale" caption) scales every ring's alpha/emissive (Slowing Down also passes `holdExhaleRing` for the first Inhale+Exhale, pinning the Exhale ring at its movement target × fade so it fades in with the first Inhale and stays through the first Exhale instead of flashing on and off); the same value is written to App's `paceArtFadeRef` and applied by `RingParticlesD` to all three particle materials' `uGlobalFade`.
 - Box Breathing: `GatesBoxBreathingD` calls `update()` from its 4-phase clock (one staggered count ring per second of hold). Slowing Down: `SlowingDownPaceRingsD` (rendered when `mode === 'slowing' && shapeOption === 'd'`) drives it from `breathPhaseRef` + `computePhaseDurations`, no holds, one count ring per phase.
 
+## Silhouette ring (MorphC, Shape D)
+A permanent, non-animated thin ring outlining the fully-inhaled Morph as seen from the camera. It sits at z=0 with scale = the inhale half-axes (1.0 × 1.5) × d/√(d² − 1) for the camera distance d=10 (≈ 1.005 × 1.508). Tube `SILHOUETTE_RING_TUBE` (the thin count-ring weight, 0.01125). Base and emissive are the live **secondary** color, emissive 1, alpha 0.1. `renderOrder` -1000 with depth test off, so everything else draws over it; it shows most during Exhale.
+
 ## Breath-count rings start point (MorphC, Shapes C/D)
 The Morph's 5-breath count rings start counting at a per-mode point (`introStartsCountingRef` / `breathCountSourceRef` in App.jsx):
 - **Breathe at Your Own Pace / Paced Breathing**: at the intro text hand-off, counted from the left slider (unchanged).
