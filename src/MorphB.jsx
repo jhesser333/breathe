@@ -24,14 +24,15 @@ const DISSOLVE_EDGE = 0.12
 
 // Burst sparkles: MorphC's surface-sparkle look (size, life, fade, twinkle),
 // but fired in one burst each time the right slider reaches its top or bottom.
-// Each particle flies away from its spawn point along X (outward from the
-// cube's center line) at a random speed.
+// Top (Exhale): particles fly outward along X; bottom (Inhale): along Y. Speed
+// is random, scaled by how far the particle spawned from the cube's pivot
+// along that axis (0 at the center, full at the face).
 const BURST_POOL = 1500
 const BURST_COUNT = 150
-const BURST_SPEED = [0.3, 1.0]   // units/s along X
+const BURST_SPEED = [0.3, 1.0]   // units/s at the face (scales to 0 at the pivot)
 const BURST_EDGE = 0.02          // raw slider distance from an end that counts as "hit"
 const BURST_REARM = 0.1          // must move this far back from that end before it can fire again
-const BURST_SIZE = 120
+const BURST_SIZE = 60
 const SPAWN_SENTINEL = -1e4
 const MORPH_Y = 0.25
 
@@ -39,7 +40,7 @@ const BURST_VERTEX_SHADER = `
 attribute float aSpawnTime;
 attribute float aLifetime;
 attribute float aSeed;
-attribute float aVelX;
+attribute vec3 aVel;
 uniform float uTime;
 uniform float uSize;
 varying float vAlpha;
@@ -52,7 +53,7 @@ void main() {
   float fadeOut = 1.0 - smoothstep(0.7, 1.0, lifeT);
   float envelope = fadeIn * fadeOut;
 
-  vec3 p = vec3(position.x + aVelX * age, position.y, position.z);
+  vec3 p = position + aVel * age;
   vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
   gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
@@ -185,20 +186,20 @@ float dissolveHash(vec3 p) {
     const seeds = new Float32Array(BURST_POOL)
     const spawnTimes = new Float32Array(BURST_POOL).fill(SPAWN_SENTINEL)
     const lifetimes = new Float32Array(BURST_POOL).fill(1)
-    const velX = new Float32Array(BURST_POOL)
+    const vel = new Float32Array(BURST_POOL * 3)
     for (let i = 0; i < BURST_POOL; i++) seeds[i] = Math.random()
 
     const geometry = new THREE.BufferGeometry()
     const positionAttr = new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage)
     const spawnTimeAttr = new THREE.BufferAttribute(spawnTimes, 1).setUsage(THREE.DynamicDrawUsage)
     const lifetimeAttr = new THREE.BufferAttribute(lifetimes, 1).setUsage(THREE.DynamicDrawUsage)
-    const velXAttr = new THREE.BufferAttribute(velX, 1).setUsage(THREE.DynamicDrawUsage)
+    const velAttr = new THREE.BufferAttribute(vel, 3).setUsage(THREE.DynamicDrawUsage)
     geometry.setAttribute('position', positionAttr)
     geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
     geometry.setAttribute('aSpawnTime', spawnTimeAttr)
     geometry.setAttribute('aLifetime', lifetimeAttr)
-    geometry.setAttribute('aVelX', velXAttr)
-    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, velXAttr, base: new Float32Array(3) }
+    geometry.setAttribute('aVel', velAttr)
+    return { geometry, positionAttr, spawnTimeAttr, lifetimeAttr, velAttr, base: new Float32Array(3) }
   }, [])
 
   const burstMaterial = useMemo(() => new THREE.ShaderMaterial({
@@ -254,23 +255,27 @@ float dissolveHash(vec3 p) {
     if (burstEndRef.current === 'bottom' && raw > BURST_REARM) burstEndRef.current = null
     if (atEnd && burstEndRef.current !== atEnd) {
       burstEndRef.current = atEnd
-      const { positionAttr, spawnTimeAttr, lifetimeAttr, velXAttr, base } = burst
+      const axis = atEnd === 'top' ? 0 : 1   // Exhale end: X, Inhale end: Y
+      const { positionAttr, spawnTimeAttr, lifetimeAttr, velAttr, base } = burst
       for (let k = 0; k < BURST_COUNT; k++) {
         const idx = burstCursorRef.current % BURST_POOL
         burstCursorRef.current += 1
         sampleCubeSurface(base, 0)
         // Spawn on the cube's visible surface at this frame's scale.
-        const x = base[0] * xScale
-        positionAttr.array[idx * 3]     = x
+        positionAttr.array[idx * 3]     = base[0] * xScale
         positionAttr.array[idx * 3 + 1] = base[1] * yScale
         positionAttr.array[idx * 3 + 2] = base[2] * zScale
-        const dir = x > 0 ? 1 : x < 0 ? -1 : (Math.random() < 0.5 ? -1 : 1)
-        velXAttr.array[idx] = dir * THREE.MathUtils.randFloat(...BURST_SPEED)
+        // Outward along the axis; base is on the unit cube, so |base|/0.5 is
+        // 0 at the pivot and 1 at the face regardless of the current scale.
+        velAttr.array[idx * 3] = 0
+        velAttr.array[idx * 3 + 1] = 0
+        velAttr.array[idx * 3 + 2] = 0
+        velAttr.array[idx * 3 + axis] = (base[axis] / 0.5) * THREE.MathUtils.randFloat(...BURST_SPEED)
         spawnTimeAttr.array[idx] = now
         lifetimeAttr.array[idx] = 1 + Math.random()
       }
       positionAttr.needsUpdate = true
-      velXAttr.needsUpdate = true
+      velAttr.needsUpdate = true
       spawnTimeAttr.needsUpdate = true
       lifetimeAttr.needsUpdate = true
     }
