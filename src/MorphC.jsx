@@ -25,7 +25,7 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_SET_COUNT = 5   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons
+const BREATH_SET_COUNT = 6   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons, sphere rows
 const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph backlight glow tracks rings only)
 const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-144, -55, -21, -8, -3]
@@ -92,10 +92,18 @@ const CUBE_LAYOUT_TRIES = 10
 const CUBE_STACK_SET = 3
 const TETRA_SET = 4                  // sculpture tetrahedrons: same placement rules as CUBE_SET
 const isSculptureSet = (set) => set === CUBE_SET || set === TETRA_SET
+// Sphere rows: each piece is 3 spheres (radius 0.5) in a row along X, one
+// sphere-diameter of gap between the middle and each outer sphere. Pieces sit
+// on the axis at SPHERE_ROW_Z (in appearance order), each at a random Z angle,
+// turning about Z only at STACK_SPIN_SPEED rad/s (random direction).
+const SPHERE_ROW_SET = 5
+const SPHERE_ROW_RADIUS = 0.5
+const SPHERE_ROW_SPACING = SPHERE_ROW_RADIUS * 2 + SPHERE_ROW_RADIUS * 2   // center-to-center: one diameter of sphere + one diameter of gap
+const SPHERE_ROW_Z = [-30, -25, -20, -15, -10]
 const isSolidSet = (set) => set >= CUBE_SET
 // TEMPORARY for testing: the first cycles use these sets, then the normal
 // 5-cycle pattern (set = cycle % 5) takes over.
-const TEMP_FIRST_CYCLES = [CUBE_STACK_SET, TETRA_SET]
+const TEMP_FIRST_CYCLES = [SPHERE_ROW_SET, CUBE_STACK_SET, TETRA_SET]
 const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
 const maxAlphaFor = (i) => (isSolidSet(Math.floor(i / BREATH_RING_COUNT)) ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA)
 
@@ -146,6 +154,11 @@ function layoutStack(morphHalf) {
   }
   return pieces
 }
+const makeZSpin = () => ({
+  rx: 0,
+  ry: 0,
+  rz: (Math.random() < 0.5 ? -1 : 1) * THREE.MathUtils.randFloat(...STACK_SPIN_SPEED),
+})
 const makeStackSpin = () => ({
   rx: 0,
   ry: (Math.random() < 0.5 ? -1 : 1) * THREE.MathUtils.randFloat(...STACK_SPIN_SPEED),
@@ -496,6 +509,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathCountingWasEnabledRef = useRef(false)
 
   const tetraGeometry = useMemo(() => makeTetraGeometry(), [])
+  const sphereRowGeometry = useMemo(() => new THREE.SphereGeometry(SPHERE_ROW_RADIUS, 32, 16), [])
   const breathMaterials = useMemo(() => (
     Array.from({ length: BREATH_TOTAL }, (_, i) => new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.primaryColor),
@@ -876,6 +890,11 @@ float dissolveHash(vec3 p) {
       const morphHalf = shapeOption === 'd'
         ? [OPTION_D_INHALE_X_SCALE, OPTION_D_INHALE_Y_SCALE, OPTION_D_INHALE_Z_SCALE].map(v => v * SPHERE_RADIUS)
         : [2.25, 3.5, 1.5].map(v => v * SPHERE_RADIUS)
+      if (set === SPHERE_ROW_SET) {
+        SPHERE_ROW_Z.forEach((z, k) => {
+          breathBaseRef.current[set * BREATH_RING_COUNT + k] = { x: 0, y: 0, z, rx: 0, ry: 0, rz: Math.random() * Math.PI * 2, s: 1 }
+        })
+      }
       if (set === CUBE_STACK_SET) {
         layoutStack(morphHalf).forEach((b, k) => { breathBaseRef.current[set * BREATH_RING_COUNT + k] = b })
       }
@@ -991,7 +1010,7 @@ float dissolveHash(vec3 p) {
           const activeIdx = base + breathLockedCountRef.current
           const activeSet = breathActiveSetRef.current
           if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
-            breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin() : makeBreathSpin()
+            breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin() : activeSet === SPHERE_ROW_SET ? makeZSpin() : makeBreathSpin()
             breathSpinStartRef.current[activeIdx] = now
           }
           const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
@@ -1105,6 +1124,12 @@ float dissolveHash(vec3 p) {
             <RoundedBox args={[1, 1, 1]} radius={CUBE_CHAMFER} smoothness={4} material={breathMaterials[i]} />
           ) : Math.floor(i / BREATH_RING_COUNT) === TETRA_SET ? (
             <mesh geometry={tetraGeometry} material={breathMaterials[i]} />
+          ) : Math.floor(i / BREATH_RING_COUNT) === SPHERE_ROW_SET ? (
+            <>
+              {[-1, 0, 1].map((k) => (
+                <mesh key={k} position={[k * SPHERE_ROW_SPACING, 0, 0]} geometry={sphereRowGeometry} material={breathMaterials[i]} />
+              ))}
+            </>
           ) : (
             <mesh scale={Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_MESH_SCALE : BREATH_RING_SCALE}>
               <torusGeometry args={[BASE_RADIUS, Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_TUBE : BREATH_RING_TUBE, 16, 64]} />
