@@ -59,6 +59,7 @@ export default function SlowingDownPaceRingsD({ gatesEnabledRef, breathPhaseRef,
       live,
       fade,
       holdExhaleRing: firstBreathRef.current === 'inhale' || firstBreathRef.current === 'exhale',
+      phaseStartPulse: true,
     })
   })
 

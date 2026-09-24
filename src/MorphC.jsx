@@ -122,7 +122,7 @@ const SPHERE_ROW_Z = [-30, -22, -16, -12, -10]
 // and one random Z speed, and each piece starts turning when it appears, so
 // the later ones lag behind and the rows fan out into a spiral.
 const SPIRAL_SET = 6
-const SPIRAL_TETRA_SCALE = SPHERE_ROW_RADIUS / Math.sqrt(3 / 8)   // unit-edge tetra circumradius -> sphere radius
+const SPIRAL_TETRA_SCALE = 1.5 * SPHERE_ROW_RADIUS / Math.sqrt(3 / 8)   // tetra circumradius = 1.5x the sphere radius (0.75; still clear of the sphere at 1.5 spacing)
 // Squash rings: the Pulse/Hold ring shape (same torus/scale as the count
 // rings) on the axis at a shuffled SQUASH_RING_Z depth, turning about Z only.
 // As it turns, its own Y scale follows the angle: full when upright or upside

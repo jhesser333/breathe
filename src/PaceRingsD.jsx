@@ -154,7 +154,10 @@ export function usePaceRings({ gateColor, emissiveColor }) {
   // holdExhaleRing: pin the Exhale ring at its movement target (x fade) instead
   // of its normal ramp -- Slowing Down's first breath, so the ring fades in with
   // the first Inhale and stays through the first Exhale rather than flashing.
-  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live, fade = 1, holdExhaleRing = false }) {
+  // phaseStartPulse (Slowing Down only; no holds): one hold-style pulse on the
+  // ring the breath just arrived at, over the first PULSE_DURATION of each
+  // side -- the "other" ring, which starts the side at its movement target.
+  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live, fade = 1, holdExhaleRing = false, phaseStartPulse = false }) {
     const inner = ringMatRef.current
     if (live) {
       if (inner) { inner.color.copy(live.secondary); inner.emissive.copy(live.primary) }
@@ -180,8 +183,9 @@ export function usePaceRings({ gateColor, emissiveColor }) {
     // curve reversed), then stays off through the hold.
     const ownAlpha = fade * (inHold ? lerp(PULSE_ALPHA_MIN, PULSE_ALPHA_MAX, pulse) : lerp(0, PULSE_MOVE_ALPHA_TARGET, moveT))
     const ownEmissive = fade * (inHold ? lerp(PULSE_EMISSIVE_MIN, PULSE_EMISSIVE_MAX, pulse) : lerp(0, PULSE_MOVE_EMISSIVE_TARGET, moveT))
-    const otherAlpha = fade * (inHold ? 0 : lerp(PULSE_MOVE_ALPHA_TARGET, 0, moveT))
-    const otherEmissive = fade * (inHold ? 0 : lerp(PULSE_MOVE_EMISSIVE_TARGET, 0, moveT))
+    const startPulse = phaseStartPulse && holdDuration === 0 && sideElapsed < PULSE_DURATION ? pulseEnvelope(sideElapsed) : 0
+    const otherAlpha = fade * (inHold ? 0 : lerp(PULSE_MOVE_ALPHA_TARGET, 0, moveT) + (PULSE_ALPHA_MAX - PULSE_ALPHA_MIN) * startPulse)
+    const otherEmissive = fade * (inHold ? 0 : lerp(PULSE_MOVE_EMISSIVE_TARGET, 0, moveT) + (PULSE_EMISSIVE_MAX - PULSE_EMISSIVE_MIN) * startPulse)
 
     const innerIsOwn = side === 'inhale'
     if (ringMeshRef.current) ringMeshRef.current.visible = true
