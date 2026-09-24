@@ -128,12 +128,12 @@ const SPIRAL_TETRA_SCALE = 1.5 * SPHERE_ROW_RADIUS / Math.sqrt(3 / 8)   // tetra
 // As it turns, its own Y scale follows the angle: full when upright or upside
 // down, SQUASH_RING_MIN_Y of that when sideways (smooth cos 2θ in between).
 const SQUASH_RING_SET = 7
-const SQUASH_RING_Z = [-5, -6, -7, -8, -9]
+const SQUASH_RING_Z = [-5, -10, -15, -20, -25]   // even steps, shuffled each cycle
 const SQUASH_RING_MIN_Y = 0.5
 const isSolidSet = (set) => set >= CUBE_SET
 // TEMPORARY for testing: the first cycles use these sets, then the normal
 // 5-cycle pattern (set = cycle % 5) takes over.
-const TEMP_FIRST_CYCLES = [SQUASH_RING_SET, SPIRAL_SET, SPHERE_ROW_SET]
+const TEMP_FIRST_CYCLES = []   // set e.g. [SQUASH_RING_SET] to preview a set first while testing
 const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
 const maxAlphaFor = (i) => {
   const set = Math.floor(i / BREATH_RING_COUNT)
@@ -202,6 +202,9 @@ function layoutStack(morphHalf) {
   }
   return pieces
 }
+// Squash rings turn at half the usual single-axis speed.
+const SQUASH_SPIN_SPEED = STACK_SPIN_SPEED.map((v) => v * 0.5)
+const makeSquashSpin = () => ({ rx: 0, ry: 0, rz: randSpin(SQUASH_SPIN_SPEED) })
 const makeZSpin = () => ({
   rx: 0,
   ry: 0,
@@ -1124,7 +1127,8 @@ float dissolveHash(vec3 p) {
           const activeSet = breathActiveSetRef.current
           if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
             breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin()
-              : activeSet === SPHERE_ROW_SET || activeSet === SQUASH_RING_SET ? makeZSpin()
+              : activeSet === SPHERE_ROW_SET ? makeZSpin()
+              : activeSet === SQUASH_RING_SET ? makeSquashSpin()
               : activeSet === SPIRAL_SET ? { rx: 0, ry: 0, rz: spiralZSpinRef.current }
               : makeBreathSpin()
             breathSpinStartRef.current[activeIdx] = now
