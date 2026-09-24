@@ -24,7 +24,7 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_SET_COUNT = 3   // sets take turns so one can fall while the next counts: still rings, spinning rings, Count Cubes
+const BREATH_SET_COUNT = 5   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, tetrahedron stack
 const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph backlight glow tracks rings only)
 const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-144, -55, -21, -8, -3]
@@ -82,9 +82,89 @@ const CUBE_MAX_ALPHA = 0.5
 const CUBE_PLACE_TRIES = 400
 const CUBE_LAYOUT_TRIES = 10
 // TEMPORARY for testing: cycle 1 uses Count Cubes too (normally still rings).
-const TEMP_FIRST_CYCLE_CUBES = true
-const setForCycle = (c) => (TEMP_FIRST_CYCLE_CUBES && c === 0 ? CUBE_SET : c % BREATH_SET_COUNT)
-const maxAlphaFor = (i) => (Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA)
+const CUBE_STACK_SET = 3
+const TETRA_STACK_SET = 4
+const isSolidSet = (set) => set >= CUBE_SET
+// TEMPORARY for testing: the first cycles use these sets, then the normal
+// 5-cycle pattern (set = cycle % 5) takes over.
+const TEMP_FIRST_CYCLES = [CUBE_STACK_SET, TETRA_STACK_SET]
+const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
+const maxAlphaFor = (i) => (isSolidSet(Math.floor(i / BREATH_RING_COUNT)) ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA)
+
+// Stack series (cube stack, tetrahedron stack): 5 identical pieces in a
+// vertical stack, the middle one at the Morph's center, sized so every piece
+// sits inside the Morph's full-Inhale ellipsoid at any Y angle, with a thin
+// gap between pieces. Pieces fill in random order, each at a random Y angle,
+// turning about Y only at STACK_SPIN_SPEED rad/s (random direction), through
+// the fall too.
+const STACK_GAP = 0.05
+const STACK_FIT_MARGIN = 0.97
+const STACK_SPIN_SPEED = [BREATH_FALL_ROT_SPEED / 2, BREATH_FALL_ROT_SPEED]   // current per-axis max spin as the min, double it as the max
+const TETRA_HEIGHT = Math.sqrt(2 / 3)   // regular tetrahedron, edge 1
+const TETRA_BASE_R = 1 / Math.sqrt(3)   // circumradius of its base triangle
+// Unit-piece vertices, centered on mid-height (tetra: base down, apex up).
+const STACK_SHAPES = {
+  [CUBE_STACK_SET]: {
+    h: 1,
+    verts: Array.from({ length: 8 }, (_, k) => [k & 1 ? 0.5 : -0.5, k & 2 ? 0.5 : -0.5, k & 4 ? 0.5 : -0.5]),
+  },
+  [TETRA_STACK_SET]: {
+    h: TETRA_HEIGHT,
+    verts: [0, 1, 2].map((k) => {
+      const a = Math.PI / 2 + (k * 2 * Math.PI) / 3
+      return [TETRA_BASE_R * Math.cos(a), -TETRA_HEIGHT / 2, TETRA_BASE_R * Math.sin(a)]
+    }).concat([[0, TETRA_HEIGHT / 2, 0]]),
+  },
+}
+// Largest piece size whose whole 5-piece stack fits in the ellipsoid
+// (x/a)^2 + (y/b)^2 + (z/c)^2 <= 1; horizontal extent uses each vertex's
+// distance from the Y axis against min(a, c), so any Y angle fits.
+function layoutStack(set, morphHalf) {
+  const { h, verts } = STACK_SHAPES[set]
+  const m = Math.min(morphHalf[0], morphHalf[2]), b = morphHalf[1]
+  const fits = (s) => {
+    for (let k = -2; k <= 2; k++) {
+      const yc = k * (s * h + STACK_GAP)
+      for (const [vx, vy, vz] of verts) {
+        const r = s * Math.hypot(vx, vz), y = yc + s * vy
+        if ((r * r) / (m * m) + (y * y) / (b * b) > 1) return false
+      }
+    }
+    return true
+  }
+  let lo = 0, hi = 4
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid }
+  const s = lo * STACK_FIT_MARGIN
+  const slots = [-2, -1, 0, 1, 2].map((k) => k * (s * h + STACK_GAP))
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[slots[i], slots[j]] = [slots[j], slots[i]]
+  }
+  return slots.map((y) => ({ x: 0, y, z: 0, rx: 0, ry: Math.random() * Math.PI * 2, rz: 0, s }))
+}
+const makeStackSpin = () => ({
+  rx: 0,
+  ry: (Math.random() < 0.5 ? -1 : 1) * THREE.MathUtils.randFloat(...STACK_SPIN_SPEED),
+  rz: 0,
+})
+// Shared tetrahedron geometry, built to match STACK_SHAPES (outward winding).
+function makeTetraGeometry() {
+  const v = STACK_SHAPES[TETRA_STACK_SET].verts.map((p) => new THREE.Vector3(...p))
+  const centroid = v.reduce((acc, p) => acc.add(p), new THREE.Vector3()).divideScalar(4)
+  const faces = [[0, 1, 2], [0, 1, 3], [1, 2, 3], [2, 0, 3]]
+  const pos = []
+  const n = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), c = new THREE.Vector3()
+  for (let [i, j, k] of faces) {
+    e1.subVectors(v[j], v[i]); e2.subVectors(v[k], v[i]); n.crossVectors(e1, e2)
+    c.copy(v[i]).add(v[j]).add(v[k]).divideScalar(3).sub(centroid)
+    if (n.dot(c) < 0) [j, k] = [k, j]
+    for (const idx of [i, j, k]) pos.push(v[idx].x, v[idx].y, v[idx].z)
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.computeVertexNormals()
+  return g
+}
 
 const _p = new THREE.Vector3()
 const _u = new THREE.Vector3()
@@ -222,8 +302,8 @@ const makeBreathSpin = () => ({
   rz: THREE.MathUtils.randFloatSpread(BREATH_FALL_ROT_SPEED),
 })
 const BREATH_EMISSIVE_MULT = 10      // baseline emissive multiplier while fading in / persistent
-const CUBE_EMISSIVE_MULT = 5         // Count Cubes' own baseline (rings use BREATH_EMISSIVE_MULT)
-const emissiveMultFor = (i) => (Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? CUBE_EMISSIVE_MULT : BREATH_EMISSIVE_MULT)
+const CUBE_EMISSIVE_MULT = 2         // solid count shapes' baseline (cubes, stacks); rings use BREATH_EMISSIVE_MULT
+const emissiveMultFor = (i) => (isSolidSet(Math.floor(i / BREATH_RING_COUNT)) ? CUBE_EMISSIVE_MULT : BREATH_EMISSIVE_MULT)
 const BREATH_EMISSIVE_FALL_TARGET = 1  // ramped down to this over the first second of the fall
 const BREATH_EMISSIVE_FALL_RAMP_S = 1.0
 const BREATH_FADE_IN_DURATION_S = 1.5  // time to fade a ring from 0 to full opacity, independent of slider speed
@@ -408,6 +488,7 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const paletteLerpPendingRef = useRef(false)
   const breathCountingWasEnabledRef = useRef(false)
 
+  const tetraGeometry = useMemo(() => makeTetraGeometry(), [])
   const breathMaterials = useMemo(() => (
     Array.from({ length: BREATH_TOTAL }, (_, i) => new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.primaryColor),
@@ -784,10 +865,13 @@ float dissolveHash(vec3 p) {
     }
     // New random Count Cube layout, applied as their rest transforms.
     const activateBreathSet = (set) => {
+      const morphHalf = shapeOption === 'd'
+        ? [OPTION_D_INHALE_X_SCALE, OPTION_D_INHALE_Y_SCALE, OPTION_D_INHALE_Z_SCALE].map(v => v * SPHERE_RADIUS)
+        : [2.25, 3.5, 1.5].map(v => v * SPHERE_RADIUS)
+      if (set === CUBE_STACK_SET || set === TETRA_STACK_SET) {
+        layoutStack(set, morphHalf).forEach((b, k) => { breathBaseRef.current[set * BREATH_RING_COUNT + k] = b })
+      }
       if (set === CUBE_SET) {
-        const morphHalf = shapeOption === 'd'
-          ? [OPTION_D_INHALE_X_SCALE, OPTION_D_INHALE_Y_SCALE, OPTION_D_INHALE_Z_SCALE].map(v => v * SPHERE_RADIUS)
-          : [2.25, 3.5, 1.5].map(v => v * SPHERE_RADIUS)
         const placed = placeCountCubes(state.camera, shapeOption === 'd' ? 0 : 0.25, morphHalf)
         placed.forEach((c, k) => {
           const { disk, ...b } = c
@@ -849,7 +933,7 @@ float dissolveHash(vec3 p) {
 
     if (countingEnabled) {
       const base = breathActiveSetRef.current * BREATH_RING_COUNT
-      const maxAlpha = breathActiveSetRef.current === CUBE_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA
+      const maxAlpha = isSolidSet(breathActiveSetRef.current) ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA
 
       // Deadband rise/fall tracker: only a confirmed reversal from a real
       // trough back to rising re-arms the next ring, so holding the
@@ -888,8 +972,9 @@ float dissolveHash(vec3 p) {
       if (breathLockedCountRef.current < BREATH_RING_COUNT) {
         if (breathArmedRef.current) {
           const activeIdx = base + breathLockedCountRef.current
-          if ((breathActiveSetRef.current === BREATH_SPIN_FROM_APPEAR_SET || breathActiveSetRef.current === CUBE_SET) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
-            breathFallSpinRef.current[activeIdx] = makeBreathSpin()
+          const activeSet = breathActiveSetRef.current
+          if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
+            breathFallSpinRef.current[activeIdx] = (activeSet === CUBE_STACK_SET || activeSet === TETRA_STACK_SET) ? makeStackSpin() : makeBreathSpin()
             breathSpinStartRef.current[activeIdx] = now
           }
           const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
@@ -993,8 +1078,10 @@ float dissolveHash(vec3 p) {
           inherit the sphere's breathing scale. */}
       {breathGroupRefs.map((ref, i) => (
         <group key={i} ref={(obj) => { ref.current = obj }} position={[0, 0, breathBaseRef.current[i].z]}>
-          {Math.floor(i / BREATH_RING_COUNT) === CUBE_SET ? (
+          {Math.floor(i / BREATH_RING_COUNT) === CUBE_SET || Math.floor(i / BREATH_RING_COUNT) === CUBE_STACK_SET ? (
             <RoundedBox args={[1, 1, 1]} radius={CUBE_CHAMFER} smoothness={4} material={breathMaterials[i]} />
+          ) : Math.floor(i / BREATH_RING_COUNT) === TETRA_STACK_SET ? (
+            <mesh geometry={tetraGeometry} material={breathMaterials[i]} />
           ) : (
             <mesh scale={Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_MESH_SCALE : BREATH_RING_SCALE}>
               <torusGeometry args={[BASE_RADIUS, Math.floor(i / BREATH_RING_COUNT) === BREATH_SPIN_FROM_APPEAR_SET ? SPIN_RING_TUBE : BREATH_RING_TUBE, 16, 64]} />
