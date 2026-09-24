@@ -35,9 +35,6 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         <button style={optionBtn(shapeOption === 'b', palette)} onClick={() => onSelectShape('b')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Cube with Targets {shapeOption === 'b' && '✓'}</div>
         </button>
-        <button style={optionBtn(shapeOption === 'e', palette)} onClick={() => onSelectShape('e')}>
-          <div style={{ fontSize: 17, fontWeight: 500 }}>Rotating Rings {shapeOption === 'e' && '✓'}</div>
-        </button>
       </div>
 
       <div style={{
