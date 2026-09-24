@@ -25,7 +25,7 @@ const OPTION_D_INHALE_Z_SCALE = 2     // Option D only: replaces the shared 1.5 
 // means literal slider movement (leftRawRef), identical across every mode --
 // not any mode's own phase clock.
 const BREATH_RING_COUNT = 5
-const BREATH_SET_COUNT = 6   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons, sphere rows
+const BREATH_SET_COUNT = 7   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons, sphere rows, sphere-tetra spiral
 const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph backlight glow tracks rings only)
 const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-144, -55, -21, -8, -3]
@@ -94,16 +94,24 @@ const TETRA_SET = 4                  // sculpture tetrahedrons: same placement r
 const isSculptureSet = (set) => set === CUBE_SET || set === TETRA_SET
 // Sphere rows: each piece is 3 spheres (radius 0.5) in a row along X, one
 // sphere-diameter of gap between the middle and each outer sphere. Pieces sit
-// on the axis at SPHERE_ROW_Z (in appearance order), each at a random Z angle,
+// on the axis at SPHERE_ROW_Z (in appearance order: farthest first), each at a random Z angle,
 // turning about Z only at STACK_SPIN_SPEED rad/s (random direction).
 const SPHERE_ROW_SET = 5
 const SPHERE_ROW_RADIUS = 0.5
-const SPHERE_ROW_SPACING = SPHERE_ROW_RADIUS * 2 + SPHERE_ROW_RADIUS * 2   // center-to-center: one diameter of sphere + one diameter of gap
-const SPHERE_ROW_Z = [-100, -80, -60, -40, -20]
+const SPHERE_ROW_SPACING = SPHERE_ROW_RADIUS * 2 + SPHERE_ROW_RADIUS   // center-to-center: one sphere diameter + a one-radius gap
+const SPHERE_ROW_Z = [-30, -22, -16, -12, -10]
+// Sphere-tetra spiral: same row layout, but the outer spheres are regular
+// tetrahedrons (children of the center sphere, same size: circumradius =
+// sphere radius), each tumbling on its own local axes. Pieces appear farthest
+// first at SPHERE_ROW_Z; the whole series shares one random starting Z angle
+// and one random Z speed, and each piece starts turning when it appears, so
+// the later ones lag behind and the rows fan out into a spiral.
+const SPIRAL_SET = 6
+const SPIRAL_TETRA_SCALE = SPHERE_ROW_RADIUS / Math.sqrt(3 / 8)   // unit-edge tetra circumradius -> sphere radius
 const isSolidSet = (set) => set >= CUBE_SET
 // TEMPORARY for testing: the first cycles use these sets, then the normal
 // 5-cycle pattern (set = cycle % 5) takes over.
-const TEMP_FIRST_CYCLES = [SPHERE_ROW_SET, CUBE_STACK_SET, TETRA_SET]
+const TEMP_FIRST_CYCLES = [SPIRAL_SET, SPHERE_ROW_SET, CUBE_STACK_SET]
 const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
 const maxAlphaFor = (i) => {
   const set = Math.floor(i / BREATH_RING_COUNT)
@@ -126,31 +134,45 @@ const CUBE_CORNERS = Array.from({ length: 8 }, (_, k) => [k & 1 ? 0.5 : -0.5, k 
 // (x/a)^2 + (y/b)^2 + (z/c)^2 <= 1 (horizontal extent = each corner's distance
 // from the Y axis, against min(a, c)); then the widest square footprint each
 // of the middle three can take at its own height.
+// Each piece is tipped STACK_TILT about its own X axis (top away from the
+// camera) and turns about its own (tilted) Y axis: Euler order XYZ applies
+// the tilt first, so ry spins in the piece's local frame.
+const STACK_TILT = -Math.PI / 6
+const STACK_FIT_ANGLES = 36   // Y-turn samples when checking the swept shape against the Morph
 function layoutStack(morphHalf) {
-  const m = Math.min(morphHalf[0], morphHalf[2]), b = morphHalf[1]
-  const fits = (e) => {
-    for (let k = -2; k <= 2; k++) {
-      const yc = k * (e + STACK_GAP)
+  const [a, b, c] = morphHalf
+  const ct = Math.cos(STACK_TILT), st = Math.sin(STACK_TILT)
+  // Tilted pieces stay parallel, so their faces are separated along the
+  // tilted Y axis by spacing * cos(tilt); widen the spacing so that gap is
+  // still STACK_GAP.
+  const spacingFor = (e) => (e + STACK_GAP) / ct
+  // Does a (w x e x w) piece centered at height yc fit inside the Morph's
+  // inhale ellipsoid at every Y-turn angle?
+  const pieceFits = (w, e, yc) => {
+    for (let n = 0; n < STACK_FIT_ANGLES; n++) {
+      const th = (n / STACK_FIT_ANGLES) * Math.PI * 2, cy = Math.cos(th), sy = Math.sin(th)
       for (const [vx, vy, vz] of CUBE_CORNERS) {
-        const r = e * Math.hypot(vx, vz), y = yc + e * vy
-        if ((r * r) / (m * m) + (y * y) / (b * b) > 1) return false
+        // scale, turn about Y, then tilt about X
+        const x0 = vx * w, y0 = vy * e, z0 = vz * w
+        const x1 = cy * x0 + sy * z0, z1 = -sy * x0 + cy * z0
+        const y2 = ct * y0 - st * z1, z2 = st * y0 + ct * z1
+        const y = y2 + yc
+        if ((x1 * x1) / (a * a) + (y * y) / (b * b) + (z2 * z2) / (c * c) > 1) return false
       }
     }
     return true
   }
-  let lo = 0, hi = 4
-  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid }
-  const e = lo * STACK_FIT_MARGIN
+  const search = (ok, hi) => {
+    let lo = 0
+    for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid }
+    return lo
+  }
+  const e = search((e) => [-2, -1, 0, 1, 2].every((k) => pieceFits(e, e, k * spacingFor(e))), 4) * STACK_FIT_MARGIN
   const pieces = [-2, -1, 0, 1, 2].map((k) => {
-    const y = k * (e + STACK_GAP)
-    let w = e
-    if (Math.abs(k) <= 1) {
-      // Square footprint w x w: corners at w/sqrt(2) from the axis, at the
-      // piece's farther face height |y| + e/2.
-      const yMax = Math.abs(y) + e / 2
-      w = Math.sqrt(2 * (1 - (yMax * yMax) / (b * b))) * m * STACK_FIT_MARGIN
-    }
-    return { x: 0, y, z: 0, rx: 0, ry: Math.random() * Math.PI * 2, rz: 0, s: e, sx: w, sy: e, sz: w }
+    const y = k * spacingFor(e)
+    // Top and bottom stay cubes; the middle three widen as far as they fit.
+    const w = Math.abs(k) <= 1 ? search((w) => pieceFits(w, e, y), 4) * STACK_FIT_MARGIN : e
+    return { x: 0, y, z: 0, rx: STACK_TILT, ry: Math.random() * Math.PI * 2, rz: 0, s: e, sx: w, sy: e, sz: w }
   })
   for (let i = pieces.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
@@ -506,6 +528,9 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   const breathFallSpinRef = useRef(new Array(BREATH_TOTAL).fill(null))
   const breathSpinStartRef = useRef(new Array(BREATH_TOTAL).fill(null))   // set when spin began on appearance (see BREATH_SPIN_FROM_APPEAR_SET)
   const breathTumbleRef = useRef(new Array(BREATH_TOTAL).fill(null))   // cube stack: all-axis spin added once each piece starts falling
+  const spiralZSpinRef = useRef(0)   // sphere-tetra spiral: one shared Z speed per series
+  const spiralTetraRefs = useMemo(() => Array.from({ length: BREATH_RING_COUNT * 2 }, () => ({ current: null })), [])
+  const spiralTetraSpinRef = useRef(Array.from({ length: BREATH_RING_COUNT * 2 }, () => null))
   const breathCycleIndexRef = useRef(0)   // 5-breath cycles completed since counting started (picks each cycle's set)
   // Per-object rest transform: rings sit on the axis at BREATH_RING_Z; Count
   // Cubes get a fresh random placement each time their set becomes active.
@@ -906,6 +931,17 @@ float dissolveHash(vec3 p) {
           breathBaseRef.current[set * BREATH_RING_COUNT + k] = { x: 0, y: 0, z, rx: 0, ry: 0, rz: Math.random() * Math.PI * 2, s: 1 }
         })
       }
+      if (set === SPIRAL_SET) {
+        const angle0 = Math.random() * Math.PI * 2
+        spiralZSpinRef.current = randSpin(STACK_SPIN_SPEED)
+        SPHERE_ROW_Z.forEach((z, k) => {
+          breathBaseRef.current[set * BREATH_RING_COUNT + k] = { x: 0, y: 0, z, rx: 0, ry: 0, rz: angle0, s: 1 }
+        })
+        spiralTetraSpinRef.current = spiralTetraSpinRef.current.map(() => ({
+          start: [Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2],
+          spin: makeBreathSpin(),
+        }))
+      }
       if (set === CUBE_STACK_SET) {
         layoutStack(morphHalf).forEach((b, k) => { breathBaseRef.current[set * BREATH_RING_COUNT + k] = b })
       }
@@ -951,6 +987,20 @@ float dissolveHash(vec3 p) {
       } else {
         const ts = now - spinStart
         group.rotation.set(b.rx + spin.rx * ts, b.ry + spin.ry * ts, b.rz + spin.rz * ts)
+      }
+    }
+
+    // Sphere-tetra spiral: each child tetrahedron tumbles on its own local
+    // axes from the moment its piece appears.
+    for (let k = 0; k < BREATH_RING_COUNT; k++) {
+      const i = SPIRAL_SET * BREATH_RING_COUNT + k
+      const spinStart = breathSpinStartRef.current[i]
+      const t = spinStart === null ? 0 : now - spinStart
+      for (let side = 0; side < 2; side++) {
+        const mesh = spiralTetraRefs[k * 2 + side].current
+        const cs = spiralTetraSpinRef.current[k * 2 + side]
+        if (!mesh || !cs) continue
+        mesh.rotation.set(cs.start[0] + cs.spin.rx * t, cs.start[1] + cs.spin.ry * t, cs.start[2] + cs.spin.rz * t)
       }
     }
 
@@ -1021,7 +1071,10 @@ float dissolveHash(vec3 p) {
           const activeIdx = base + breathLockedCountRef.current
           const activeSet = breathActiveSetRef.current
           if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
-            breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin() : activeSet === SPHERE_ROW_SET ? makeZSpin() : makeBreathSpin()
+            breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin()
+              : activeSet === SPHERE_ROW_SET ? makeZSpin()
+              : activeSet === SPIRAL_SET ? { rx: 0, ry: 0, rz: spiralZSpinRef.current }
+              : makeBreathSpin()
             breathSpinStartRef.current[activeIdx] = now
           }
           const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
@@ -1047,7 +1100,7 @@ float dissolveHash(vec3 p) {
         const set = breathActiveSetRef.current
         breathSetFallingRef.current[set] = true
         const order = [0, 1, 2, 3, 4]
-        if (set === CUBE_STACK_SET || set === SPHERE_ROW_SET) {
+        if (set === CUBE_STACK_SET || set === SPHERE_ROW_SET || set === SPIRAL_SET) {
           // Each piece starts an all-axis tumble on top of the turn it had
           // reached (see breathTumbleRef); the cube stack also falls bottom-up.
           order.forEach((k) => { breathTumbleRef.current[base + k] = makeBreathSpin() })
@@ -1138,6 +1191,15 @@ float dissolveHash(vec3 p) {
             <RoundedBox args={[1, 1, 1]} radius={CUBE_CHAMFER} smoothness={4} material={breathMaterials[i]} />
           ) : Math.floor(i / BREATH_RING_COUNT) === TETRA_SET ? (
             <mesh geometry={tetraGeometry} material={breathMaterials[i]} />
+          ) : Math.floor(i / BREATH_RING_COUNT) === SPIRAL_SET ? (
+            <>
+              <mesh geometry={sphereRowGeometry} material={breathMaterials[i]} />
+              {[-1, 1].map((dir, side) => (
+                <mesh key={dir} ref={(obj) => { spiralTetraRefs[(i % BREATH_RING_COUNT) * 2 + side].current = obj }}
+                  position={[dir * SPHERE_ROW_SPACING, 0, 0]} scale={SPIRAL_TETRA_SCALE}
+                  geometry={tetraGeometry} material={breathMaterials[i]} />
+              ))}
+            </>
           ) : Math.floor(i / BREATH_RING_COUNT) === SPHERE_ROW_SET ? (
             <>
               {[-1, 0, 1].map((k) => (
