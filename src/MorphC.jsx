@@ -131,8 +131,8 @@ const SQUASH_RING_SET = 7
 const SQUASH_RING_Z = [-5, -10, -15, -20, -25]   // even steps, shuffled each cycle
 const SQUASH_RING_MIN_Y = 0.5
 const isSolidSet = (set) => set >= CUBE_SET
-// TEMPORARY for testing: the first cycles use these sets, then the normal
-// 5-cycle pattern (set = cycle % 5) takes over.
+// Optional testing override: the first cycles use these sets, then the
+// normal pattern (set = cycle % BREATH_SET_COUNT) takes over.
 const TEMP_FIRST_CYCLES = []   // set e.g. [SQUASH_RING_SET] to preview a set first while testing
 const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
 const maxAlphaFor = (i) => {
