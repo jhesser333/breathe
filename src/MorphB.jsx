@@ -10,8 +10,8 @@ const EXHALE_EMISSIVE = 1.5
 const INHALE_EMISSIVE = 1.5
 const EXHALE_ROUGHNESS = 0.3
 const INHALE_ROUGHNESS = 0.3
-const EXHALE_OPACITY = 0.75
-const INHALE_OPACITY = 0.75
+const EXHALE_OPACITY = 0.5
+const INHALE_OPACITY = 0.5
 const EXHALE_FRESNEL_POWER = 0
 const INHALE_FRESNEL_POWER = 0.2
 const FRESNEL_INTENSITY = 1
@@ -29,11 +29,17 @@ const DISSOLVE_EDGE = 0.12
 // along that axis (0 at the center, full at the face).
 const BURST_POOL = 1500
 const BURST_COUNT = 150
-const BURST_SPEED = [0.3, 1.0]   // units/s at the face (scales to 0 at the pivot)
+const BURST_SPEED = [0.15, 0.5]  // units/s at the face (scales to 0 at the pivot)
 const BURST_EDGE = 0.02          // raw slider distance from an end that counts as "hit"
 const BURST_REARM = 0.1          // must move this far back from that end before it can fire again
 const BURST_SIZE = 60
 const SPAWN_SENTINEL = -1e4
+// Surface sparkles: same look as the bursts, but no velocity, emitted
+// continuously, and inside the scaled group so they stick to the cube.
+const SURFACE_POOL = 1500
+const SURFACE_SPAWN_RATE = 300   // particles/sec (the sphere's MAX_SPAWN_RATE)
+const SURFACE_SIZE = BURST_SIZE
+const MAX_SPAWN_PER_FRAME = 150  // safety cap against huge dt spikes (e.g. tab refocus)
 const MORPH_Y = 0.25
 
 const BURST_VERTEX_SHADER = `
@@ -216,6 +222,33 @@ float dissolveHash(vec3 p) {
     blending: THREE.AdditiveBlending,
   }), [palette.primaryColor])
 
+  // Surface sparkles reuse the burst shaders with every velocity at 0.
+  const surface = useMemo(() => {
+    const positions = new Float32Array(SURFACE_POOL * 3)
+    const seeds = new Float32Array(SURFACE_POOL)
+    for (let i = 0; i < SURFACE_POOL; i++) {
+      sampleCubeSurface(positions, i)
+      seeds[i] = Math.random()
+    }
+    const geometry = new THREE.BufferGeometry()
+    const spawnTimeAttr = new THREE.BufferAttribute(new Float32Array(SURFACE_POOL).fill(SPAWN_SENTINEL), 1).setUsage(THREE.DynamicDrawUsage)
+    const lifetimeAttr = new THREE.BufferAttribute(new Float32Array(SURFACE_POOL).fill(1), 1).setUsage(THREE.DynamicDrawUsage)
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
+    geometry.setAttribute('aSpawnTime', spawnTimeAttr)
+    geometry.setAttribute('aLifetime', lifetimeAttr)
+    geometry.setAttribute('aVel', new THREE.BufferAttribute(new Float32Array(SURFACE_POOL * 3), 3))
+    return { geometry, spawnTimeAttr, lifetimeAttr }
+  }, [])
+
+  const surfaceMaterial = useMemo(() => {
+    const m = burstMaterial.clone()
+    m.uniforms.uSize.value = SURFACE_SIZE
+    return m
+  }, [burstMaterial])
+
+  const surfaceCursorRef = useRef(0)
+  const surfaceAccumulatorRef = useRef(0)
   const burstCursorRef = useRef(0)
   // Which end the right slider last burst at ('top' | 'bottom' | null); cleared
   // once it moves BURST_REARM away, so resting at an end never repeats.
@@ -223,7 +256,7 @@ float dissolveHash(vec3 p) {
   // without firing (the slider starts at the top).
   const burstEndRef = useRef(undefined)
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return
     // Ease slider input in/out (default convention -- see CLAUDE.md) so
     // every value derived below moves smoothly rather than tracking the
@@ -280,6 +313,24 @@ float dissolveHash(vec3 p) {
       lifetimeAttr.needsUpdate = true
     }
     burstMaterial.uniforms.uTime.value = now
+
+    // Surface sparkles: steady emission, no velocity.
+    surfaceAccumulatorRef.current += SURFACE_SPAWN_RATE * delta
+    let toSpawn = Math.floor(surfaceAccumulatorRef.current)
+    if (toSpawn > 0) {
+      surfaceAccumulatorRef.current -= toSpawn
+      toSpawn = Math.min(toSpawn, MAX_SPAWN_PER_FRAME)
+      const { spawnTimeAttr, lifetimeAttr } = surface
+      for (let k = 0; k < toSpawn; k++) {
+        const idx = surfaceCursorRef.current % SURFACE_POOL
+        surfaceCursorRef.current += 1
+        spawnTimeAttr.array[idx] = now
+        lifetimeAttr.array[idx] = 1 + Math.random()
+      }
+      spawnTimeAttr.needsUpdate = true
+      lifetimeAttr.needsUpdate = true
+    }
+    surfaceMaterial.uniforms.uTime.value = now
   })
 
   return (
@@ -288,6 +339,9 @@ float dissolveHash(vec3 p) {
         <RoundedBox args={[1, 1, 1]} radius={0.15} smoothness={4}>
           <primitive object={material} attach="material" />
         </RoundedBox>
+        <points geometry={surface.geometry}>
+          <primitive object={surfaceMaterial} attach="material" />
+        </points>
       </group>
       {/* Burst sparkles sit outside the scaled group so their X travel isn't
           stretched by the cube's breathing scale. */}
