@@ -6,16 +6,17 @@ import * as THREE from 'three'
 export default function MorphB({ leftVal, rightVal, palette }) {
   const groupRef = useRef()
 
-  const { material, fresnelUniforms } = useMemo(() => {
+  const { material } = useMemo(() => {
+    // Fixed at what used to be the sliders' Exhale values.
     const fresnelUniforms = {
-      fresnelPower:     { value: 1.5 },
+      fresnelPower:     { value: 0.2 },
       fresnelIntensity: { value: 1.0 },
     }
 
     const mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color(palette.tertiaryColor),
       emissive: new THREE.Color(palette.primaryColor),
-      emissiveIntensity: 2,
+      emissiveIntensity: 3,
       roughness: 1,
       metalness: 0,
     })
@@ -47,7 +48,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
       )
     }
 
-    return { material: mat, fresnelUniforms }
+    return { material: mat }
   }, [palette.tertiaryColor, palette.primaryColor])
 
   useFrame(() => {
@@ -62,12 +63,7 @@ varying vec3 vFresnelDir;\n` + shader.fragmentShader
     const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
-
-    material.emissiveIntensity = rv < 0.85
-      ? THREE.MathUtils.lerp(2, 1, rv / 0.85)
-      : THREE.MathUtils.lerp(1, 3, (rv - 0.85) / 0.15)
-    material.roughness = THREE.MathUtils.lerp(0.3, 1, rv)
-    fresnelUniforms.fresnelPower.value = THREE.MathUtils.lerp(0.2, 1.5, lv)
+    // Material is not slider-driven: fixed at the old Exhale values (see useMemo).
   })
 
   return (

@@ -30,7 +30,7 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 | Left (0=bottom=exhale, 1=top=inhale) | inhale / exhale | X/Z scale + Fresnel inner glow intensity |
 | Right (0=bottom=inhale, 1=top=exhale) | exhale / inhale | Y scale + emissive intensity |
 
-The mappings below are for **Shapes A/B** (`MorphA.jsx`/`MorphB.jsx`). Shapes C/D (`MorphC.jsx`) use their own — see "Shapes C/D (Morphing Sphere)" after this list.
+The mappings below are for **Shape A** (`MorphA.jsx`). **Shape B** (`MorphB.jsx`, Morphing Cube) keeps only the X/Y/Z scale mappings; its material is not slider-driven and stays fixed at the old Exhale values (emissive 3, roughness 1, Fresnel power 0.2, Fresnel intensity 1). Shapes C/D (`MorphC.jsx`) use their own — see "Shapes C/D (Morphing Sphere)" after this list.
 
 **Left slider (lv):**
 - X scale: lerp(2.2, 1.2, lv) — wide at exhale, narrow at inhale
