@@ -30,6 +30,8 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 | Left (0=bottom=exhale, 1=top=inhale) | inhale / exhale | X/Z scale + Fresnel inner glow intensity |
 | Right (0=bottom=inhale, 1=top=exhale) | exhale / inhale | Y scale + emissive intensity |
 
+The mappings below are for **Shapes A/B** (`MorphA.jsx`/`MorphB.jsx`). Shapes C/D (`MorphC.jsx`) use their own — see "Shapes C/D (Morphing Sphere)" after this list.
+
 **Left slider (lv):**
 - X scale: lerp(2.2, 1.2, lv) — wide at exhale, narrow at inhale
 - Z scale: lerp(0.5, 1.2, lv)
@@ -40,6 +42,20 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 - Y scale: lerp(3.5, 0.4, rv) — tall at inhale, flat at exhale
 - Emissive intensity: piecewise — 2 at inhale (rv=0), dips to 1 at rv=0.85 (15% of the way from exhale to inhale), rises to 3 at exhale (rv=1)
 - Roughness: lerp(0.3, 1, rv) — smoother at inhale, rougher at exhale
+
+**Shapes C/D (Morphing Sphere, `MorphC.jsx`)** — Shape D's values shown (the `OPTION_D_*` constants); Shape C uses the older shared scales noted in the code:
+- Left slider (lv, exhale → inhale):
+  - X scale: 3 → 2
+  - Z scale: 0.25 → 2
+  - Fresnel power: 0 → 0.2
+  - Flow particles (system 2): full rate only mid-travel, tapering to 0 toward both ends (`smoothstep(1−lv, 0.75, 1)` / `smoothstep(lv, 0.5, 0.75)`), drifting in the slider's current direction
+- Right slider (rv, inhale → exhale):
+  - Y scale: 3 → 0.25
+  - Emissive intensity: 1.5 → 0
+  - Roughness: 0.3 → 1
+  - Opacity: 0.75 → 0
+  - Dissolve into grain across the full travel (solid at inhale, gone at exhale)
+  - Surface sparkles (system 1): full rate until rv 0.75, then ramp to 0
 
 - Left slider starts at 0 (bottom / Exhale). Right slider starts at 1 (top / Exhale).
 - Morph starts in Exhale state: wide flat disc.
