@@ -2,6 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
+import { useGateBurstB, isSuccess, missFactor, applyMissScale } from './gateReactionsB'
 
 const POOL_A = 3
 const POOL_B = 3
@@ -77,11 +78,12 @@ function computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef) {
   return SPAWN_Z * ratio
 }
 
+// missElapsed: null until the target is judged a miss at z=0 (see gateReactionsB).
 function makeSlotA() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, missElapsed: null }
 }
 function makeSlotB() {
-  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false }
+  return { z: 0, speed: 0, active: false, fadeElapsed: 0, hasTriggeredNext: false, missElapsed: null }
 }
 
 function createTieMaterial(color) {
@@ -99,16 +101,27 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef }) {
+export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matBotRefsA = useRef(Array.from({ length: POOL_A }, () => null))
+  const meshTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
+  const meshBotRefsA = useRef(Array.from({ length: POOL_A }, () => null))
 
   const slotsB = useRef(Array.from({ length: POOL_B }, makeSlotB))
   const groupRefsB = useRef(Array.from({ length: POOL_B }, () => null))
   const matLeftRefsB = useRef(Array.from({ length: POOL_B }, () => null))
   const matRightRefsB = useRef(Array.from({ length: POOL_B }, () => null))
+  const meshLeftRefsB = useRef(Array.from({ length: POOL_B }, () => null))
+  const meshRightRefsB = useRef(Array.from({ length: POOL_B }, () => null))
+
+  // Success/miss reactions as each target reaches the Morph.
+  const gateBurst = useGateBurstB(emissiveColor)
+  const judge = (slot, type, now) => {
+    if (rightVal && isSuccess(type, rightVal.current)) gateBurst.burst(type, slot.z, now)
+    else slot.missElapsed = 0
+  }
 
   // Preview ties: the 6 ties (including the at-gate tie) ahead of the
   // frontmost real checkpoint (whichever of A/B is currently furthest
@@ -145,7 +158,8 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const wasEnabled = useRef(false)
   const preSeedRef = useRef({ elapsed: 0, needsInitial: true })
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    const now = state.clock.elapsedTime
     const spawnB = (speed) => {
       const gateBZ = computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
       checkpoints.current.push({ z: gateBZ, speed, fadeElapsed: 0 })
@@ -202,7 +216,11 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (!slot.active) { group.visible = false; return }
 
       slot.fadeElapsed += delta
-      const emissive = calcEmissive(slot.z)
+      if (slot.missElapsed != null) slot.missElapsed += delta
+      const miss = missFactor(slot.missElapsed)
+      applyMissScale(meshTopRefsA.current[i], miss)
+      applyMissScale(meshBotRefsA.current[i], miss)
+      const emissive = calcEmissive(slot.z) * (1 - miss)
       const fadeOut = slot.z > FADE_OUT_START
         ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
@@ -221,6 +239,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (slot.z >= 0 && !slot.hasTriggeredNext) {
         slot.hasTriggeredNext = true
         if (breathPhaseRef) breathPhaseRef.current = 'exhale'
+        judge(slot, 'exhale', now)
         spawnA()
       }
 
@@ -240,6 +259,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (slot.z >= 0 && !slot.hasTriggeredNext) {
         slot.hasTriggeredNext = true
         if (breathPhaseRef) breathPhaseRef.current = 'inhale'
+        judge(slot, 'inhale', now)
       }
 
       if (slot.z > DESPAWN_Z) { slot.active = false; group.visible = false; return }
@@ -249,7 +269,11 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (slot.z < GATE_B_FADE_Z) { group.visible = false; return }
 
       slot.fadeElapsed += delta
-      const emissive = calcEmissive(slot.z)
+      if (slot.missElapsed != null) slot.missElapsed += delta
+      const miss = missFactor(slot.missElapsed)
+      applyMissScale(meshLeftRefsB.current[i], miss)
+      applyMissScale(meshRightRefsB.current[i], miss)
+      const emissive = calcEmissive(slot.z) * (1 - miss)
       const fadeOut = slot.z > FADE_OUT_START
         ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
         : 1
@@ -324,18 +348,21 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         lerpMaterials[s][i].opacity = TIE_ALPHA * fadeIn
       }
     }
+
+    gateBurst.tick(now)
   })
 
   return (
     <>
+      {gateBurst.points}
       {Array.from({ length: POOL_A }, (_, i) => (
         <group key={`a${i}`} ref={el => { groupRefsA.current[i] = el }} visible={false}>
-          <RoundedBox position={[0, GATE_A_TOP_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
+          <RoundedBox ref={el => { meshTopRefsA.current[i] = el }} position={[0, GATE_A_TOP_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
             <meshStandardMaterial ref={el => { matTopRefsA.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </RoundedBox>
-          <RoundedBox position={[0, GATE_A_BOT_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
+          <RoundedBox ref={el => { meshBotRefsA.current[i] = el }} position={[0, GATE_A_BOT_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
             <meshStandardMaterial ref={el => { matBotRefsA.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
@@ -344,12 +371,12 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       ))}
       {Array.from({ length: POOL_B }, (_, i) => (
         <group key={`b${i}`} ref={el => { groupRefsB.current[i] = el }} visible={false}>
-          <RoundedBox position={[-GATE_B_X, GATE_B_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
+          <RoundedBox ref={el => { meshLeftRefsB.current[i] = el }} position={[-GATE_B_X, GATE_B_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
             <meshStandardMaterial ref={el => { matLeftRefsB.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />
           </RoundedBox>
-          <RoundedBox position={[GATE_B_X, GATE_B_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
+          <RoundedBox ref={el => { meshRightRefsB.current[i] = el }} position={[GATE_B_X, GATE_B_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
             <meshStandardMaterial ref={el => { matRightRefsB.current[i] = el }}
               color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
               roughness={0.5} metalness={0.1} transparent opacity={0} />

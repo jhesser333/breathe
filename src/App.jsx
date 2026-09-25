@@ -1103,6 +1103,7 @@ export default function App() {
         </EffectComposer>
         {hasGates && mode !== 'box' && (
           <GatesComponent
+            rightVal={rightVal}
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.secondaryColor}
@@ -1116,6 +1117,7 @@ export default function App() {
         )}
         {mode === 'box' && hasGates && (
           <BoxGatesComponent
+            rightVal={rightVal}
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
             gateColor={palette.secondaryColor}

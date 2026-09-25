@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
+import { useGateBurstB, isSuccess, missFactor, applyMissScale } from './gateReactionsB'
 
 const POOL_SIZE = 28
 const SPAWN_Z = -6
@@ -27,10 +28,10 @@ function calcEmissive(z) {
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false }
+  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false, judged: false, missElapsed: null }
 }
 
-export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate }) {
+export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, rightVal }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -40,7 +41,11 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
   const cbTRefs = useRef([]);    const cbTMatRefs = useRef([])
   const cbBRefs = useRef([]);    const cbBMatRefs = useRef([])
 
-  useFrame((_, delta) => {
+  // Success/miss reactions as each target reaches the Morph.
+  const gateBurst = useGateBurstB(emissiveColor)
+
+  useFrame((state, delta) => {
+    const now = state.clock.elapsedTime
     const ss = slots.current
     const enabled = gatesEnabledRef.current
 
@@ -56,6 +61,7 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         s.z = spawnZ; s.speed = speed; s.active = true
         s.type = type; s.isLast = (i === N - 1); s.isFirst = (i === 0)
         s.fadeElapsed = 0; s.hasTriggeredNext = false; s.hasTriggeredFirst = false; s.hasPreTriggeredLast = false
+        s.judged = false; s.missElapsed = null
       }
     }
 
@@ -94,11 +100,18 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
           s.hasTriggeredNext = true
           spawnSeries(s.type === 'inhale' ? 'exhale' : 'inhale')
         }
+        if (s.z >= 0 && !s.judged) {
+          s.judged = true
+          if (rightVal && isSuccess(s.type, rightVal.current)) gateBurst.burst(s.type, s.z, now)
+          else s.missElapsed = 0
+        }
+        if (s.missElapsed != null) s.missElapsed += delta
+        const miss = missFactor(s.missElapsed)
 
         const fadeIn = smoothstep(Math.min(s.fadeElapsed / FADE_DURATION, 1))
         const fadeOut = s.z > 0 ? 1 - smoothstep(Math.min(s.z / 2, 1)) : 1
         const opacity = fadeIn * fadeOut
-        const emissive = calcEmissive(s.z)
+        const emissive = calcEmissive(s.z) * (1 - miss)
         const isInhale = s.type === 'inhale'
 
         g.position.z = s.z
@@ -112,6 +125,8 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         if (mr) mr.visible = isInhale
         if (mt) mt.visible = !isInhale
         if (mb) mb.visible = !isInhale
+        applyMissScale(ml, miss); applyMissScale(mr, miss)
+        applyMissScale(mt, miss); applyMissScale(mb, miss)
 
         if (isInhale) {
           if (mml) { mml.opacity = opacity; mml.emissiveIntensity = emissive }
@@ -122,10 +137,12 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         }
       }
     }
+    gateBurst.tick(now)
   })
 
   return (
     <>
+      {gateBurst.points}
       {Array.from({ length: POOL_SIZE }).map((_, i) => (
         <group key={i} ref={el => { gateGroupRefs.current[i] = el }}>
           <RoundedBox ref={el => { plLRefs.current[i] = el }}
