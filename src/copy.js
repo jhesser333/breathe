@@ -23,6 +23,9 @@ export const TEXTS = {
   slowingTextE: 'Keep Morph aligned with the targets to slow down your breathing.',
   slowingTextDAmbient: 'You will soon see art animate at the rate you recorded.',
   slowingTextEAmbient: 'Keep your breathing in sync with the art as it slows down.',
+  // Shape B (Morphing Cube) versions of the two lines above -- its targets are visible.
+  slowingTextDCube: 'Gates will soon move in at the rate you recorded. Breathe so the art fits through the gates.',
+  slowingTextECube: 'Keep your breathing in sync with the gates as they move farther apart.',
   boxInhale:    'Inhale',
   boxHold:      'Hold',
   boxExhale:    'Exhale',

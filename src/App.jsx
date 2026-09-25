@@ -491,7 +491,10 @@ export default function App() {
   // Slowing Down (D/E): show Text D or E the way the Diagonal intro shows
   // Text B2 -- 1s fade-in, then hold for one left-slider breath cycle.
   const showPacedText = useCallback((which) => {
-    const text = which === 'D' ? TEXTS.slowingTextDAmbient : TEXTS.slowingTextEAmbient
+    const isCube = shapeRef.current === 'b'
+    const text = which === 'D'
+      ? (isCube ? TEXTS.slowingTextDCube : TEXTS.slowingTextDAmbient)
+      : (isCube ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient)
     pacedTextStageRef.current = which + '-pending'
     clearTimeout(tutorialTimerRef.current)
     awaitingMovementRef.current = false
@@ -627,7 +630,7 @@ export default function App() {
         clearTimeout(tutorialTimerRef.current)
         setTutorialVisible(false)
         tutorialVisibleRef.current = false
-        currentMainTextRef.current = TEXTS.slowingTextEAmbient
+        currentMainTextRef.current = shapeRef.current === 'b' ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient
         return
       }
       pacedCaptionRef.current = {
