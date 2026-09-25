@@ -86,9 +86,9 @@ function DiagonalTrack({ sliderRef, value, side }) {
   )
 }
 
-export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, shiftUp = 0 }) {
+export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0 }) {
   const [leftRef, leftVal] = useTouchSlider(0, leftRawRef, 'diagonal-left')
-  const [rightRef, rightVal] = useTouchSlider(1, null, 'diagonal-right')
+  const [rightRef, rightVal] = useTouchSlider(1, rightRawRef, 'diagonal-right')
 
   useEffect(() => { onLeft(leftVal) }, [leftVal])
   useEffect(() => { onRight(rightVal) }, [rightVal])

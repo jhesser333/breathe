@@ -23,6 +23,8 @@ A mobile-first React Three Fiber app where two thumb sliders drive real-time ani
 
 ## Slider controls
 
+**Right slider drives everything (for now).** The left slider stays on screen and works (`leftVal`, `leftRawRef` still update), but nothing reads it; it's reserved for audio later. App.jsx exposes the right slider in the left slider's old convention (0 exhale → 1 inhale) as `breathRef` (`1 − rightVal`) and `breathRawRef` (`1 − rightRawRef`, the right slider's unclamped raw ratio from `useTouchSlider`), and passes them wherever the left slider used to go: every Morph's `leftVal`/`leftRawRef` props, `SlowingDownController`'s breath recording, the Diagonal Text A1/A2/B1/B2 sequence (`updateDiagonalSequence`), the Slowing Down D/E hold text (`updatePacedText`), the "sliders at the bottom" start (`startPacedArt` fires when the right slider reaches its top, i.e. Exhale), and idle detection (`setLeft` no longer counts as movement). Where the sections below say "left slider", read the right slider via these refs.
+
 **Convention: every value driven by a slider eases in and out by default.** Each Morph component reads `leftVal.current`/`rightVal.current` and immediately passes them through `THREE.MathUtils.smoothstep(v, 0, 1)` once at the top of `useFrame`, then uses those eased `lv`/`rv` for every derived lerp/scale/material property — rather than tracking the thumb's raw position 1:1. New slider-driven properties should build on the same eased `lv`/`rv`, not the raw ref values. (Detectors that need the raw, un-eased signal — e.g. `SlowingDownController`'s breath-cycle zigzag detection via `leftRawRef` — are an intentional exception, since they're reading input, not animating output.)
 
 | Slider | Label (top/bottom) | Controls |

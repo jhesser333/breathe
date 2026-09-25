@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect, useLayoutEffect } from 'react'
+import { useRef, useCallback, useState, useEffect, useLayoutEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import MorphA from './MorphA'
@@ -158,6 +158,14 @@ const PACED_CAPTION_ALPHA = [1, 1, 1, 0.5, 0.15]   // per breath: last two fade 
 export default function App() {
   const leftVal = useRef(0)
   const rightVal = useRef(1)
+  // Everything (visuals, tutorial text, breath recording) is driven by the
+  // right slider for now; the left slider stays on screen and works but
+  // drives nothing (reserved for audio later). breathRef/breathRawRef read the
+  // right slider in the left slider's old convention (0 exhale -> 1 inhale),
+  // so code written for the left slider can use them unchanged.
+  const rightRawRef = useRef(1)
+  const breathRef = useMemo(() => ({ get current() { return 1 - rightVal.current } }), [])
+  const breathRawRef = useMemo(() => ({ get current() { return 1 - rightRawRef.current } }), [])
   // Attached to the experience screen's outer wrapper div -- PaletteLerpDriver
   // writes a CSS custom property here so the DOM overlay's text can track the
   // live palette (see navPillStyle/mode-caption below and TutorialText.jsx).
@@ -496,7 +504,7 @@ export default function App() {
       pacedTextStageRef.current = which + '-hold'
       pacedTextStrokesRef.current = 0
       pacedTextDirRef.current = 0
-      pacedTextExtremeRef.current = leftVal.current
+      pacedTextExtremeRef.current = breathRef.current
     }, DIAG_FADE_IN_MS)
   }, [])
 
@@ -733,7 +741,7 @@ export default function App() {
     clearTimeout(tutorialTimerRef.current)
     tutorialTimerRef.current = setTimeout(() => {
       diagStageRef.current = 'B2-hold'
-      beginDiagonalHold(leftVal.current)
+      beginDiagonalHold(breathRef.current)
     }, DIAG_FADE_IN_MS)
   }, [beginDiagonalHold])
 
@@ -771,7 +779,7 @@ export default function App() {
         clearTimeout(tutorialTimerRef.current)
         tutorialTimerRef.current = setTimeout(() => {
           diagStageRef.current = 'B1-hold'
-          beginDiagonalHold(leftVal.current)
+          beginDiagonalHold(breathRef.current)
         }, DIAG_FADE_IN_MS)
       }
     } else if (stage === 'B1-hold' || stage === 'B2-hold') {
@@ -879,18 +887,19 @@ export default function App() {
     setBreathLength(v)
   }, [])
 
+  // Left slider: kept working, but drives nothing for now (see breathRef).
   const setLeft = useCallback((v) => {
     leftVal.current = v
-    lastMoveTime.current = Date.now()
-    if (sliderLayout === 'diagonal') updateDiagonalSequence(v)
-    updatePacedText(v)
-    if (pacedWaitForBottomRef.current && v <= DIAG_EDGE_THRESHOLD) startPacedArt()
-    handleMovement()
-  }, [handleMovement, sliderLayout, updateDiagonalSequence, startPacedArt, updatePacedText])
+  }, [])
 
   const setRight = useCallback((v) => {
     rightVal.current = v
     lastMoveTime.current = Date.now()
+    // Breath position in the old left-slider convention (0 exhale -> 1 inhale).
+    const b = 1 - v
+    if (sliderLayout === 'diagonal') updateDiagonalSequence(b)
+    updatePacedText(b)
+    if (pacedWaitForBottomRef.current && b <= DIAG_EDGE_THRESHOLD) startPacedArt()
 
     const stage = stageRef.current
     if ((stage === 'A' && !textAFadeStartedRef.current) || (stage === 'B' && !textBFadeStartedRef.current)) {
@@ -926,7 +935,7 @@ export default function App() {
     }
 
     handleMovement()
-  }, [handleMovement, triggerTextAFade, triggerTextBFade])
+  }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, startPacedArt, updatePacedText])
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = false
@@ -975,7 +984,7 @@ export default function App() {
       currentMainTextRef.current = TEXT_A1_DIAGONAL
       setTutorialText(TEXT_A1_DIAGONAL)
       setTutorialFadeMs(2000)
-      setTutorialOpacity(1 - leftVal.current)
+      setTutorialOpacity(1 - breathRef.current)
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
     } else {
@@ -1117,7 +1126,7 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} />
         {shapeOption === 'd' && <CameraVerticalShift />}
-        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} landscapeIndexRef={landscapeIndexRef} />
+        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} landscapeIndexRef={landscapeIndexRef} />
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
@@ -1164,7 +1173,7 @@ export default function App() {
         )}
         {mode === 'slowing' && (
           <SlowingDownController
-            leftRawRef={leftRawRef}
+            leftRawRef={breathRawRef}
             spawnIntervalRef={spawnIntervalRef}
             recordingEnabledRef={recordingEnabledRef}
             lastMaxTimeRef={lastMaxTimeRef}
@@ -1191,8 +1200,8 @@ export default function App() {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
           {sliderLayout === 'diagonal'
-            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} shiftUp={sliderShiftUp} />
-            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} shiftUp={sliderShiftUp} />}
+            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />
+            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />}
         </div>
         <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}>
           <span style={{
