@@ -28,16 +28,17 @@ const SHRINK_S = 1
 const SHRINK_STAGGER_S = 0.25
 const REVERSAL_DEADBAND = 0.08           // same as MorphC
 const MAX_ALPHA = 0.5                    // MorphC's Count Cube material, in the secondary color
-const EMISSIVE = 2
+const EMISSIVE = 4
 
 // Sets take turns, one per 5-breath group, in this order.
-const SPHERE_SET = 0
+const SPHERE_SET = 0       // sphere tower
 const STACK_SET = 1
 const OVOID_SET = 2
 const NEST_CUBE_SET = 3
-const TETRA_SET = 4
-const RING_SET = 5
-const SET_COUNT = 6
+const TETRA_SET = 4        // tetrahedron tower
+const RING_SET = 5         // nested rings
+const CIRCLE_SET = 6       // circular-ring tower
+const SET_COUNT = 7
 
 // Nested sets (ovoids, cubes, rings): all centered, #1 is 25% of #5.
 const NEST_STEPS = [0.25, 0.4375, 0.625, 0.8125, 1]
@@ -48,17 +49,21 @@ const OVOID_HALF = HALF.map((v) => v * OVOID_FIT)
 // (checked numerically, corners included).
 const NEST_CUBE_SIZE = INHALE_SCALE.map((v) => v - 0.2)
 const NEST_CUBE_CHAMFER = MORPH_CORNER_RADIUS
-// Thick rings: MorphC's spinning-ring shape (tube 3x, 3x deeper along its own
-// Z), #5's outer edge on the #5 ovoid (fits whole, checked numerically).
-const RING_TUBE = 0.045 * 3
-const RING_DEPTH = 3
+// Rings (nested and circular): the Pulse/Hold ring's proportions (PaceRingsD:
+// tube 0.015 x 3 on radius 1). Nested: #5's outer edge on the #5 ovoid.
+const RING_TUBE = 0.015 * 3
 const RING_A = OVOID_HALF[0] / (1 + RING_TUBE)
 const RING_B = OVOID_HALF[1] / (1 + RING_TUBE)
 
-// Spheres: radius 0.5 x a random 0.5-1, random spots inside the cube.
+// Towers (spheres, tetrahedrons, circular rings): 5 pieces stacked on the Y
+// axis, middle at the center, spaced as far apart as the end pieces allow
+// (they may overlap each other); spheres and circular rings also get a random
+// X/Z offset that still keeps them inside the cube.
 const SPHERE_RADIUS = 0.5
-const SPHERE_SCALE = [0.5, 1]
-const SPHERE_TRIES = 300
+const TOWER_OFFSET_TRIES = 200
+// Sphere tower pulse: 1 s loop, eased, 100% -> 90% -> 100%.
+const PULSE_PERIOD_S = 1
+const PULSE_DEPTH = 0.1
 
 // Cube stack: same rules as MorphC's (tilted 30 deg, random Y angle, Y spin).
 const STACK_GAP = 0.05
@@ -92,28 +97,34 @@ const SPHERE_SAMPLES = Array.from({ length: 64 }, (_, i) => {
 })
 const sphereFits = (x, y, z, r) => SPHERE_SAMPLES.every(([sx, sy, sz]) => insideMorph(x + sx * r, y + sy * r, z + sz * r))
 
-function layoutSpheres() {
-  const placed = []
-  for (let k = 0; k < COUNT; k++) {
-    let r = SPHERE_RADIUS * THREE.MathUtils.randFloat(...SPHERE_SCALE)
-    let best = null
-    for (let attempt = 0; attempt < SPHERE_TRIES * 4 && !best; attempt++) {
-      // Shrink slightly if a big sphere keeps failing to fit at all.
-      if (attempt > 0 && attempt % SPHERE_TRIES === 0) r *= 0.95
-      const x = THREE.MathUtils.randFloatSpread(2 * Math.max(HALF[0] - r, 0))
-      const y = THREE.MathUtils.randFloatSpread(2 * Math.max(HALF[1] - r, 0))
-      const z = THREE.MathUtils.randFloatSpread(2 * Math.max(HALF[2] - r, 0))
-      if (!sphereFits(x, y, z, r)) continue
-      // Keep centers at least the larger radius apart, so none hides fully
-      // inside another; after enough tries, take any spot that fits.
-      const clear = placed.every((p) => Math.hypot(p.x - x, p.y - y, p.z - z) >= Math.max(p.s, r))
-      if (clear || attempt >= SPHERE_TRIES * 2) best = { x, y, z, rx: 0, ry: 0, rz: 0, sx: r, sy: r, sz: r }
-    }
-    placed.push(best || { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, sx: r, sy: r, sz: r })
-    placed[placed.length - 1].s = r
-  }
-  return placed
+const bisect = (ok, hi) => {
+  let lo = 0
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid }
+  return lo
 }
+// Largest bounding-sphere radius that fits at the cube's center (tetrahedrons
+// at max size, free to spin without clipping the sides).
+const MAX_CENTER_RADIUS = bisect((r) => sphereFits(0, 0, 0, r), 1)
+
+// Tower of 5 bounding spheres of radius r (world units at Inhale), in random
+// appearance order.
+function layoutTower(r, withOffset) {
+  const spacing = bisect((s) => sphereFits(0, 2 * s, 0, r) && sphereFits(0, -2 * s, 0, r), HALF[1])
+  const pieces = [-2, -1, 0, 1, 2].map((k) => {
+    const y = k * spacing
+    let x = 0, z = 0
+    if (withOffset) {
+      for (let t = 0; t < TOWER_OFFSET_TRIES; t++) {
+        const cx = THREE.MathUtils.randFloatSpread(2 * Math.max(HALF[0] - r, 0))
+        const cz = THREE.MathUtils.randFloatSpread(2 * Math.max(HALF[2] - r, 0))
+        if (sphereFits(cx, y, cz, r)) { x = cx; z = cz; break }
+      }
+    }
+    return { x, y, z, rx: 0, ry: 0, rz: 0, sx: r, sy: r, sz: r }
+  })
+  return shuffle(pieces)
+}
+const randAngles = (b) => ({ ...b, rx: Math.random() * Math.PI * 2, ry: Math.random() * Math.PI * 2, rz: Math.random() * Math.PI * 2 })
 
 // MorphC's layoutStack, fitted against the cube instead of an ellipsoid.
 function layoutStack() {
@@ -165,11 +176,6 @@ function makeTetraGeometry() {
   g.scale(1 / TETRA_CIRCUMRADIUS, 1 / TETRA_CIRCUMRADIUS, 1 / TETRA_CIRCUMRADIUS)
   return g
 }
-function layoutTetras() {
-  const TAU = Math.PI * 2
-  return layoutSpheres().map((b) => ({ ...b, rx: Math.random() * TAU, ry: Math.random() * TAU, rz: Math.random() * TAU }))
-}
-
 const shuffle = (a) => {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
@@ -179,18 +185,23 @@ const shuffle = (a) => {
 }
 const centered = (sx, sy, sz, ry = 0) => ({ x: 0, y: 0, z: 0, rx: 0, ry, rz: 0, sx, sy, sz })
 function layoutSet(set) {
-  if (set === SPHERE_SET) return layoutSpheres()
+  if (set === SPHERE_SET) return layoutTower(SPHERE_RADIUS, true)
   if (set === STACK_SET) return layoutStack()
-  if (set === TETRA_SET) return layoutTetras()
+  // Tetrahedrons: max size (circumradius), no offset, random angles.
+  if (set === TETRA_SET) return layoutTower(MAX_CENTER_RADIUS, false).map(randAngles)
+  // Circular rings: outer diameter = the tower spheres', random angles.
+  if (set === CIRCLE_SET) {
+    return layoutTower(SPHERE_RADIUS, true).map((b) => randAngles({ ...b, sx: b.sx / (1 + RING_TUBE), sy: b.sy / (1 + RING_TUBE), sz: b.sz / (1 + RING_TUBE) }))
+  }
   if (set === OVOID_SET) return NEST_STEPS.map((k) => centered(OVOID_HALF[0] * k, OVOID_HALF[1] * k, OVOID_HALF[2] * k))
   if (set === NEST_CUBE_SET) return NEST_STEPS.map((k) => centered(NEST_CUBE_SIZE[0] * k, NEST_CUBE_SIZE[1] * k, NEST_CUBE_SIZE[2] * k))
   // Rings: nested sizes in random order, each at a random Y angle.
-  return shuffle(NEST_STEPS.slice()).map((k) => centered(RING_A * k, RING_B * k, RING_A * RING_DEPTH * k, Math.random() * Math.PI * 2))
+  return shuffle(NEST_STEPS.slice()).map((k) => centered(RING_A * k, RING_B * k, RING_A * k, Math.random() * Math.PI * 2))
 }
 // Spin (rad/s per axis) a piece starts when it begins to appear.
 function makeSpin(set) {
   if (set === STACK_SET || set === RING_SET) return [0, randSpin(STACK_SPIN_SPEED), 0]
-  if (set === TETRA_SET) return [randSpin(STACK_SPIN_SPEED), randSpin(STACK_SPIN_SPEED), randSpin(STACK_SPIN_SPEED)]
+  if (set === TETRA_SET || set === CIRCLE_SET) return [randSpin(STACK_SPIN_SPEED), randSpin(STACK_SPIN_SPEED), randSpin(STACK_SPIN_SPEED)]
   return null
 }
 
@@ -316,6 +327,7 @@ export function useBreathCountB(palette) {
       }
       if (!countingEnabled && ps.shrinkStart === null) f = 0
       p.visible = f > 0.0001
+      if (Math.floor(i / COUNT) === SPHERE_SET) f *= 1 - (PULSE_DEPTH / 2) * (1 - Math.cos((2 * Math.PI * now) / PULSE_PERIOD_S))
       p.scale.set(b.sx * f, b.sy * f, b.sz * f)
       const w = ps.spin || [0, 0, 0]
       const t = ps.spinStart === null ? 0 : now - ps.spinStart
@@ -336,7 +348,7 @@ export function useBreathCountB(palette) {
           <mesh geometry={sphereGeometry} material={materials[i]} />
         ) : Math.floor(i / COUNT) === TETRA_SET ? (
           <mesh geometry={tetraGeometry} material={materials[i]} />
-        ) : Math.floor(i / COUNT) === RING_SET ? (
+        ) : Math.floor(i / COUNT) === RING_SET || Math.floor(i / COUNT) === CIRCLE_SET ? (
           <mesh geometry={ringGeometry} material={materials[i]} />
         ) : (
           <RoundedBox args={[1, 1, 1]} radius={Math.floor(i / COUNT) === NEST_CUBE_SET ? NEST_CUBE_CHAMFER : STACK_CHAMFER} smoothness={4} material={materials[i]} />
