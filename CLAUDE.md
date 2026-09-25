@@ -44,7 +44,7 @@ The mappings below are for **Shape A** (`MorphA.jsx`). **Shape B** (`MorphB.jsx`
 - Roughness: lerp(0.3, 1, rv) — smoother at inhale, rougher at exhale
 
 **Shapes C/D (Morphing Sphere, `MorphC.jsx`)** — Shape D's values shown (the `OPTION_D_*` constants); Shape C uses the older shared scales noted in the code:
-- Left slider (lv, exhale → inhale):
+- Right slider, inhale half (`lv` = the eased right slider inverted, 1 − rv: 0 exhale → 1 inhale). These were on the left slider; every Morphing Sphere visual now follows the right slider, and the left one is reserved for audio later:
   - X scale: 3 → 2
   - Z scale: 0.25 → 2
   - Fresnel power: 0 → 0.2
@@ -130,6 +130,7 @@ Each `Gates*.jsx` keeps an independent "checkpoint" list (one entry per gate spa
 - **Box Breathing**: `GatesBoxBreathingHeadlessE.jsx` mirrors `GatesBoxBreathingC.jsx`'s exact `spawnSeries`/`onFirstGate`/`onLastGate` timing (`POOL_SIZE=28`, `SPAWN_Z=-6`, `leadZ = speed*2` pre-trigger) so App.jsx's tutorial text and `breathPhaseRef` wiring work unmodified, but renders no meshes. It additionally writes `holdFlareRef.current` (0-2) each frame: the currently-arriving series' `isFirst` slot travels from z=0 to `DESPAWN_Z` for exactly one Hold phase's duration (by construction of the spacing math), so `calcEmissive(slot.z - 3)` (the same ramp shape used by visible gates) re-centered onto that slot's `z` doubles as the Hold-phase emissive clock; `0` when no such slot is in flight (i.e. during a named Inhale/Exhale phase, not a Hold). Consumed by `StarFieldE` (see Background section) to flare the background starfield during both Hold-in and Hold-out.
 
 ## Shape D pace rings (PaceRingsD.jsx) — Box Breathing + Slowing Down
+**Ring particles (`RingParticlesD.jsx`)** are hard-edged dots: full alpha right up to the dot's edge (no soft falloff), still with twinkle.
 Shared hook `usePaceRings` drives three ring types, identical in both modes: **Pulse/Hold ring** (inner, `PULSE_RING_TUBE`), **Pulse/Hold Exhale ring** (outer, half the inner tube, Y-fade shader with its fade band at half height, sits at the count rings' max X scale), and **count rings** (quarter of the inner tube, X-scaling, Y-fade shader whose fade band animates with X position — full size at the inner ring, the Exhale ring's half-height band at the outer ring).
 - Inhale: inner ring fades 0→alpha 0.5/emissive 1, outer fades 0.5→0, count rings shrink max X→min X. Hold-in: inner pulses once/second alpha 0.5↔1 and emissive 1↔1.25 (floor matches the movement max, so nothing jumps), outer off. Exhale/Hold-out: exact mirror (outer fades in and pulses, inner fades out and is off, count rings grow min X→max X). Count rings fade 0→0.2 alpha/emissive as they travel.
 - Edge alignment via tube-ratio scale factors: count ring min (Inhale end) outer edge lines up with the Pulse/Hold ring's outer edge; count ring max X (Exhale end) inner edge lines up with the Exhale ring's inner edge. The Exhale ring itself stays placed by `LAYOUT_MIN_SCALE`/`LAYOUT_MAX_X`.
@@ -169,7 +170,7 @@ A permanent, non-animated thin ring outlining the fully-inhaled Morph as seen fr
 
 ## Breath-count rings start point (MorphC, Shapes C/D)
 The Morph's 5-breath count rings start counting at a per-mode point (`introStartsCountingRef` / `breathCountSourceRef` in App.jsx):
-- **Breathe at Your Own Pace / Paced Breathing**: at the intro text hand-off, counted from the left slider (unchanged).
+- **Breathe at Your Own Pace / Paced Breathing**: at the intro text hand-off, counted from the right slider (`1 − rightVal`).
 - **Box Breathing**: at the first Inhale of the first box cycle (the box `pendingGatesFnRef` thunk); Shape D counts from `boxProgressRef` (one ring per paced box cycle).
 - **Slowing Down**: at the first paced Inhale after recording. Shapes D/E: in `startPacedArt` (see Slowing Down → D/E hand-off); Shape D counts from `ringPaceProgressRef` (one ring per paced breath). Other shapes: `PacedBreathCountStarter` watches `gatesEnabledRef` + `breathPhaseRef`.
 MorphC resets its ring state whenever counting is enabled or disabled, so every start/restart begins at breath 1.

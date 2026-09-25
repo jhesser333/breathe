@@ -37,8 +37,8 @@ const SILHOUETTE_RING_EMISSIVE = 1
 
 // Breath-count rings: groups of 5 breaths, one ring fades in and locks per
 // completed Inhale, all 5 fall away together on the 5th Exhale. "Breath" here
-// means literal slider movement (leftRawRef), identical across every mode --
-// not any mode's own phase clock.
+// means the right slider (1 - rightVal) unless App.jsx supplies a paced source --
+// Box Breathing and Slowing Down count from their own phase clocks.
 const BREATH_RING_COUNT = 5
 const BREATH_SET_COUNT = 8   // sets take turns so one can fall while the next counts: still rings, spinning rings, sculpture cubes, cube stack, sculpture tetrahedrons, sphere rows, sphere-tetra spiral, squash rings
 const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph backlight glow tracks rings only)
@@ -515,7 +515,7 @@ function sampleSpherePositions(count) {
   return positions
 }
 
-export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRawRef, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle }) {
+export default function MorphC({ rightVal, palette, shapeOption, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle }) {
   const groupRef = useRef()
   const matRef = useRef()
 
@@ -530,7 +530,9 @@ export default function MorphC({ leftVal, rightVal, palette, shapeOption, leftRa
   // Tracks whether lv is currently trending toward exhale (1) or inhale (-1),
   // used only to decide which way newly-spawned flow particles travel.
   // (lv=0 is exhale, lv=1 is inhale -- opposite numeric convention from rv.)
-  const prevLvRef = useRef(leftVal.current)
+  // lv is derived from the right slider (1 - rightVal): every visual follows
+  // the right slider; the left one is reserved for audio later.
+  const prevLvRef = useRef(1 - rightVal.current)
   const flowDirRef = useRef(1)
 
   // Breath-count rings state (see module-level BREATH_* constants above).
@@ -824,7 +826,9 @@ float dissolveHash(vec3 p) {
     // Ease slider input in/out (default convention -- see CLAUDE.md) so
     // every value derived below moves smoothly rather than tracking the
     // thumb's raw position 1:1.
-    const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
+    // Right slider only (see prevLvRef): lv = the eased right slider,
+    // inverted to the old left-slider convention (0 exhale -> 1 inhale).
+    const lv = THREE.MathUtils.smoothstep(1 - rightVal.current, 0, 1)
     const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
     const isD = shapeOption === 'd'
@@ -854,7 +858,7 @@ float dissolveHash(vec3 p) {
     const spawnRampProgress = THREE.MathUtils.smoothstep(rv, 0.75, 1.0)
     const spawnRate = THREE.MathUtils.lerp(MAX_SPAWN_RATE, 0, spawnRampProgress)
 
-    // System 2 is fully controlled by the left slider, and ramps down to 0 at
+    // System 2 is fully controlled by lv (the right slider, inverted), and ramps down to 0 at
     // BOTH ends: full rate only in the middle (lv 0.25 -> 0.5), ramping to 0
     // toward exhale (matches system 1's timing when both sliders move together)
     // and ramping to 0 toward inhale on the other side.
@@ -938,7 +942,7 @@ float dissolveHash(vec3 p) {
     // Count source: the left slider, or (Box Breathing / Slowing Down) a paced
     // 0 (exhale) -> 1 (inhale) progress ref chosen by App.jsx.
     const countSource = breathCountSourceRef && breathCountSourceRef.current
-    const raw = countSource ? countSource.current : leftRawRef.current
+    const raw = countSource ? countSource.current : 1 - rightVal.current   // right slider, 0 exhale -> 1 inhale
     const resetBreathSet = (set) => {
       breathSetFallingRef.current[set] = false
       for (let i = set * BREATH_RING_COUNT; i < (set + 1) * BREATH_RING_COUNT; i++) {
