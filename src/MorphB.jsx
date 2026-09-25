@@ -27,6 +27,7 @@ const DISSOLVE_EDGE = 0.12
 // Top (Exhale): particles fly outward along X; bottom (Inhale): along Y. Speed
 // is random, scaled by how far the particle spawned from the cube's pivot
 // along that axis (0 at the center, full at the face).
+const BURSTS_ENABLED = false     // switched off for now; set true to bring them back
 const BURST_POOL = 1500
 const BURST_COUNT = 150
 const BURST_SPEED = [0.15, 0.5]  // units/s at the face (scales to 0 at the pivot)
@@ -286,7 +287,7 @@ float dissolveHash(vec3 p) {
     if (burstEndRef.current === undefined) burstEndRef.current = atEnd
     if (burstEndRef.current === 'top' && raw < 1 - BURST_REARM) burstEndRef.current = null
     if (burstEndRef.current === 'bottom' && raw > BURST_REARM) burstEndRef.current = null
-    if (atEnd && burstEndRef.current !== atEnd) {
+    if (BURSTS_ENABLED && atEnd && burstEndRef.current !== atEnd) {
       burstEndRef.current = atEnd
       const axis = atEnd === 'top' ? 0 : 1   // Exhale end: X, Inhale end: Y
       const { positionAttr, spawnTimeAttr, lifetimeAttr, velAttr, base } = burst

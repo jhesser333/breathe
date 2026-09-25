@@ -11,11 +11,12 @@ const GATE_B_Z = -30
 const GATE_B_FADE_Z = -20
 const DESPAWN_Z = 6
 const FADE_DURATION = 1.0
-const EMISSIVE_START_Z = -3
+// Emissive ramps 0 -> 1 from the moment a target appears (z=-20) until just
+// before the Morph (EMISSIVE_MID_Z), then pulses 1 -> 2 at z=0. Targets stay
+// fully visible until DESPAWN_Z, which is past the bottom of the screen.
+const EMISSIVE_START_Z = SPAWN_Z
 const EMISSIVE_MID_Z = -0.5
 const MAX_EMISSIVE = 2
-const FADE_OUT_START = 0
-const FADE_OUT_DURATION = 2
 
 function smoothstep(t) {
   t = Math.max(0, Math.min(1, t))
@@ -221,10 +222,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       applyMissScale(meshTopRefsA.current[i], miss)
       applyMissScale(meshBotRefsA.current[i], miss)
       const emissive = calcEmissive(slot.z) * (1 - miss)
-      const fadeOut = slot.z > FADE_OUT_START
-        ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
-        : 1
-      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
       if (matTopRefsA.current[i]) {
         matTopRefsA.current[i].opacity = opacity
         matTopRefsA.current[i].emissiveIntensity = emissive
@@ -274,10 +272,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       applyMissScale(meshLeftRefsB.current[i], miss)
       applyMissScale(meshRightRefsB.current[i], miss)
       const emissive = calcEmissive(slot.z) * (1 - miss)
-      const fadeOut = slot.z > FADE_OUT_START
-        ? 1 - smoothstep(Math.min((slot.z - FADE_OUT_START) / FADE_OUT_DURATION, 1))
-        : 1
-      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1)) * fadeOut
+      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
       if (matLeftRefsB.current[i]) {
         matLeftRefsB.current[i].opacity = opacity
         matLeftRefsB.current[i].emissiveIntensity = emissive

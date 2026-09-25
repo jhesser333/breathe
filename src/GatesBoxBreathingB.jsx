@@ -20,15 +20,17 @@ function smoothstep(t) {
   return c * c * (3 - 2 * c)
 }
 
-function calcEmissive(z) {
-  if (z < -3) return 0
-  if (z < -0.5) return smoothstep((z + 3) / 2.5)
+// Ramps 0 -> 1 from the target's own spawn z to just before the Morph, then
+// pulses 1 -> 2 at z=0. Targets stay fully visible until DESPAWN_Z, which is
+// past the bottom of the screen.
+function calcEmissive(z, spawnZ) {
+  if (z < -0.5) return smoothstep((z - spawnZ) / (-0.5 - spawnZ))
   if (z < 0) return 1 + smoothstep((z + 0.5) / 0.5)
   return 2
 }
 
 function makeSlot() {
-  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false, judged: false, missElapsed: null }
+  return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, spawnZ: 0, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false, judged: false, missElapsed: null }
 }
 
 export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, rightVal }) {
@@ -58,7 +60,7 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         const idx = ss.findIndex(s => !s.active)
         if (idx === -1) continue
         const s = ss[idx]
-        s.z = spawnZ; s.speed = speed; s.active = true
+        s.z = spawnZ; s.spawnZ = spawnZ; s.speed = speed; s.active = true
         s.type = type; s.isLast = (i === N - 1); s.isFirst = (i === 0)
         s.fadeElapsed = 0; s.hasTriggeredNext = false; s.hasTriggeredFirst = false; s.hasPreTriggeredLast = false
         s.judged = false; s.missElapsed = null
@@ -109,9 +111,8 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         const miss = missFactor(s.missElapsed)
 
         const fadeIn = smoothstep(Math.min(s.fadeElapsed / FADE_DURATION, 1))
-        const fadeOut = s.z > 0 ? 1 - smoothstep(Math.min(s.z / 2, 1)) : 1
-        const opacity = fadeIn * fadeOut
-        const emissive = calcEmissive(s.z) * (1 - miss)
+        const opacity = fadeIn
+        const emissive = calcEmissive(s.z, s.spawnZ) * (1 - miss)
         const isInhale = s.type === 'inhale'
 
         g.position.z = s.z
