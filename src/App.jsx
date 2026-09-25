@@ -30,6 +30,8 @@ import StarFieldE from './StarFieldE'
 import TutorialText from './TutorialText'
 import SlowingDownController from './SlowingDownController'
 import BreathLengthControl from './BreathLengthControl'
+import PasscodeScreen from './PasscodeScreen'
+import { RESET_ON_UNLOCK, TESTING_DEFAULTS } from './passcode'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
@@ -206,6 +208,19 @@ export default function App() {
     localStorage.setItem('selectedMode', v)
     setSelectedModeState(v)
   }, [])
+
+  // Passcode gate (see passcode.js). Entering the code resets everyone to the
+  // testing defaults while RESET_ON_UNLOCK is on.
+  const [unlocked, setUnlocked] = useState(false)
+  const handleUnlock = useCallback(() => {
+    if (RESET_ON_UNLOCK) {
+      setSelectedMode(TESTING_DEFAULTS.selectedMode)
+      setShapeOption(TESTING_DEFAULTS.shapeOption)
+      setSliderLayout(TESTING_DEFAULTS.sliderLayout)
+      setTargetPace(TESTING_DEFAULTS.targetPace)
+    }
+    setUnlocked(true)
+  }, [setSelectedMode, setShapeOption, setSliderLayout, setTargetPace])
 
   // Background is fully derived from the shape choice: Options D and E have
   // no visible Gates/rails, so they're the only ones that need an ambient
@@ -1031,6 +1046,11 @@ export default function App() {
   useLayoutEffect(() => {
     if (navButtonsRef.current) setSliderShiftUp(navButtonsRef.current.offsetHeight)
   }, [sliderLayout])
+
+  // Passcode gate: not saved anywhere, so every load/refresh asks again.
+  if (!unlocked) {
+    return <PasscodeScreen palette={palette} onUnlock={handleUnlock} />
+  }
 
   if (screen === 'selectMode') {
     return (

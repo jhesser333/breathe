@@ -3,14 +3,14 @@ import { MODE_LABELS } from './copy'
 
 const OPTIONS = [
   {
-    id: 'slowing',
-    label: MODE_LABELS.slowing,
-    desc: 'The app gently helps you slow the pace of your breathing',
-  },
-  {
     id: 'box',
     label: MODE_LABELS.box,
     desc: 'The app guides you through equal phases of Inhale, hold, Exhale, hold',
+  },
+  {
+    id: 'slowing',
+    label: MODE_LABELS.slowing,
+    desc: 'The app gently helps you slow the pace of your breathing',
   },
   {
     id: 'basic',
