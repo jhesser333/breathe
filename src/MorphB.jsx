@@ -80,7 +80,7 @@ function sampleCubeSurface(out, i) {
   out[i * 3 + 2] = p[2]
 }
 
-export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle }) {
+export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle, landscapeIndexRef }) {
   const groupRef = useRef()
   // 5-breath count pieces inside the cube (see breathCountB.jsx).
   const breathCount = useBreathCountB(palette)
@@ -242,7 +242,7 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
     const countSource = breathCountSourceRef && breathCountSourceRef.current
     const countRaw = countSource ? countSource.current : (leftRawRef ? leftRawRef.current : leftVal.current)
     const countingEnabled = !!(breathCountingEnabledRef && breathCountingEnabledRef.current)
-    breathCount.update(now, countRaw, countingEnabled, onBreathPaletteCycle, livePaletteRef)
+    breathCount.update(now, countRaw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef)
 
     // Follow the app-wide breath-cycle palette (App.jsx owns the lerp).
     if (livePaletteRef && livePaletteRef.current) {

@@ -2,6 +2,7 @@ import { useRef, useCallback, useState, useEffect, useLayoutEffect } from 'react
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import MorphA from './MorphA'
+import LandscapeB from './LandscapeB'
 import MorphB from './MorphB'
 import MorphC from './MorphC'
 import MorphE from './MorphE'
@@ -279,6 +280,9 @@ export default function App() {
   // livePaletteRef holds the live (possibly mid-lerp) THREE.Color for every
   // palette field, read imperatively by MorphC/RingParticlesD/BackgroundRingsD
   // and by the Canvas background (via PaletteLerpDriver) every frame.
+  // Morphing Cube landscape (LandscapeB): which landscape new shapes use,
+  // advanced by MorphB's 5-breath count at each palette change.
+  const landscapeIndexRef = useRef(0)
   const paletteCycleIndexRef = useRef(0)
   const paletteLerpRef = useRef(null)
   const livePaletteRef = useRef({
@@ -954,6 +958,7 @@ export default function App() {
     paceArtFadeRef.current = 1
     paletteCycleIndexRef.current = 0
     paletteLerpRef.current = null
+    landscapeIndexRef.current = 0
     livePaletteRef.current.tertiary.set(PALETTES.teal.tertiaryColor)
     livePaletteRef.current.primary.set(PALETTES.teal.primaryColor)
     livePaletteRef.current.secondary.set(PALETTES.teal.secondaryColor)
@@ -1111,7 +1116,8 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} />
         {shapeOption === 'd' && <CameraVerticalShift />}
-        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} />
+        <MorphComponent leftVal={leftVal} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={leftRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} landscapeIndexRef={landscapeIndexRef} />
+        {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
         {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}

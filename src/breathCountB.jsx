@@ -161,7 +161,7 @@ function layoutStack() {
 // normalized to circumradius 1.
 const TETRA_CHAMFER = 0.06
 const TETRA_CIRCUMRADIUS = Math.sqrt(3 / 8)   // edge 1
-function makeTetraGeometry() {
+export function makeTetraGeometry() {
   const dirs = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map((d) => new THREE.Vector3(...d).normalize())
   const coreR = TETRA_CIRCUMRADIUS - TETRA_CHAMFER
   const pts = []
@@ -255,13 +255,14 @@ export function useBreathCountB(palette) {
   }
 
   // raw: count source (0 exhale -> 1 inhale); countingEnabled: from App.
-  const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef) => {
+  const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef) => {
     const st = s.current
     if (countingEnabled !== st.wasEnabled) {
       // Arm the first piece only if the source starts low; otherwise (e.g.
       // Slowing Down starts as an Inhale target passes) wait for the next
       // trough so piece 1 doesn't pop in fully grown.
       st.cycle = 0; st.locked = 0; st.dir = -1; st.extreme = raw; st.armed = raw <= GROW_START; st.palettePending = false
+      if (landscapeIndexRef) landscapeIndexRef.current = 0   // landscape restarts with the count (LandscapeB)
       for (let set = 0; set < SET_COUNT; set++) resetSet(set)
       activateSet(SPHERE_SET)
     }
@@ -280,6 +281,7 @@ export function useBreathCountB(palette) {
         if (st.palettePending) {
           st.palettePending = false
           if (onBreathPaletteCycle) onBreathPaletteCycle(now)
+          if (landscapeIndexRef) landscapeIndexRef.current += 1   // next landscape, with the palette change
         }
       }
 
