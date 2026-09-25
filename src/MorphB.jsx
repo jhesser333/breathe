@@ -3,25 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { useBreathCountB } from './breathCountB'
-
-// Material: same parameters as the Morphing Sphere (MorphC), all driven by the
-// right slider only. rv is eased; rv=0 is Inhale, rv=1 is Exhale (the default).
-// Paired INHALE_/EXHALE_ values: equal pairs don't change with the slider yet.
-const EXHALE_EMISSIVE = 1.5
-const INHALE_EMISSIVE = 1.5
-const EXHALE_ROUGHNESS = 0.3
-const INHALE_ROUGHNESS = 0.3
-const EXHALE_OPACITY = 0.5
-const INHALE_OPACITY = 0.5
-const EXHALE_FRESNEL_POWER = 0
-const INHALE_FRESNEL_POWER = 0.2
-const FRESNEL_INTENSITY = 1
-// Dissolve (same grain effect as MorphC): 0 = fully solid, 1 = fully gone.
-// Both ends solid for now.
-const EXHALE_DISSOLVE = 0
-const INHALE_DISSOLVE = 0
-const DISSOLVE_SCALE = 80
-const DISSOLVE_EDGE = 0.12
+import { createCubeMorphMaterial, EXHALE_EMISSIVE, INHALE_EMISSIVE, EXHALE_ROUGHNESS, INHALE_ROUGHNESS, EXHALE_OPACITY, INHALE_OPACITY, EXHALE_FRESNEL_POWER, INHALE_FRESNEL_POWER, FRESNEL_INTENSITY, EXHALE_DISSOLVE, INHALE_DISSOLVE, DISSOLVE_SCALE, DISSOLVE_EDGE } from './cubeMaterialB'
 
 // Burst sparkles: MorphC's surface-sparkle look (size, life, fade, twinkle),
 // but fired in one burst each time the right slider reaches its top or bottom.
@@ -103,93 +85,10 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
   // 5-breath count pieces inside the cube (see breathCountB.jsx).
   const breathCount = useBreathCountB(palette)
 
-  const { material, fresnelUniforms } = useMemo(() => {
-    const fresnelUniforms = {
-      fresnelPower:     { value: EXHALE_FRESNEL_POWER },
-      fresnelIntensity: { value: FRESNEL_INTENSITY },
-      dissolveProgress: { value: 0 },
-      dissolveScale:    { value: DISSOLVE_SCALE },
-      dissolveEdge:     { value: DISSOLVE_EDGE },
-    }
-
-    const mat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(palette.tertiaryColor),
-      emissive: new THREE.Color(palette.primaryColor),
-      emissiveIntensity: EXHALE_EMISSIVE,
-      roughness: EXHALE_ROUGHNESS,
-      metalness: 0,
-      transparent: true,
-      opacity: EXHALE_OPACITY,
-    })
-
-    mat.customProgramCacheKey = () => `fresnel-morph-b-${palette.primaryColor}`
-
-    mat.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, fresnelUniforms)
-
-      // View direction for the Fresnel mask; local (unscaled) position for the
-      // dissolve grain so dot size stays stable as the cube scales.
-      shader.vertexShader = 'varying vec3 vFresnelDir;\nvarying vec3 vDissolvePos;\n' + shader.vertexShader
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <project_vertex>',
-        `#include <project_vertex>
-        vFresnelDir = normalize(-mvPosition.xyz);
-        vDissolvePos = position;`
-      )
-
-      shader.fragmentShader =
-        `uniform float fresnelPower;
-uniform float fresnelIntensity;
-uniform float dissolveProgress;
-uniform float dissolveScale;
-uniform float dissolveEdge;
-varying vec3 vFresnelDir;
-varying vec3 vDissolvePos;
-
-float dissolveHash(vec3 p) {
-  p = fract(p * vec3(443.897, 441.423, 437.195));
-  p += dot(p, p.yzx + 19.19);
-  return fract((p.x + p.y) * p.z);
-}
-\n` + shader.fragmentShader
-
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
-        {
-          float fr = pow(1.0 - max(dot(normalize(vNormal), vFresnelDir), 0.0), fresnelPower);
-          totalEmissiveRadiance *= (1.0 - fr * fresnelIntensity);
-        }`
-      )
-
-      // Dissolve: same metaball-style grain as MorphC.
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <opaque_fragment>',
-        `#include <opaque_fragment>
-        {
-          vec3 dScaled = vDissolvePos * dissolveScale;
-          vec3 dBaseCell = floor(dScaled);
-          float dCoverage = 0.0;
-          for (int ix = -1; ix <= 1; ix++) {
-            for (int iy = -1; iy <= 1; iy++) {
-              for (int iz = -1; iz <= 1; iz++) {
-                if (abs(ix) + abs(iy) + abs(iz) > 2) continue;
-                vec3 dNeighbor = dBaseCell + vec3(float(ix), float(iy), float(iz));
-                float dNoise = dissolveHash(dNeighbor);
-                float dProgress = smoothstep(dissolveProgress - dissolveEdge, dissolveProgress + dissolveEdge, dNoise);
-                float dDist = length(dScaled - (dNeighbor + 0.5));
-                float dFalloff = 1.0 - smoothstep(0.8, 1.3, dDist);
-                dCoverage = max(dCoverage, dFalloff * dProgress);
-              }
-            }
-          }
-          gl_FragColor.a *= dCoverage;
-        }`
-      )
-    }
-
-    return { material: mat, fresnelUniforms }
-  }, [palette.tertiaryColor, palette.primaryColor])
+  const { material, fresnelUniforms } = useMemo(
+    () => createCubeMorphMaterial(palette.tertiaryColor, palette.primaryColor),
+    [palette.tertiaryColor, palette.primaryColor]
+  )
 
   const burst = useMemo(() => {
     const positions = new Float32Array(BURST_POOL * 3)

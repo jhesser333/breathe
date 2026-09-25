@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { useGateBurstB, isSuccess, missFactor, applyMissScale } from './gateReactionsB'
+import { createCubeMorphMaterial, gateLookT, applyGateLook } from './cubeMaterialB'
 
 const POOL_A = 3
 const POOL_B = 3
@@ -105,15 +106,17 @@ function makeTieRefArray() {
 export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef, paceProgressRef }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
-  const matTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
-  const matBotRefsA = useRef(Array.from({ length: POOL_A }, () => null))
+  // Cube Morph material per target cube (Exhale look until the pulse -- see cubeMaterialB).
+  const matsTopA = useMemo(() => Array.from({ length: POOL_A }, () => createCubeMorphMaterial(gateColor, emissiveColor)), [gateColor, emissiveColor])
+  const matsBotA = useMemo(() => Array.from({ length: POOL_A }, () => createCubeMorphMaterial(gateColor, emissiveColor)), [gateColor, emissiveColor])
   const meshTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const meshBotRefsA = useRef(Array.from({ length: POOL_A }, () => null))
 
   const slotsB = useRef(Array.from({ length: POOL_B }, makeSlotB))
   const groupRefsB = useRef(Array.from({ length: POOL_B }, () => null))
-  const matLeftRefsB = useRef(Array.from({ length: POOL_B }, () => null))
-  const matRightRefsB = useRef(Array.from({ length: POOL_B }, () => null))
+  // Cube Morph material per target cube (Exhale look until the pulse -- see cubeMaterialB).
+  const matsLeftB = useMemo(() => Array.from({ length: POOL_B }, () => createCubeMorphMaterial(gateColor, emissiveColor)), [gateColor, emissiveColor])
+  const matsRightB = useMemo(() => Array.from({ length: POOL_B }, () => createCubeMorphMaterial(gateColor, emissiveColor)), [gateColor, emissiveColor])
   const meshLeftRefsB = useRef(Array.from({ length: POOL_B }, () => null))
   const meshRightRefsB = useRef(Array.from({ length: POOL_B }, () => null))
 
@@ -177,6 +180,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
+    const live = livePaletteRef && livePaletteRef.current
     const spawnB = (speed) => {
       const gateBZ = computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
       checkpoints.current.push({ z: gateBZ, speed, fadeElapsed: 0 })
@@ -238,15 +242,10 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       applyMissScale(meshTopRefsA.current[i], miss)
       applyMissScale(meshBotRefsA.current[i], miss)
       const emissive = calcEmissive(slot.z) * (1 - miss)
-      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
-      if (matTopRefsA.current[i]) {
-        matTopRefsA.current[i].opacity = opacity
-        matTopRefsA.current[i].emissiveIntensity = emissive
-      }
-      if (matBotRefsA.current[i]) {
-        matBotRefsA.current[i].opacity = opacity
-        matBotRefsA.current[i].emissiveIntensity = emissive
-      }
+      const fadeIn = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
+      const lookT = gateLookT(slot.z)
+      applyGateLook(matsTopA[i], lookT, fadeIn, emissive, live)
+      applyGateLook(matsBotA[i], lookT, fadeIn, emissive, live)
 
       slot.z += slot.speed * delta
 
@@ -288,15 +287,10 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       applyMissScale(meshLeftRefsB.current[i], miss)
       applyMissScale(meshRightRefsB.current[i], miss)
       const emissive = calcEmissive(slot.z) * (1 - miss)
-      const opacity = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
-      if (matLeftRefsB.current[i]) {
-        matLeftRefsB.current[i].opacity = opacity
-        matLeftRefsB.current[i].emissiveIntensity = emissive
-      }
-      if (matRightRefsB.current[i]) {
-        matRightRefsB.current[i].opacity = opacity
-        matRightRefsB.current[i].emissiveIntensity = emissive
-      }
+      const fadeIn = smoothstep(Math.min(slot.fadeElapsed / FADE_DURATION, 1))
+      const lookT = gateLookT(slot.z)
+      applyGateLook(matsLeftB[i], lookT, fadeIn, emissive, live)
+      applyGateLook(matsRightB[i], lookT, fadeIn, emissive, live)
       group.visible = true
     })
 
@@ -368,12 +362,8 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
     gateBurst.tick(now, livePaletteRef)
 
     // Follow the app-wide breath-cycle palette (App.jsx owns the lerp):
-    // targets secondary + primary glow, ties primary.
-    if (livePaletteRef && livePaletteRef.current) {
-      const live = livePaletteRef.current
-      ;[matTopRefsA, matBotRefsA, matLeftRefsB, matRightRefsB].forEach((refs) => refs.current.forEach((m) => {
-        if (m) { m.color.copy(live.secondary); m.emissive.copy(live.primary) }
-      }))
+    // ties primary (targets follow it in applyGateLook).
+    if (live) {
       previewMaterials.forEach((m) => m.color.copy(live.primary))
       trailingMaterials.forEach((m) => m.color.copy(live.primary))
       lerpMaterials.forEach((seg) => seg.forEach((m) => m.color.copy(live.primary)))
@@ -386,28 +376,20 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       {Array.from({ length: POOL_A }, (_, i) => (
         <group key={`a${i}`} ref={el => { groupRefsA.current[i] = el }} visible={false}>
           <RoundedBox ref={el => { meshTopRefsA.current[i] = el }} position={[0, GATE_A_TOP_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matTopRefsA.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
+            <primitive object={matsTopA[i].material} attach="material" />
           </RoundedBox>
           <RoundedBox ref={el => { meshBotRefsA.current[i] = el }} position={[0, GATE_A_BOT_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matBotRefsA.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
+            <primitive object={matsBotA[i].material} attach="material" />
           </RoundedBox>
         </group>
       ))}
       {Array.from({ length: POOL_B }, (_, i) => (
         <group key={`b${i}`} ref={el => { groupRefsB.current[i] = el }} visible={false}>
           <RoundedBox ref={el => { meshLeftRefsB.current[i] = el }} position={[-GATE_B_X, GATE_B_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matLeftRefsB.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
+            <primitive object={matsLeftB[i].material} attach="material" />
           </RoundedBox>
           <RoundedBox ref={el => { meshRightRefsB.current[i] = el }} position={[GATE_B_X, GATE_B_Y, 0]} args={CUBE_ARGS} radius={CUBE_RADIUS} smoothness={3}>
-            <meshStandardMaterial ref={el => { matRightRefsB.current[i] = el }}
-              color={gateColor} emissive={emissiveColor} emissiveIntensity={0}
-              roughness={0.5} metalness={0.1} transparent opacity={0} />
+            <primitive object={matsRightB[i].material} attach="material" />
           </RoundedBox>
         </group>
       ))}
