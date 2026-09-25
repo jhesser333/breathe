@@ -47,6 +47,9 @@ const GATE_B_Y = 0.25        // centered at morph height
 
 const TIES_PER_SEGMENT = 6   // 1 tie at the segment's leading gate + 5 equally spaced before the next gate
 const LERP_SEGMENTS_MAX = 2  // max simultaneous real-gate-to-real-gate intervals (normally 1, with headroom)
+// Ties are hidden: the landscape (LandscapeB) now shows the forward motion.
+// Their layout still runs, so setting this back to true restores them as-is.
+const SHOW_TIES = false
 const TIE_ALPHA = 0.15
 const TIE_GAP = 0.1          // inset so ties don't overlap the inhale pillars' inner faces
 const TIE_HEIGHT_Y = 0.02
@@ -327,7 +330,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       if (!mesh) continue
       if (!frontmost) { mesh.visible = false; continue }
       mesh.position.z = frontmost.z - i * TIE_SPACING
-      mesh.visible = true
+      mesh.visible = SHOW_TIES
       previewMaterials[i].opacity = TIE_ALPHA * smoothstep(Math.min(frontmost.fadeElapsed / FADE_DURATION, 1))
     }
 
@@ -341,7 +344,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       const z = backmost ? backmost.z + i * TIE_SPACING : 0
       if (!backmost || i < trailingStart || z > DESPAWN_Z) { mesh.visible = false; continue }
       mesh.position.z = z
-      mesh.visible = true
+      mesh.visible = SHOW_TIES
       trailingMaterials[i].opacity = TIE_ALPHA * smoothstep(Math.min(backmost.fadeElapsed / FADE_DURATION, 1))
     }
 
@@ -362,7 +365,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         if (!a || !b) { mesh.visible = false; continue }
 
         mesh.position.z = a.z + (i / TIES_PER_SEGMENT) * depth
-        mesh.visible = true
+        mesh.visible = SHOW_TIES
         lerpMaterials[s][i].opacity = TIE_ALPHA * fadeIn
       }
     }
