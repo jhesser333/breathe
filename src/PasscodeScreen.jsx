@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { PASSCODE } from './passcode'
 
 // Full-screen passcode gate shown before anything else (see passcode.js).
+// Styled to match the Home screen (SelectModeScreen.jsx): title like "HOME",
+// entry box like a mode card, message like a card's description.
 export default function PasscodeScreen({ palette, onUnlock }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState(false)
@@ -29,10 +31,10 @@ export default function PasscodeScreen({ palette, onUnlock }) {
       fontFamily: 'sans-serif', padding: '0 16px',
     }}>
       <h1 style={{
-        color: palette.headerColor, fontSize: 24, fontWeight: 300,
-        letterSpacing: '0.1em', margin: '0 0 24px',
+        color: palette.tertiaryColor, fontSize: 32, fontWeight: 700,
+        letterSpacing: '0.15em', margin: '0 0 24px',
       }}>
-        ENTER PASSCODE
+        PASSCODE
       </h1>
       <input
         type="text"
@@ -46,18 +48,18 @@ export default function PasscodeScreen({ palette, onUnlock }) {
         spellCheck={false}
         aria-label="Passcode"
         style={{
-          width: 160, padding: '12px 0',
-          textAlign: 'center', fontSize: 28, letterSpacing: '0.4em',
+          width: 160, padding: '16px 0',
+          textAlign: 'center', fontSize: 24, fontWeight: 500, letterSpacing: '0.4em',
           color: palette.textColor,
           background: 'rgba(255,255,255,0.05)',
-          border: `1px solid ${palette.primaryColor}`,
-          borderRadius: 8, outline: 'none',
+          border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: 12, outline: 'none',
           fontFamily: 'sans-serif',
         }}
       />
       <p style={{
-        color: palette.textColor, fontSize: 14, height: 20,
-        margin: '16px 0 0', opacity: error ? 0.8 : 0,
+        color: 'rgba(255,255,255,0.45)', fontSize: 13, height: 20,
+        margin: '16px 0 0', opacity: error ? 1 : 0,
         transition: 'opacity 0.3s ease',
       }}>
         Incorrect code
