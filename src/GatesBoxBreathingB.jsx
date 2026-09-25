@@ -33,7 +33,7 @@ function makeSlot() {
   return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, spawnZ: 0, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false, judged: false, missElapsed: null }
 }
 
-export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, rightVal, livePaletteRef }) {
+export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, rightVal, livePaletteRef, boxProgressRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -46,6 +46,11 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
   // Success/miss reactions as each target reaches the Morph.
   const gateBurst = useGateBurstB(emissiveColor)
 
+  // Paced breath progress for the 5-breath count (boxProgressRef, same
+  // meaning as GatesBoxBreathingD's): each series' approach is a movement
+  // phase (Inhale 0->1, Exhale 1->0) and its crossing is the following Hold.
+  const seriesRef = useRef({ type: 'inhale', spawnTime: 0, interval: 1, arrived: true })
+
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
     const ss = slots.current
@@ -55,6 +60,7 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
       const N = Math.max(1, Math.round(spawnIntervalRef.current))
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
       const spacing = N > 1 ? Math.abs(SPAWN_Z) / (N - 1) : 0
+      seriesRef.current = { type, spawnTime: now, interval: spawnIntervalRef.current, arrived: false }
       for (let i = 0; i < N; i++) {
         const spawnZ = SPAWN_Z - i * spacing
         const idx = ss.findIndex(s => !s.active)
@@ -102,6 +108,7 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
           s.hasTriggeredNext = true
           spawnSeries(s.type === 'inhale' ? 'exhale' : 'inhale')
         }
+        if (s.z >= 0 && s.isFirst && s.type === seriesRef.current.type) seriesRef.current.arrived = true
         if (s.z >= 0 && !s.judged) {
           s.judged = true
           if (rightVal && isSuccess(s.type, rightVal.current)) gateBurst.burst(s.type, s.z, now)
@@ -138,6 +145,12 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         }
       }
     }
+    if (boxProgressRef) {
+      const sr = seriesRef.current
+      const p = sr.arrived ? 1 : Math.min(1, (now - sr.spawnTime) / sr.interval)
+      boxProgressRef.current = !enabled ? 0 : sr.type === 'inhale' ? p : 1 - p
+    }
+
     gateBurst.tick(now, livePaletteRef)
 
     // Follow the app-wide breath-cycle palette (App.jsx owns the lerp).

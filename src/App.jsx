@@ -998,7 +998,7 @@ export default function App() {
       boxCaptionIndexRef.current = 0
       // First Inhale of the first box: start counting, one ring per box cycle
       // (Shape D's paced progress; other shapes fall back to the slider).
-      breathCountSourceRef.current = shapeRef.current === 'd' ? boxProgressRef : null
+      breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? boxProgressRef : null
       breathCountingEnabledRef.current = true
       currentMainTextRef.current = TEXTS.boxInhale
       setTutorialText(TEXTS.boxInhale)
@@ -1013,7 +1013,7 @@ export default function App() {
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
-    breathCountSourceRef.current = shapeRef.current === 'd' ? ringPaceProgressRef : null
+    breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? ringPaceProgressRef : null
     breathCountingEnabledRef.current = true
   }, [])
 
@@ -1132,6 +1132,7 @@ export default function App() {
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
             livePaletteRef={livePaletteRef}
+            paceProgressRef={ringPaceProgressRef}
             startOnInhale={mode === 'slowing'}
           />
         )}

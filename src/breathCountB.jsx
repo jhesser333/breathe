@@ -175,7 +175,10 @@ export function useBreathCountB(palette) {
   const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef) => {
     const st = s.current
     if (countingEnabled !== st.wasEnabled) {
-      st.cycle = 0; st.locked = 0; st.dir = -1; st.extreme = raw; st.armed = true; st.palettePending = false
+      // Arm the first piece only if the source starts low; otherwise (e.g.
+      // Slowing Down starts as an Inhale target passes) wait for the next
+      // trough so piece 1 doesn't pop in fully grown.
+      st.cycle = 0; st.locked = 0; st.dir = -1; st.extreme = raw; st.armed = raw <= GROW_START; st.palettePending = false
       for (let set = 0; set < SET_COUNT; set++) resetSet(set)
       activateSet(SPHERE_SET)
     }

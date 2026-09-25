@@ -102,7 +102,7 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef }) {
+export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef, paceProgressRef }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
@@ -122,6 +122,22 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   const judge = (slot, type, now) => {
     if (rightVal && isSuccess(type, rightVal.current)) gateBurst.burst(type, slot.z, now)
     else slot.missElapsed = 0
+    startPaceRamp(type, now)
+  }
+
+  // Paced breath progress for the 5-breath count (paceProgressRef, 0 exhale
+  // -> 1 inhale): 1 as each Inhale target passes, 0 as each Exhale target
+  // passes, ramping between them over the next opposite target's exact
+  // arrival time, so it follows Slowing Down's changing pace.
+  const paceRampRef = useRef({ from: 0, to: 0, start: 0, dur: 1 })
+  const startPaceRamp = (type, now) => {
+    const from = type === 'inhale' ? 1 : 0
+    const others = (type === 'inhale' ? slotsA : slotsB).current
+    let next = null
+    others.forEach((o) => { if (o.active && o.z < 0 && (!next || o.z > next.z)) next = o })
+    paceRampRef.current = next
+      ? { from, to: 1 - from, start: now, dur: Math.max(0.05, -next.z / next.speed) }
+      : { from, to: from, start: now, dur: 1 }
   }
 
   // Preview ties: the 6 ties (including the at-gate tie) ahead of the
@@ -342,6 +358,11 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
         mesh.visible = true
         lerpMaterials[s][i].opacity = TIE_ALPHA * fadeIn
       }
+    }
+
+    if (paceProgressRef) {
+      const r = paceRampRef.current
+      paceProgressRef.current = THREE.MathUtils.lerp(r.from, r.to, Math.min(1, (now - r.start) / r.dur))
     }
 
     gateBurst.tick(now, livePaletteRef)
