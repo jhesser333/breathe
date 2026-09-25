@@ -69,14 +69,16 @@ const GATE_INNER_HALF_X = GATE_B_X - CUBE_ARGS[0] / 2
 const TIE_WIDTH_X = 2 * (GATE_INNER_HALF_X - TIE_GAP)
 const TIE_ARGS = [TIE_WIDTH_X, TIE_HEIGHT_Y, TIE_DEPTH_Z]
 
-// Dynamic second-gate (Inhale Gate B) spawn z -- see GatesA.jsx's identical
-// helper for the full derivation. Falls back to ratio 1.5 (today's fixed
-// GATE_B_Z/SPAWN_Z constant) outside Slowing Down's ramp.
+// Dynamic second-gate (Inhale Gate B) spawn z. Falls back to ratio 1.5 (the
+// fixed GATE_B_Z/SPAWN_Z constant) outside Slowing Down's ramp. The Inhale
+// target arrives `inhale` seconds after the Exhale target it spawns with --
+// the time the user spends inhaling between them. (GatesA's copy uses
+// `exhale` here, which swaps the two phases on an asymmetric pace like 4-6.)
 function computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef) {
   const inhale = inhaleSecondsRef?.current
   const exhale = exhaleSecondsRef?.current
   const P = spawnIntervalRef.current
-  const ratio = (inhale != null && exhale != null && P > 0) ? 1 + exhale / P : 1.5
+  const ratio = (inhale != null && exhale != null && P > 0) ? 1 + inhale / P : 1.5
   return SPAWN_Z * ratio
 }
 
@@ -103,7 +105,7 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef, paceProgressRef }) {
+export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef, paceProgressRef, startOnInhale = false }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   // Cube Morph material per target cube (Exhale look until the pulse -- see cubeMaterialB).
@@ -181,8 +183,8 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
     const live = livePaletteRef && livePaletteRef.current
-    const spawnB = (speed) => {
-      const gateBZ = computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
+    const spawnB = (speed, z) => {
+      const gateBZ = z ?? computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef)
       checkpoints.current.push({ z: gateBZ, speed, fadeElapsed: 0 })
 
       const slot = slotsB.current.find(s => !s.active)
@@ -228,6 +230,17 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       wasEnabled.current = true
       checkpoints.current = []
       spawnA()
+      if (startOnInhale) {
+        // Slowing Down: the paced cycle begins right on an Inhale (the
+        // sliders are at the bottom), with an extra Inhale target placed to
+        // arrive exactly inhaleSeconds later; the regular Exhale target
+        // then arrives at one full interval.
+        if (breathPhaseRef) breathPhaseRef.current = 'inhale'
+        const P = spawnIntervalRef.current
+        const inhale = inhaleSecondsRef?.current ?? P / 2
+        spawnB(Math.abs(SPAWN_Z) / P, SPAWN_Z * (inhale / P))
+        startPaceRamp('exhale', now)
+      }
     }
     if (!gatesEnabledRef.current) wasEnabled.current = false
 
@@ -251,7 +264,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       if (slot.z >= 0 && !slot.hasTriggeredNext) {
         slot.hasTriggeredNext = true
-        if (breathPhaseRef) breathPhaseRef.current = 'exhale'
+        if (breathPhaseRef) breathPhaseRef.current = 'inhale'   // the phase to breathe next
         judge(slot, 'exhale', now)
         spawnA()
       }
@@ -271,7 +284,7 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
 
       if (slot.z >= 0 && !slot.hasTriggeredNext) {
         slot.hasTriggeredNext = true
-        if (breathPhaseRef) breathPhaseRef.current = 'inhale'
+        if (breathPhaseRef) breathPhaseRef.current = 'exhale'   // the phase to breathe next
         judge(slot, 'inhale', now)
       }
 

@@ -87,7 +87,7 @@ function sampleCubeSurface(out, i) {
   out[i * 3 + 2] = p[2]
 }
 
-export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle, landscapeIndexRef }) {
+export default function MorphB({ rightVal, palette, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle, landscapeIndexRef }) {
   const groupRef = useRef()
   // 5-breath count pieces inside the cube (see breathCountB.jsx).
   const breathCount = useBreathCountB(palette)
@@ -192,11 +192,12 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
     // Ease slider input in/out (default convention -- see CLAUDE.md) so
     // every value derived below moves smoothly rather than tracking the
     // thumb's raw position 1:1.
-    const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
     const rv = THREE.MathUtils.smoothstep(rightVal.current, 0, 1)
 
-    const xScale = THREE.MathUtils.lerp(2.2, 1.2, lv)
-    const zScale = THREE.MathUtils.lerp(0.5, 1.2, lv)
+    // Every visual follows the right slider (the left one is reserved for
+    // audio later): rv 0 = Inhale (tall, narrow), rv 1 = Exhale (wide, flat).
+    const xScale = THREE.MathUtils.lerp(1.2, 2.2, rv)
+    const zScale = THREE.MathUtils.lerp(1.2, 0.5, rv)
     const yScale = THREE.MathUtils.lerp(3.5, 0.4, rv)
     groupRef.current.scale.set(xScale, yScale, zScale)
 
@@ -295,7 +296,7 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
     // 5-breath count: counted from the left slider unless App.jsx supplies a
     // paced source (it doesn't for this skin).
     const countSource = breathCountSourceRef && breathCountSourceRef.current
-    const countRaw = countSource ? countSource.current : (leftRawRef ? leftRawRef.current : leftVal.current)
+    const countRaw = countSource ? countSource.current : 1 - rightVal.current   // right slider, 0 exhale -> 1 inhale
     const countingEnabled = !!(breathCountingEnabledRef && breathCountingEnabledRef.current)
     breathCount.update(now, countRaw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef)
 

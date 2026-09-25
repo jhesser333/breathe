@@ -542,7 +542,8 @@ export default function App() {
   }, [showPacedText])
 
   const handleSlowingRecordingDone = useCallback(() => {
-    if (shapeRef.current === 'd' || shapeRef.current === 'e') {
+    // Shape B (Morphing Cube) follows the same tutorial as D/E.
+    if (shapeRef.current === 'd' || shapeRef.current === 'e' || shapeRef.current === 'b') {
       // Art waits until Text D has been read and the sliders reach the
       // bottom (see startPacedArt); hold the ramp at the recorded pace.
       phase2StartRef.current = Infinity
@@ -598,7 +599,7 @@ export default function App() {
     phase2StartRef.current = Date.now() / 1000
     pacedCueStageRef.current = 'captions'
     pacedBreathNumRef.current = 0
-    breathCountSourceRef.current = shapeRef.current === 'd' ? ringPaceProgressRef : null
+    breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? ringPaceProgressRef : null
     breathCountingEnabledRef.current = true
     gatesEnabledRef.current = true
   }, [])
@@ -1120,8 +1121,8 @@ export default function App() {
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
-        {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
-        {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e') && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
+        {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && shapeOption !== 'b' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
+        {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e' || shapeOption === 'b') && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
         {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
@@ -1168,8 +1169,8 @@ export default function App() {
             recordingEnabledRef={recordingEnabledRef}
             lastMaxTimeRef={lastMaxTimeRef}
             onGatesReady={handleSlowingRecordingDone}
-            onTextDone={shapeOption === 'd' || shapeOption === 'e' ? () => {} : handleSlowingTextDDone}
-            onTextEDone={shapeOption === 'd' || shapeOption === 'e' ? () => {} : handleSlowingTextEDone}
+            onTextDone={shapeOption === 'd' || shapeOption === 'e' || shapeOption === 'b' ? () => {} : handleSlowingTextDDone}
+            onTextEDone={shapeOption === 'd' || shapeOption === 'e' || shapeOption === 'b' ? () => {} : handleSlowingTextEDone}
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
             targetInhaleSeconds={targetPaceInfo.inhale}

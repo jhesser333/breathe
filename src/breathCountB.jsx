@@ -61,8 +61,9 @@ const RING_B = OVOID_HALF[1] / (1 + RING_TUBE)
 // X/Z offset that still keeps them inside the cube.
 const SPHERE_RADIUS = 0.5
 const TOWER_OFFSET_TRIES = 200
-// Sphere tower pulse: 1 s loop, eased, 100% -> 90% -> 100%.
-const PULSE_PERIOD_S = 1
+// Sphere tower pulse: eased loop, 100% -> 90% -> 100%, each sphere with its
+// own random loop length and starting offset.
+const PULSE_PERIOD_S = [1, 1.5]
 const PULSE_DEPTH = 0.1
 
 // Cube stack: same rules as MorphC's (tilted 30 deg, random Y angle, Y spin).
@@ -185,7 +186,7 @@ const shuffle = (a) => {
 }
 const centered = (sx, sy, sz, ry = 0) => ({ x: 0, y: 0, z: 0, rx: 0, ry, rz: 0, sx, sy, sz })
 function layoutSet(set) {
-  if (set === SPHERE_SET) return layoutTower(SPHERE_RADIUS, true)
+  if (set === SPHERE_SET) return layoutTower(SPHERE_RADIUS, true).map((b) => ({ ...b, pulsePeriod: THREE.MathUtils.randFloat(...PULSE_PERIOD_S), pulsePhase: Math.random() }))
   if (set === STACK_SET) return layoutStack()
   // Tetrahedrons: max size (circumradius), no offset, random angles.
   if (set === TETRA_SET) return layoutTower(MAX_CENTER_RADIUS, false).map(randAngles)
@@ -329,7 +330,7 @@ export function useBreathCountB(palette) {
       }
       if (!countingEnabled && ps.shrinkStart === null) f = 0
       p.visible = f > 0.0001
-      if (Math.floor(i / COUNT) === SPHERE_SET) f *= 1 - (PULSE_DEPTH / 2) * (1 - Math.cos((2 * Math.PI * now) / PULSE_PERIOD_S))
+      if (Math.floor(i / COUNT) === SPHERE_SET) f *= 1 - (PULSE_DEPTH / 2) * (1 - Math.cos(2 * Math.PI * (now / (b.pulsePeriod || 1) + (b.pulsePhase || 0))))
       p.scale.set(b.sx * f, b.sy * f, b.sz * f)
       const w = ps.spin || [0, 0, 0]
       const t = ps.spinStart === null ? 0 : now - ps.spinStart

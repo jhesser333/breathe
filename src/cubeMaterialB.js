@@ -10,8 +10,8 @@ import * as THREE from 'three'
 // Paired INHALE_/EXHALE_ values: equal pairs don't change with the slider yet.
 export const EXHALE_EMISSIVE = 1.5
 export const INHALE_EMISSIVE = 1.5
-export const EXHALE_ROUGHNESS = 0.3
-export const INHALE_ROUGHNESS = 0.3
+export const EXHALE_ROUGHNESS = 0
+export const INHALE_ROUGHNESS = 0
 export const EXHALE_OPACITY = 0.5
 export const INHALE_OPACITY = 0.5
 export const EXHALE_FRESNEL_POWER = 0

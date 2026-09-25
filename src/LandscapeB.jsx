@@ -26,21 +26,13 @@ const Y = 0
 const SCALE = [1, 3]             // diameter
 const GAP = [2, 5]               // units of travel between spawns, per side
 const EXCLUDE_X = 1.5            // keep clear of the targets (outer edge 1.15) and ties
+const X_SPREAD = 1               // inner edge varies from EXCLUDE_X out to this much further
 const FADE_S = 1
 const OWN_PACE_INTERVAL = 12
 // Tertiary color for both base and glow, emissive 0.5 (otherwise the
 // targets' approach look).
 const LANDSCAPE_LOOK = { roughness: 0.3, metalness: 0, approachRoughness: 0.3, approachEmissive: 0.5, emissiveFrom: 'tertiary' }
 const TARGET_SPAWN_DIST = { box: 6, other: 20 }
-
-const _v = new THREE.Vector3()
-
-// X of the camera view's edge at depth z on the y=0 plane (the camera has no
-// yaw, so screen x is proportional to world x at a fixed depth).
-function viewHalfWidth(camera, z) {
-  _v.set(1, Y, z).project(camera)
-  return _v.x > 1e-6 ? 1 / _v.x : 0
-}
 
 const makeSlot = () => ({ active: false, kind: 'sphere', x: 0, z: 0, s: 1, rx: 0, ry: 0, rz: 0, born: 0 })
 
@@ -60,12 +52,11 @@ export default function LandscapeB({ mode, spawnIntervalRef, landscapeIndexRef, 
   const sides = useRef([-1, 1].map((dir) => ({ dir, travel: 0, next: THREE.MathUtils.randFloat(...GAP) })))
   const filled = useRef(false)
 
-  const spawn = (dir, z, camera, now) => {
+  const spawn = (dir, z, now) => {
     const s = THREE.MathUtils.randFloat(...SCALE)
     const r = s / 2
     const lo = EXCLUDE_X + r
-    const hi = viewHalfWidth(camera, z)
-    if (hi <= lo) return
+    const hi = lo + X_SPREAD
     const slot = slots.current.find((o) => !o.active)
     if (!slot) return
     const kind = KINDS[((landscapeIndexRef?.current ?? 0) % KINDS.length + KINDS.length) % KINDS.length]
@@ -81,14 +72,12 @@ export default function LandscapeB({ mode, spawnIntervalRef, landscapeIndexRef, 
 
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
-    const camera = state.camera
-    camera.updateMatrixWorld()
 
     // Fill the stretch from the spawn depth to the camera right away.
     if (!filled.current) {
       filled.current = true
       for (const side of sides.current) {
-        for (let z = SPAWN_Z + side.next; z < DESPAWN_Z; z += THREE.MathUtils.randFloat(...GAP)) spawn(side.dir, z, camera, now)
+        for (let z = SPAWN_Z + side.next; z < DESPAWN_Z; z += THREE.MathUtils.randFloat(...GAP)) spawn(side.dir, z, now)
       }
     }
 
@@ -101,7 +90,7 @@ export default function LandscapeB({ mode, spawnIntervalRef, landscapeIndexRef, 
       if (side.travel >= side.next) {
         side.travel -= side.next
         side.next = THREE.MathUtils.randFloat(...GAP)
-        spawn(side.dir, SPAWN_Z + side.travel, camera, now)
+        spawn(side.dir, SPAWN_Z + side.travel, now)
       }
     }
 
