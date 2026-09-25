@@ -161,7 +161,11 @@ export function useGateBurstB(emissiveColor) {
     lifetimeAttr.needsUpdate = true
   }
 
-  const tick = (now) => { material.uniforms.uTime.value = now }
+  // livePaletteRef (optional): follow the app-wide breath-cycle palette.
+  const tick = (now, livePaletteRef) => {
+    material.uniforms.uTime.value = now
+    if (livePaletteRef && livePaletteRef.current) material.uniforms.uColor.value.copy(livePaletteRef.current.primary)
+  }
 
   // Particles move in the shader, so skip frustum culling on stale bounds.
   const points = (

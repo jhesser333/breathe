@@ -33,7 +33,7 @@ function makeSlot() {
   return { z: 0, speed: 0, active: false, type: 'inhale', isLast: false, isFirst: false, spawnZ: 0, fadeElapsed: 0, hasTriggeredNext: false, hasTriggeredFirst: false, hasPreTriggeredLast: false, judged: false, missElapsed: null }
 }
 
-export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, rightVal }) {
+export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, onFirstGate, onLastGate, rightVal, livePaletteRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const wasEnabled = useRef(false)
 
@@ -138,7 +138,15 @@ export default function GatesBoxBreathingB({ gatesEnabledRef, spawnIntervalRef, 
         }
       }
     }
-    gateBurst.tick(now)
+    gateBurst.tick(now, livePaletteRef)
+
+    // Follow the app-wide breath-cycle palette (App.jsx owns the lerp).
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      ;[plLMatRefs, plRMatRefs, cbTMatRefs, cbBMatRefs].forEach((refs) => refs.current.forEach((m) => {
+        if (m) { m.color.copy(live.secondary); m.emissive.copy(live.primary) }
+      }))
+    }
   })
 
   return (

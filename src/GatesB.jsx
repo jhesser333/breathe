@@ -102,7 +102,7 @@ function makeTieRefArray() {
   return Array.from({ length: TIES_PER_SEGMENT }, () => null)
 }
 
-export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal }) {
+export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, emissiveColor, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef }) {
   const slotsA = useRef(Array.from({ length: POOL_A }, makeSlotA))
   const groupRefsA = useRef(Array.from({ length: POOL_A }, () => null))
   const matTopRefsA = useRef(Array.from({ length: POOL_A }, () => null))
@@ -344,7 +344,19 @@ export default function GatesB({ gatesEnabledRef, spawnIntervalRef, gateColor, e
       }
     }
 
-    gateBurst.tick(now)
+    gateBurst.tick(now, livePaletteRef)
+
+    // Follow the app-wide breath-cycle palette (App.jsx owns the lerp):
+    // targets secondary + primary glow, ties primary.
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      ;[matTopRefsA, matBotRefsA, matLeftRefsB, matRightRefsB].forEach((refs) => refs.current.forEach((m) => {
+        if (m) { m.color.copy(live.secondary); m.emissive.copy(live.primary) }
+      }))
+      previewMaterials.forEach((m) => m.color.copy(live.primary))
+      trailingMaterials.forEach((m) => m.color.copy(live.primary))
+      lerpMaterials.forEach((seg) => seg.forEach((m) => m.color.copy(live.primary)))
+    }
   })
 
   return (

@@ -2,6 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
+import { useBreathCountB } from './breathCountB'
 
 // Material: same parameters as the Morphing Sphere (MorphC), all driven by the
 // right slider only. rv is eased; rv=0 is Inhale, rv=1 is Exhale (the default).
@@ -97,8 +98,10 @@ function sampleCubeSurface(out, i) {
   out[i * 3 + 2] = p[2]
 }
 
-export default function MorphB({ leftVal, rightVal, palette }) {
+export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle }) {
   const groupRef = useRef()
+  // 5-breath count pieces inside the cube (see breathCountB.jsx).
+  const breathCount = useBreathCountB(palette)
 
   const { material, fresnelUniforms } = useMemo(() => {
     const fresnelUniforms = {
@@ -332,6 +335,22 @@ float dissolveHash(vec3 p) {
       lifetimeAttr.needsUpdate = true
     }
     surfaceMaterial.uniforms.uTime.value = now
+
+    // 5-breath count: counted from the left slider unless App.jsx supplies a
+    // paced source (it doesn't for this skin).
+    const countSource = breathCountSourceRef && breathCountSourceRef.current
+    const countRaw = countSource ? countSource.current : (leftRawRef ? leftRawRef.current : leftVal.current)
+    const countingEnabled = !!(breathCountingEnabledRef && breathCountingEnabledRef.current)
+    breathCount.update(now, countRaw, countingEnabled, onBreathPaletteCycle, livePaletteRef)
+
+    // Follow the app-wide breath-cycle palette (App.jsx owns the lerp).
+    if (livePaletteRef && livePaletteRef.current) {
+      const live = livePaletteRef.current
+      material.color.copy(live.tertiary)
+      material.emissive.copy(live.primary)
+      burstMaterial.uniforms.uColor.value.copy(live.primary)
+      surfaceMaterial.uniforms.uColor.value.copy(live.primary)
+    }
   })
 
   return (
@@ -343,6 +362,7 @@ float dissolveHash(vec3 p) {
         <points geometry={surface.geometry}>
           <primitive object={surfaceMaterial} attach="material" />
         </points>
+        {breathCount.elements}
       </group>
       {/* Burst sparkles sit outside the scaled group so their X travel isn't
           stretched by the cube's breathing scale. */}
