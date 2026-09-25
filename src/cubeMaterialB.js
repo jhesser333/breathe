@@ -26,7 +26,11 @@ export const DISSOLVE_EDGE = 0.12
 
 // Uniforms are per material, so every caller gets its own Fresnel/dissolve
 // controls. Starts at the Exhale settings, fully solid.
-export function createCubeMorphMaterial(color, emissive) {
+// flatShade (the Morph only): shade every point as if it faced the camera
+// like the cube's front face (world +Z) -- lighting, specular and the Fresnel
+// mask alike -- so the top and the (Y-stretched) rounded edges match the
+// front instead of going darker.
+export function createCubeMorphMaterial(color, emissive, { flatShade = false } = {}) {
   const fresnelUniforms = {
     fresnelPower:     { value: EXHALE_FRESNEL_POWER },
     fresnelIntensity: { value: FRESNEL_INTENSITY },
@@ -45,7 +49,7 @@ export function createCubeMorphMaterial(color, emissive) {
     opacity: EXHALE_OPACITY,
   })
 
-  mat.customProgramCacheKey = () => 'fresnel-morph-b'
+  mat.customProgramCacheKey = () => (flatShade ? 'fresnel-morph-b-flat' : 'fresnel-morph-b')
 
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, fresnelUniforms)
@@ -76,11 +80,19 @@ return fract((p.x + p.y) * p.z);
 }
 \n` + shader.fragmentShader
 
+    if (flatShade) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+        normal = normalize((viewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);`
+      )
+    }
+
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
       {
-        float fr = pow(1.0 - max(dot(normalize(vNormal), vFresnelDir), 0.0), fresnelPower);
+        float fr = pow(1.0 - max(dot(${flatShade ? 'normal' : 'normalize(vNormal)'}, vFresnelDir), 0.0), fresnelPower);
         totalEmissiveRadiance *= (1.0 - fr * fresnelIntensity);
       }`
     )

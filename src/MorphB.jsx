@@ -86,7 +86,7 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
   const breathCount = useBreathCountB(palette)
 
   const { material, fresnelUniforms } = useMemo(
-    () => createCubeMorphMaterial(palette.tertiaryColor, palette.primaryColor),
+    () => createCubeMorphMaterial(palette.tertiaryColor, palette.primaryColor, { flatShade: true }),
     [palette.tertiaryColor, palette.primaryColor]
   )
 
