@@ -43,6 +43,7 @@ const SPAWN_SENTINEL = -1e4
 // time to reach it, reading as slower/calmer without traveling less far).
 const SPARKLE_ATTRACT_RATE = 0.275
 const NO_ATTRACT_CUTOFF = 1e6     // sentinel uAttractCutoff value meaning "no cutoff, decay normally" -- far beyond any real uTime
+const SPARKLE_MAX_SIZE_MULT = 0.67   // largest sparkle vs. the old max (2x uSize): 33% smaller
 const SPARKLE_RATE_RAMP_UP_FRACTION = 0.3    // reaches max spawn rate at 30% of the way to full inhale
 
 const SHOW_INFLOW_OUTFLOW = false   // temporarily hidden so Sparkle + the inhale ring can be tuned in isolation -- flip back to true when done
@@ -72,6 +73,7 @@ attribute float aOutwardSpeed;
 attribute vec3 aColor;
 uniform float uTime;
 uniform float uSize;
+uniform float uSizeSpread;
 uniform float uAttract;
 uniform float uAttractCutoff;
 uniform float uCenterY;
@@ -106,7 +108,7 @@ void main() {
   vec3 displaced = vec3(position.xy + dirXY * outward, position.z);
 
   vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
-  gl_PointSize = uSize * (1.0 + aSeed) * envelope / -mvPosition.z;
+  gl_PointSize = uSize * (1.0 + aSeed * uSizeSpread) * envelope / -mvPosition.z;
   gl_Position = projectionMatrix * mvPosition;
 
   vAlpha = envelope;
@@ -274,6 +276,8 @@ export default function RingParticlesD({ textColor, secondaryColor, tertiaryColo
   const sparkleMaterial = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uSize: { value: 200 },   // 2x the inflow/outflow particles' 100
+      // Birth size runs uSize .. uSize*(1+spread): max 268, 33% below the old 400 (spread 1).
+      uSizeSpread: { value: SPARKLE_MAX_SIZE_MULT * 2 - 1 },
       uTime: { value: 0 },
       uAttract: { value: SPARKLE_ATTRACT_RATE },
       uAttractCutoff: { value: NO_ATTRACT_CUTOFF },
