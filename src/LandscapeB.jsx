@@ -13,7 +13,8 @@ import { makeTetraGeometry } from './breathCountB'
 // far end.
 //
 // Look: the targets' approach look (the cube Morph's Exhale material, see
-// cubeMaterialB). Speed matches the targets: Box Breathing 6/interval,
+// cubeMaterialB) but with the tertiary color for base and glow at emissive
+// 0.5 (LANDSCAPE_LOOK). Speed matches the targets: Box Breathing 6/interval,
 // Slowing Down/Paced 20/interval (as GatesB and its ties), Breathe at Your
 // Own Pace a fixed 20/12 drift.
 
@@ -27,6 +28,9 @@ const GAP = [2, 5]               // units of travel between spawns, per side
 const EXCLUDE_X = 1.5            // keep clear of the targets (outer edge 1.15) and ties
 const FADE_S = 1
 const OWN_PACE_INTERVAL = 12
+// Tertiary color for both base and glow, emissive 0.5 (otherwise the
+// targets' approach look).
+const LANDSCAPE_LOOK = { roughness: 0.3, metalness: 0, approachEmissive: 0.5, emissiveFrom: 'tertiary' }
 const TARGET_SPAWN_DIST = { box: 6, other: 20 }
 
 const _v = new THREE.Vector3()
@@ -44,8 +48,8 @@ export default function LandscapeB({ mode, spawnIntervalRef, landscapeIndexRef, 
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useMemo(() => Array.from({ length: POOL }, () => ({ current: null })), [])
   const meshRefs = useMemo(() => Array.from({ length: POOL }, () => ({ sphere: null, cube: null, tetra: null })), [])
-  const mats = useMemo(() => Array.from({ length: POOL }, () => createCubeMorphMaterial(palette.tertiaryColor, palette.primaryColor)),
-    [palette.tertiaryColor, palette.primaryColor])
+  const mats = useMemo(() => Array.from({ length: POOL }, () => createCubeMorphMaterial(palette.tertiaryColor, palette.tertiaryColor)),
+    [palette.tertiaryColor])
   const sphereGeometry = useMemo(() => new THREE.SphereGeometry(0.5, 32, 16), [])
   const tetraGeometry = useMemo(() => {
     const g = makeTetraGeometry()   // circumradius 1
@@ -118,7 +122,7 @@ export default function LandscapeB({ mode, spawnIntervalRef, landscapeIndexRef, 
       const m = meshRefs[i]
       for (const k of KINDS) if (m[k]) m[k].visible = k === o.kind
       const fadeIn = THREE.MathUtils.smoothstep(Math.min((now - o.born) / FADE_S, 1), 0, 1)
-      applyGateLook(mats[i], 0, fadeIn, 0, live)
+      applyGateLook(mats[i], 0, fadeIn, 0, live, LANDSCAPE_LOOK)
     }
   })
 
