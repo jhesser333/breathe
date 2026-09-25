@@ -156,7 +156,7 @@ function layoutStack() {
   })
 }
 
-// Tetrahedrons: circumradius like the spheres' radius (0.5 x 0.5-1), so any
+// Tetrahedrons: sized by circumradius (see MAX_CENTER_RADIUS), so any
 // rotation stays inside; MorphC's chamfered tetrahedron geometry (copied),
 // normalized to circumradius 1.
 const TETRA_CHAMFER = 0.06
