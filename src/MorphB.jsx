@@ -23,6 +23,13 @@ const SPAWN_SENTINEL = -1e4
 const SURFACE_POOL = 1500
 const SURFACE_SPAWN_RATE = 300   // particles/sec (the sphere's MAX_SPAWN_RATE)
 const SURFACE_SIZE = BURST_SIZE
+// Drifting sparkles: a second surface system with the same look and rate, but
+// spawned on the cube's surface at its current scale, outside the scaled group
+// (so they don't stick to the mesh), each drifting slowly straight out from
+// the face it spawned on at a random DRIFT_SPEED (units/s).
+const DRIFT_POOL = 1500
+const DRIFT_SPAWN_RATE = SURFACE_SPAWN_RATE
+const DRIFT_SPEED = [0.03, 0.1]
 const MAX_SPAWN_PER_FRAME = 150  // safety cap against huge dt spikes (e.g. tab refocus)
 const MORPH_Y = 0.25
 
@@ -152,6 +159,25 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [burstMaterial])
 
+  const drift = useMemo(() => {
+    const seeds = new Float32Array(DRIFT_POOL)
+    for (let i = 0; i < DRIFT_POOL; i++) seeds[i] = Math.random()
+    const geometry = new THREE.BufferGeometry()
+    const positionAttr = new THREE.BufferAttribute(new Float32Array(DRIFT_POOL * 3), 3).setUsage(THREE.DynamicDrawUsage)
+    const velAttr = new THREE.BufferAttribute(new Float32Array(DRIFT_POOL * 3), 3).setUsage(THREE.DynamicDrawUsage)
+    const spawnTimeAttr = new THREE.BufferAttribute(new Float32Array(DRIFT_POOL).fill(SPAWN_SENTINEL), 1).setUsage(THREE.DynamicDrawUsage)
+    const lifetimeAttr = new THREE.BufferAttribute(new Float32Array(DRIFT_POOL).fill(1), 1).setUsage(THREE.DynamicDrawUsage)
+    geometry.setAttribute('position', positionAttr)
+    geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1))
+    geometry.setAttribute('aSpawnTime', spawnTimeAttr)
+    geometry.setAttribute('aLifetime', lifetimeAttr)
+    geometry.setAttribute('aVel', velAttr)
+    return { geometry, positionAttr, velAttr, spawnTimeAttr, lifetimeAttr }
+  }, [])
+  const driftMaterial = useMemo(() => surfaceMaterial.clone(), [surfaceMaterial])
+  const driftCursorRef = useRef(0)
+  const driftAccumulatorRef = useRef(0)
+
   const surfaceCursorRef = useRef(0)
   const surfaceAccumulatorRef = useRef(0)
   const burstCursorRef = useRef(0)
@@ -237,6 +263,35 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
     }
     surfaceMaterial.uniforms.uTime.value = now
 
+    // Drifting sparkles: on a random face at this frame's scale, moving
+    // straight out along that face's normal.
+    driftAccumulatorRef.current += DRIFT_SPAWN_RATE * delta
+    let toDrift = Math.floor(driftAccumulatorRef.current)
+    if (toDrift > 0) {
+      driftAccumulatorRef.current -= toDrift
+      toDrift = Math.min(toDrift, MAX_SPAWN_PER_FRAME)
+      const { positionAttr, velAttr, spawnTimeAttr, lifetimeAttr } = drift
+      const scale = [xScale, yScale, zScale]
+      for (let k = 0; k < toDrift; k++) {
+        const idx = driftCursorRef.current % DRIFT_POOL
+        driftCursorRef.current += 1
+        const axis = Math.floor(Math.random() * 3)
+        const side = Math.random() < 0.5 ? -1 : 1
+        for (let a = 0; a < 3; a++) {
+          const u = a === axis ? side * 0.5 : Math.random() - 0.5
+          positionAttr.array[idx * 3 + a] = u * scale[a]
+          velAttr.array[idx * 3 + a] = a === axis ? side * THREE.MathUtils.randFloat(...DRIFT_SPEED) : 0
+        }
+        spawnTimeAttr.array[idx] = now
+        lifetimeAttr.array[idx] = 1 + Math.random()
+      }
+      positionAttr.needsUpdate = true
+      velAttr.needsUpdate = true
+      spawnTimeAttr.needsUpdate = true
+      lifetimeAttr.needsUpdate = true
+    }
+    driftMaterial.uniforms.uTime.value = now
+
     // 5-breath count: counted from the left slider unless App.jsx supplies a
     // paced source (it doesn't for this skin).
     const countSource = breathCountSourceRef && breathCountSourceRef.current
@@ -251,6 +306,7 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
       material.emissive.copy(live.primary)
       burstMaterial.uniforms.uColor.value.copy(live.primary)
       surfaceMaterial.uniforms.uColor.value.copy(live.secondary)
+      driftMaterial.uniforms.uColor.value.copy(live.secondary)
     }
   })
 
@@ -268,6 +324,10 @@ export default function MorphB({ leftVal, rightVal, palette, leftRawRef, breathC
       {/* Burst sparkles sit outside the scaled group so their X travel isn't
           stretched by the cube's breathing scale. */}
       {/* Particles move in the shader, so skip frustum culling on stale bounds. */}
+      {/* Drifting sparkles: outside the scaled group so they leave the mesh. */}
+      <points position={[0, MORPH_Y, 0]} geometry={drift.geometry} frustumCulled={false}>
+        <primitive object={driftMaterial} attach="material" />
+      </points>
       <points position={[0, MORPH_Y, 0]} geometry={burst.geometry} frustumCulled={false}>
         <primitive object={burstMaterial} attach="material" />
       </points>
