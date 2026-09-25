@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 
 // Shape B (Morphing Cube) only: 5-breath count pieces inside the cube.
 //
@@ -26,13 +27,33 @@ const LOCK_AT = 0.98
 const SHRINK_S = 1
 const SHRINK_STAGGER_S = 0.25
 const REVERSAL_DEADBAND = 0.08           // same as MorphC
-const MAX_ALPHA = 0.5                    // MorphC's Count Cube material
+const MAX_ALPHA = 0.5                    // MorphC's Count Cube material, in the secondary color
 const EMISSIVE = 2
 
-// Sets take turns, one per 5-breath group.
+// Sets take turns, one per 5-breath group, in this order.
 const SPHERE_SET = 0
 const STACK_SET = 1
-const SET_COUNT = 2
+const OVOID_SET = 2
+const NEST_CUBE_SET = 3
+const TETRA_SET = 4
+const RING_SET = 5
+const SET_COUNT = 6
+
+// Nested sets (ovoids, cubes, rings): all centered, #1 is 25% of #5.
+const NEST_STEPS = [0.25, 0.4375, 0.625, 0.8125, 1]
+const OVOID_FIT = 0.98                  // #5 ovoid: the cube's Inhale half-extents x this
+const OVOID_HALF = HALF.map((v) => v * OVOID_FIT)
+// #5 nested cube: the Inhale size minus 0.1 on every side, with the Morph's
+// own (non-uniformly scaled) corner rounding -- keeps a 0.1 gap everywhere
+// (checked numerically, corners included).
+const NEST_CUBE_SIZE = INHALE_SCALE.map((v) => v - 0.2)
+const NEST_CUBE_CHAMFER = MORPH_CORNER_RADIUS
+// Thick rings: MorphC's spinning-ring shape (tube 3x, 3x deeper along its own
+// Z), #5's outer edge on the #5 ovoid (fits whole, checked numerically).
+const RING_TUBE = 0.045 * 3
+const RING_DEPTH = 3
+const RING_A = OVOID_HALF[0] / (1 + RING_TUBE)
+const RING_B = OVOID_HALF[1] / (1 + RING_TUBE)
 
 // Spheres: radius 0.5 x a random 0.5-1, random spots inside the cube.
 const SPHERE_RADIUS = 0.5
@@ -124,15 +145,64 @@ function layoutStack() {
   })
 }
 
-const makePieceState = () => ({ grow: 0, shrinkStart: null, spinStart: null, spin: 0 })
+// Tetrahedrons: circumradius like the spheres' radius (0.5 x 0.5-1), so any
+// rotation stays inside; MorphC's chamfered tetrahedron geometry (copied),
+// normalized to circumradius 1.
+const TETRA_CHAMFER = 0.06
+const TETRA_CIRCUMRADIUS = Math.sqrt(3 / 8)   // edge 1
+function makeTetraGeometry() {
+  const dirs = [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map((d) => new THREE.Vector3(...d).normalize())
+  const coreR = TETRA_CIRCUMRADIUS - TETRA_CHAMFER
+  const pts = []
+  const sphere = new THREE.IcosahedronGeometry(TETRA_CHAMFER, 2).getAttribute('position')
+  for (const d of dirs) {
+    const corner = d.clone().multiplyScalar(coreR)
+    for (let k = 0; k < sphere.count; k++) {
+      pts.push(new THREE.Vector3(sphere.getX(k), sphere.getY(k), sphere.getZ(k)).add(corner))
+    }
+  }
+  const g = new ConvexGeometry(pts)
+  g.scale(1 / TETRA_CIRCUMRADIUS, 1 / TETRA_CIRCUMRADIUS, 1 / TETRA_CIRCUMRADIUS)
+  return g
+}
+function layoutTetras() {
+  const TAU = Math.PI * 2
+  return layoutSpheres().map((b) => ({ ...b, rx: Math.random() * TAU, ry: Math.random() * TAU, rz: Math.random() * TAU }))
+}
+
+const shuffle = (a) => {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+const centered = (sx, sy, sz, ry = 0) => ({ x: 0, y: 0, z: 0, rx: 0, ry, rz: 0, sx, sy, sz })
+function layoutSet(set) {
+  if (set === SPHERE_SET) return layoutSpheres()
+  if (set === STACK_SET) return layoutStack()
+  if (set === TETRA_SET) return layoutTetras()
+  if (set === OVOID_SET) return NEST_STEPS.map((k) => centered(OVOID_HALF[0] * k, OVOID_HALF[1] * k, OVOID_HALF[2] * k))
+  if (set === NEST_CUBE_SET) return NEST_STEPS.map((k) => centered(NEST_CUBE_SIZE[0] * k, NEST_CUBE_SIZE[1] * k, NEST_CUBE_SIZE[2] * k))
+  // Rings: nested sizes in random order, each at a random Y angle.
+  return shuffle(NEST_STEPS.slice()).map((k) => centered(RING_A * k, RING_B * k, RING_A * RING_DEPTH * k, Math.random() * Math.PI * 2))
+}
+// Spin (rad/s per axis) a piece starts when it begins to appear.
+function makeSpin(set) {
+  if (set === STACK_SET || set === RING_SET) return [0, randSpin(STACK_SPIN_SPEED), 0]
+  if (set === TETRA_SET) return [randSpin(STACK_SPIN_SPEED), randSpin(STACK_SPIN_SPEED), randSpin(STACK_SPIN_SPEED)]
+  return null
+}
+
+const makePieceState = () => ({ grow: 0, shrinkStart: null, spinStart: null, spin: null })
 
 export function useBreathCountB(palette) {
   const total = COUNT * SET_COUNT
   const wrapperRefs = useMemo(() => Array.from({ length: total }, () => ({ current: null })), [total])
   const pieceRefs = useMemo(() => Array.from({ length: total }, () => ({ current: null })), [total])
   const materials = useMemo(() => Array.from({ length: total }, () => new THREE.MeshStandardMaterial({
-    color: new THREE.Color(palette.primaryColor),
-    emissive: new THREE.Color(palette.primaryColor),
+    color: new THREE.Color(palette.secondaryColor),
+    emissive: new THREE.Color(palette.secondaryColor),
     emissiveIntensity: EMISSIVE,
     roughness: 1,
     metalness: 0,
@@ -144,6 +214,8 @@ export function useBreathCountB(palette) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   })), [total])
   const sphereGeometry = useMemo(() => new THREE.SphereGeometry(1, 32, 16), [])
+  const tetraGeometry = useMemo(() => makeTetraGeometry(), [])
+  const ringGeometry = useMemo(() => new THREE.TorusGeometry(1, RING_TUBE, 16, 64), [])
 
   const layoutRef = useRef(Array.from({ length: total }, () => ({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 })))
   const pieceStateRef = useRef(Array.from({ length: total }, makePieceState))
@@ -165,7 +237,7 @@ export function useBreathCountB(palette) {
     }
   }
   const activateSet = (set) => {
-    const layout = set === SPHERE_SET ? layoutSpheres() : layoutStack()
+    const layout = layoutSet(set)
     layout.forEach((b, k) => { layoutRef.current[set * COUNT + k] = b; applyLayout(set * COUNT + k) })
     resetSet(set)
     s.current.activeSet = set
@@ -206,9 +278,9 @@ export function useBreathCountB(palette) {
           const i = base + st.locked
           const ps = pieceStateRef.current[i]
           ps.grow = smooth((raw - GROW_START) / (LOCK_AT - GROW_START))
-          if (ps.grow > 0 && ps.spinStart === null && st.activeSet === STACK_SET) {
+          if (ps.grow > 0 && ps.spinStart === null) {
             ps.spinStart = now
-            ps.spin = randSpin(STACK_SPIN_SPEED)
+            ps.spin = makeSpin(st.activeSet)
           }
           if (raw >= LOCK_AT) { ps.grow = 1; st.locked += 1; st.armed = false }
         }
@@ -217,11 +289,10 @@ export function useBreathCountB(palette) {
         const order = [0, 1, 2, 3, 4]
         if (st.activeSet === STACK_SET) {
           order.sort((p, q) => layoutRef.current[base + q].y - layoutRef.current[base + p].y)   // top-down
+        } else if (st.activeSet === OVOID_SET || st.activeSet === NEST_CUBE_SET) {
+          order.reverse()   // largest first, so the inner ones go last
         } else {
-          for (let k = order.length - 1; k > 0; k--) {
-            const j = Math.floor(Math.random() * (k + 1))
-            ;[order[k], order[j]] = [order[j], order[k]]
-          }
+          shuffle(order)
         }
         order.forEach((k, pos) => { pieceStateRef.current[base + k].shrinkStart = now + pos * SHRINK_STAGGER_S })
         st.palettePending = true
@@ -246,13 +317,14 @@ export function useBreathCountB(palette) {
       if (!countingEnabled && ps.shrinkStart === null) f = 0
       p.visible = f > 0.0001
       p.scale.set(b.sx * f, b.sy * f, b.sz * f)
-      const spun = ps.spinStart === null ? 0 : ps.spin * (now - ps.spinStart)
-      p.rotation.set(b.rx, b.ry + spun, b.rz)
+      const w = ps.spin || [0, 0, 0]
+      const t = ps.spinStart === null ? 0 : now - ps.spinStart
+      p.rotation.set(b.rx + w[0] * t, b.ry + w[1] * t, b.rz + w[2] * t)
     }
 
     if (livePaletteRef && livePaletteRef.current) {
       const live = livePaletteRef.current
-      materials.forEach((m) => { m.color.copy(live.primary); m.emissive.copy(live.primary) })
+      materials.forEach((m) => { m.color.copy(live.secondary); m.emissive.copy(live.secondary) })
     }
   }
 
@@ -260,10 +332,14 @@ export function useBreathCountB(palette) {
     <group key={`count-${i}`} ref={(obj) => { wrapperRefs[i].current = obj; applyLayout(i) }}
       scale={[1 / INHALE_SCALE[0], 1 / INHALE_SCALE[1], 1 / INHALE_SCALE[2]]}>
       <group ref={(obj) => { pieceRefs[i].current = obj }} visible={false} scale={0}>
-        {Math.floor(i / COUNT) === SPHERE_SET ? (
+        {Math.floor(i / COUNT) === SPHERE_SET || Math.floor(i / COUNT) === OVOID_SET ? (
           <mesh geometry={sphereGeometry} material={materials[i]} />
+        ) : Math.floor(i / COUNT) === TETRA_SET ? (
+          <mesh geometry={tetraGeometry} material={materials[i]} />
+        ) : Math.floor(i / COUNT) === RING_SET ? (
+          <mesh geometry={ringGeometry} material={materials[i]} />
         ) : (
-          <RoundedBox args={[1, 1, 1]} radius={STACK_CHAMFER} smoothness={4} material={materials[i]} />
+          <RoundedBox args={[1, 1, 1]} radius={Math.floor(i / COUNT) === NEST_CUBE_SET ? NEST_CUBE_CHAMFER : STACK_CHAMFER} smoothness={4} material={materials[i]} />
         )}
       </group>
     </group>

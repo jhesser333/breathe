@@ -248,7 +248,9 @@ float dissolveHash(vec3 p) {
   const surfaceMaterial = useMemo(() => {
     const m = burstMaterial.clone()
     m.uniforms.uSize.value = SURFACE_SIZE
+    m.uniforms.uColor.value.set(palette.secondaryColor)   // surface sparkles: secondary
     return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [burstMaterial])
 
   const surfaceCursorRef = useRef(0)
@@ -349,7 +351,7 @@ float dissolveHash(vec3 p) {
       material.color.copy(live.tertiary)
       material.emissive.copy(live.primary)
       burstMaterial.uniforms.uColor.value.copy(live.primary)
-      surfaceMaterial.uniforms.uColor.value.copy(live.primary)
+      surfaceMaterial.uniforms.uColor.value.copy(live.secondary)
     }
   })
 
