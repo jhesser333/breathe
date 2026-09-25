@@ -15,8 +15,8 @@ const CUBE_RADIUS = 0.1
 const GATE_A_TOP_Y = 0.65
 const GATE_A_BOT_Y = -0.15
 const GATE_B_X = 0.9
-// These targets' own pulse look (MeshStandardMaterial defaults).
-const BOX_GATE_LOOK = { roughness: 1, metalness: 0 }
+// These targets' own pulse look (glossy, like GatesB's; no metalness).
+const BOX_GATE_LOOK = { roughness: 0, metalness: 0 }
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))

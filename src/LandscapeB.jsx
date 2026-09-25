@@ -30,7 +30,7 @@ const FADE_S = 1
 const OWN_PACE_INTERVAL = 12
 // Tertiary color for both base and glow, emissive 0.5 (otherwise the
 // targets' approach look).
-const LANDSCAPE_LOOK = { roughness: 0.3, metalness: 0, approachEmissive: 0.5, emissiveFrom: 'tertiary' }
+const LANDSCAPE_LOOK = { roughness: 0.3, metalness: 0, approachRoughness: 0.3, approachEmissive: 0.5, emissiveFrom: 'tertiary' }
 const TARGET_SPAWN_DIST = { box: 6, other: 20 }
 
 const _v = new THREE.Vector3()

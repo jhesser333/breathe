@@ -134,11 +134,13 @@ return fract((p.x + p.y) * p.z);
 export const GATE_EXHALE_LOOK = true
 export const GATE_PULSE_START_Z = -0.5
 // Target pulse look: GatesB's cubes (Box Breathing's use roughness 1, metalness 0).
-export const GATE_LOOK = { roughness: 0.5, metalness: 0.1 }
+export const GATE_LOOK = { roughness: 0, metalness: 0.1 }
 // Approach glow: unlike the Morph at Exhale (whose Fresnel power 0 masks its
 // emissive entirely), targets glow unmasked at this multiplier from spawn,
 // in the primary color, rising into their pulse.
 export const GATE_APPROACH_EMISSIVE = 0.5
+// Targets are fully glossy on the way in too (the Morph's Exhale is 0.3).
+export const GATE_APPROACH_ROUGHNESS = 0
 
 // 0 = Exhale look, 1 = target pulse look.
 export function gateLookT(z) {
@@ -151,10 +153,11 @@ export function gateLookT(z) {
 // One target cube's frame: t from gateLookT, fadeIn 0-1, pulseEmissive = the
 // target's own emissive (ramp/pulse, already dimmed on a miss); live = the
 // app's live palette (tertiary/secondary/primary) or null. look may also set
-// approachEmissive and emissiveFrom ('primary' default, or 'tertiary').
+// approachEmissive, approachRoughness and emissiveFrom ('primary' default, or
+// 'tertiary').
 export function applyGateLook({ material, fresnelUniforms }, t, fadeIn, pulseEmissive, live, look = GATE_LOOK) {
   const lerp = THREE.MathUtils.lerp
-  material.roughness = lerp(EXHALE_ROUGHNESS, look.roughness, t)
+  material.roughness = lerp(look.approachRoughness ?? GATE_APPROACH_ROUGHNESS, look.roughness, t)
   material.metalness = lerp(0, look.metalness, t)
   material.opacity = fadeIn * lerp(EXHALE_OPACITY, 1, t)
   material.emissiveIntensity = lerp(look.approachEmissive ?? GATE_APPROACH_EMISSIVE, pulseEmissive, t)
