@@ -515,7 +515,7 @@ function sampleSpherePositions(count) {
   return positions
 }
 
-export default function MorphC({ rightVal, palette, shapeOption, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle }) {
+export default function MorphC({ rightVal, palette, shapeOption, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle, onBreathCountEvent }) {
   const groupRef = useRef()
   const matRef = useRef()
 
@@ -571,6 +571,9 @@ export default function MorphC({ rightVal, palette, shapeOption, breathCountingE
   // it now drives the whole app's palette, not just MorphC's own colors).
   const paletteLerpPendingRef = useRef(false)
   const breathCountingWasEnabledRef = useRef(false)
+  // Last piece reported to App's onBreathCountEvent ("cycle:index"), so each
+  // breath is reported once even if the Inhale reverses before locking.
+  const breathEventFiredRef = useRef(null)
 
   const tetraGeometry = useMemo(() => makeTetraGeometry(), [])
   const silhouetteMaterial = useMemo(() => new THREE.MeshStandardMaterial({
@@ -1015,6 +1018,7 @@ float dissolveHash(vec3 p) {
       breathExtremeRef.current = raw
       breathArmedRef.current = true
       paletteLerpPendingRef.current = false
+      breathEventFiredRef.current = null
       for (let s = 0; s < BREATH_SET_COUNT; s++) resetBreathSet(s)
       activateBreathSet(setForCycle(0))
     }
@@ -1138,6 +1142,11 @@ float dissolveHash(vec3 p) {
             breathSpinStartRef.current[activeIdx] = now
           }
           const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
+          const eventKey = breathCycleIndexRef.current + ':' + breathLockedCountRef.current
+          if (progress > 0 && breathEventFiredRef.current !== eventKey) {
+            breathEventFiredRef.current = eventKey
+            if (onBreathCountEvent) onBreathCountEvent('breath', breathCycleIndexRef.current, breathLockedCountRef.current + 1)
+          }
           // Slew-rate limited toward the slider-driven target instead of
           // snapping straight to it, so a fast Inhale still reads as a
           // smooth fade in from 0 rather than an instant pop -- reversing
@@ -1181,6 +1190,7 @@ float dissolveHash(vec3 p) {
         // Palette lerp doesn't start yet -- queued for the next cycle's
         // breath 1 inhale (see the rise-confirmation branch above).
         paletteLerpPendingRef.current = true
+        if (onBreathCountEvent) onBreathCountEvent('cycleDone', breathCycleIndexRef.current)
 
         // Next cycle counts on the other set; the tracker is already heading
         // down and unarmed, so the next confirmed rise arms its breath 1.

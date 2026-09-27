@@ -376,6 +376,13 @@ export default function App() {
   const pacedTextStrokesRef = useRef(0)
   const [pacedCaptionsOn, setPacedCaptionsOn] = useState(false)
 
+  // 5-breath count tutorial: runs for the first two (slider-driven) count
+  // cycles after the intro hand-off, driven by the Morph's breath events
+  // (onBreathCountEvent). Box/Slowing then wait for the sliders at the
+  // bottom and call pacedStartFnRef to start the paced art on cycle 3.
+  const countTutorialRef = useRef({ active: false, mode: null })
+  const pacedStartFnRef = useRef(null)
+
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
     directionRef.current = 0
@@ -456,16 +463,6 @@ export default function App() {
         }, breathMs * 3)
       }, FADE_TRANSITION_MS)
     }, breathMs * 2)
-  }, [])
-
-  const showSlowingTextC = useCallback(() => {
-    clearTimeout(tutorialTimerRef.current)
-    currentMainTextRef.current = TEXTS.gatesSlowing
-    setTutorialText(TEXTS.gatesSlowing)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
-    awaitingMovementRef.current = false
-    recordingEnabledRef.current = true
   }, [])
 
   const showSlowingTextD = useCallback(() => {
@@ -555,15 +552,10 @@ export default function App() {
   const handleSlowingRecordingDone = useCallback(() => {
     // Shape B (Morphing Cube) follows the same tutorial as D/E.
     if (shapeRef.current === 'd' || shapeRef.current === 'e' || shapeRef.current === 'b') {
-      // Art waits until Text D has been read and the sliders reach the
-      // bottom (see startPacedArt); hold the ramp at the recorded pace.
+      // Art waits for the count tutorial's third cycle (see startPacedArt);
+      // hold the ramp at the recorded pace. Texts C/D/E are breath-driven
+      // (handleBreathCountEvent).
       phase2StartRef.current = Infinity
-      clearTimeout(tutorialTimerRef.current)
-      setTutorialVisible(false)
-      tutorialVisibleRef.current = false
-      tutorialTimerRef.current = setTimeout(() => {
-        showPacedText('D')
-      }, FADE_TRANSITION_MS)
       return
     }
     const t_done = Date.now() / 1000
@@ -591,7 +583,7 @@ export default function App() {
     gateEnableTimerRef.current = setTimeout(() => {
       gatesEnabledRef.current = true
     }, d * 1000)
-  }, [showSlowingTextD, showPacedText])
+  }, [showSlowingTextD])
 
   const handleSlowingTextDDone = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
@@ -605,15 +597,92 @@ export default function App() {
   // Slowing Down (D/E): sliders reached the bottom after Text D -- start the
   // paced art on an Inhale (GatesHeadless*'s startOnInhale) and the ramp.
   const startPacedArt = useCallback(() => {
+    // Wait (for the next time the sliders reach the bottom) until recording
+    // has produced a starting pace.
+    if (phaseRef.current !== 'gates') return
     pacedWaitForBottomRef.current = false
     breathPhaseRef.current = 'exhale'
     phase2StartRef.current = Date.now() / 1000
     pacedCueStageRef.current = 'captions'
     pacedBreathNumRef.current = 0
+    // Counting is already on (count tutorial); just switch its source, so
+    // the count carries on into the next set instead of restarting.
     breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? ringPaceProgressRef : null
-    breathCountingEnabledRef.current = true
     gatesEnabledRef.current = true
   }, [])
+
+  // Box Breathing: count tutorial's third cycle -- start the gates/pace art
+  // on the first Inhale with the Inhale/Hold/Exhale/Hold captions.
+  const startBoxArt = useCallback(() => {
+    pacedWaitForBottomRef.current = false
+    bbCycleRef.current = 0
+    bbTutorialActiveRef.current = true
+    boxCaptionsStartedRef.current = true
+    gatesEnabledRef.current = true
+    boxClockStartRef.current = performance.now()
+    boxCaptionIndexRef.current = 0
+    // Counting is already on; switch to the paced source without a reset.
+    breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? boxProgressRef : null
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialFadeMs(FADE_TRANSITION_MS)
+    currentMainTextRef.current = TEXTS.boxInhale
+    setTutorialText(TEXTS.boxInhale)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+  }, [])
+
+  const showCountText = useCallback((text) => {
+    clearTimeout(tutorialTimerRef.current)
+    awaitingMovementRef.current = false
+    currentMainTextRef.current = text
+    setTutorialOpacity(null)
+    setTutorialFadeMs(FADE_TRANSITION_MS)
+    setTutorialText(text)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+  }, [])
+
+  const hideCountText = useCallback(() => {
+    clearTimeout(tutorialTimerRef.current)
+    awaitingMovementRef.current = false
+    setTutorialFadeMs(FADE_TRANSITION_MS)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+  }, [])
+
+  // Breath events from the Morph's 5-breath counter: 'breath' as piece n
+  // (1-5) of count cycle `cycle` (0-based) starts to appear, 'cycleDone' as
+  // a cycle's pieces go away (breath 5's Exhale). Each text shows on its
+  // breath and fades out on the next one.
+  const handleBreathCountEvent = useCallback((type, cycle, n) => {
+    const ct = countTutorialRef.current
+    if (!ct.active) return
+    const m = ct.mode
+    const paced = m === 'box' || m === 'slowing'
+    if (type === 'cycleDone') {
+      if (cycle === 1 && paced) {
+        ct.active = false
+        pacedWaitForBottomRef.current = true
+      }
+      return
+    }
+    if (cycle === 0) {
+      if (n === 1) showCountText(TEXTS.countEachBreath)
+      else if (n === 2) hideCountText()
+      else if (n === 3) showCountText(TEXTS.countColors)
+      else if (n === 4) {
+        hideCountText()
+        if (!paced) ct.active = false
+      }
+    } else if (cycle === 1 && paced) {
+      const isCube = shapeRef.current === 'b'
+      if (m === 'slowing' && n === 1) recordingEnabledRef.current = true
+      if (n === 2) showCountText(m === 'box' ? TEXTS.boxCountSoon : TEXTS.gatesSlowing)
+      else if (n === 3) showCountText(m === 'box' ? TEXTS.boxCountPace : isCube ? TEXTS.slowingTextDCube : TEXTS.slowingTextDAmbient)
+      else if (n === 4) showCountText(m === 'box' ? TEXTS.boxCountTwoMore : isCube ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient)
+      else if (n === 5) hideCountText()
+    }
+  }, [showCountText, hideCountText])
 
   const handlePacedPhase = useCallback((phase) => {
     const stage = pacedCueStageRef.current
@@ -690,6 +759,7 @@ export default function App() {
     tutorialTimerRef.current = setTimeout(() => {
       stageRef.current = 'done'
       if (introStartsCountingRef.current) breathCountingEnabledRef.current = true
+      if (countTutorialRef.current.mode !== 'timed') countTutorialRef.current.active = true
       if (pendingGatesFnRef.current !== null) {
         const fn = pendingGatesFnRef.current
         pendingGatesFnRef.current = null
@@ -726,6 +796,7 @@ export default function App() {
     tutorialTimerRef.current = setTimeout(() => {
       diagStageRef.current = 'done'
       if (introStartsCountingRef.current) breathCountingEnabledRef.current = true
+      if (countTutorialRef.current.mode !== 'timed') countTutorialRef.current.active = true
       if (pendingGatesFnRef.current !== null) {
         const fn = pendingGatesFnRef.current
         pendingGatesFnRef.current = null
@@ -902,7 +973,7 @@ export default function App() {
     const b = 1 - v
     if (sliderLayout === 'diagonal') updateDiagonalSequence(b)
     updatePacedText(b)
-    if (pacedWaitForBottomRef.current && b <= DIAG_EDGE_THRESHOLD) startPacedArt()
+    if (pacedWaitForBottomRef.current && b <= DIAG_EDGE_THRESHOLD && pacedStartFnRef.current) pacedStartFnRef.current()
 
     const stage = stageRef.current
     if ((stage === 'A' && !textAFadeStartedRef.current) || (stage === 'B' && !textBFadeStartedRef.current)) {
@@ -938,7 +1009,7 @@ export default function App() {
     }
 
     handleMovement()
-  }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, startPacedArt, updatePacedText])
+  }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, updatePacedText])
 
   const handleSelectMode = useCallback((m) => {
     gatesEnabledRef.current = false
@@ -965,7 +1036,11 @@ export default function App() {
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
     breathCountingEnabledRef.current = false
-    introStartsCountingRef.current = m !== 'box' && m !== 'slowing'
+    // Every mode counts from the intro hand-off (Box/Slowing switch to their
+    // paced source at the count tutorial's third cycle).
+    introStartsCountingRef.current = true
+    countTutorialRef.current = { active: false, mode: m }
+    pacedStartFnRef.current = m === 'box' ? startBoxArt : m === 'slowing' ? startPacedArt : null
     breathCountSourceRef.current = null
     breathPhaseRef.current = 'exhale'
     paceArtFadeRef.current = 1
@@ -1006,28 +1081,11 @@ export default function App() {
       tutorialVisibleRef.current = true
     }
     if (m === 'timed') pendingGatesFnRef.current = showGatesText
-    if (m === 'slowing') pendingGatesFnRef.current = showSlowingTextC
-    if (m === 'box') pendingGatesFnRef.current = () => {
-      bbCycleRef.current = 0
-      bbTutorialActiveRef.current = true
-      boxCaptionsStartedRef.current = true
-      gatesEnabledRef.current = true
-      boxClockStartRef.current = performance.now()
-      boxCaptionIndexRef.current = 0
-      // First Inhale of the first box: start counting, one ring per box cycle
-      // (Shape D's paced progress; other shapes fall back to the slider).
-      breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? boxProgressRef : null
-      breathCountingEnabledRef.current = true
-      currentMainTextRef.current = TEXTS.boxInhale
-      setTutorialText(TEXTS.boxInhale)
-      setTutorialVisible(true)
-      tutorialVisibleRef.current = true
-    }
 
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, showSlowingTextC, sliderLayout])
+  }, [resetSlowingState, showGatesText, sliderLayout, startBoxArt, startPacedArt])
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
@@ -1042,6 +1100,7 @@ export default function App() {
   const handleBackFromExperience = useCallback(() => {
     gatesEnabledRef.current = false
     pacedWaitForBottomRef.current = false
+    countTutorialRef.current = { active: false, mode: null }
     pacedCueStageRef.current = 'off'
     pacedBreathNumRef.current = 0
     pacedCaptionRef.current = null
@@ -1129,7 +1188,7 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} />
         {shapeOption === 'd' && <CameraVerticalShift />}
-        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} landscapeIndexRef={landscapeIndexRef} />
+        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}

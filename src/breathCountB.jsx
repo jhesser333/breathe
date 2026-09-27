@@ -256,7 +256,7 @@ export function useBreathCountB(palette) {
   }
 
   // raw: count source (0 exhale -> 1 inhale); countingEnabled: from App.
-  const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef) => {
+  const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef, onBreathCountEvent) => {
     const st = s.current
     if (countingEnabled !== st.wasEnabled) {
       // Arm the first piece only if the source starts low; otherwise (e.g.
@@ -295,6 +295,7 @@ export function useBreathCountB(palette) {
           if (ps.grow > 0 && ps.spinStart === null) {
             ps.spinStart = now
             ps.spin = makeSpin(st.activeSet)
+            if (onBreathCountEvent) onBreathCountEvent('breath', st.cycle, st.locked + 1)
           }
           if (raw >= LOCK_AT) { ps.grow = 1; st.locked += 1; st.armed = false }
         }
@@ -310,6 +311,7 @@ export function useBreathCountB(palette) {
         }
         order.forEach((k, pos) => { pieceStateRef.current[base + k].shrinkStart = now + pos * SHRINK_STAGGER_S })
         st.palettePending = true
+        if (onBreathCountEvent) onBreathCountEvent('cycleDone', st.cycle)
         st.cycle += 1
         st.locked = 0
         activateSet(st.cycle % SET_COUNT)

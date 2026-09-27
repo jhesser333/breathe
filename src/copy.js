@@ -26,6 +26,12 @@ export const TEXTS = {
   // Shape B (Morphing Cube) versions of the two lines above -- its targets are visible.
   slowingTextDCube: 'Gates will soon move in at the rate you recorded. Breathe so the art fits through the gates.',
   slowingTextECube: 'Keep your breathing in sync with the gates as they move farther apart.',
+  // 5-breath count tutorial (all modes, the two user-paced cycles after the intro).
+  countEachBreath: 'Each breath will add an object.',
+  countColors:     'The colors will change after 5 breaths.',
+  boxCountSoon:    'In a few breaths, additional art will appear.',
+  boxCountPace:    'The new art will help pace your breath.',
+  boxCountTwoMore: 'Two more breaths on your own.',
   boxInhale:    'Inhale',
   boxHold:      'Hold',
   boxExhale:    'Exhale',
