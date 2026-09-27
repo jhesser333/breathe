@@ -45,7 +45,7 @@ const BREATH_RING_TOTAL = BREATH_RING_COUNT * 2   // ring sets 0-1 (the Morph ba
 const BREATH_TOTAL = BREATH_RING_COUNT * BREATH_SET_COUNT
 const BREATH_RING_Z = [-144, -55, -21, -8, -3]
 const BREATH_FADE_START = 0.25       // fraction of slider travel where fade-in begins (0 alpha before this)
-const BREATH_FADE_THRESHOLD = 0.90   // fraction of slider travel where alpha reaches full and the ring locks in
+const BREATH_FADE_THRESHOLD = 0.98   // fraction of slider travel where alpha reaches full and the ring locks in (smoothstepped 0.25 -> 0.98, same as the cube's scale-in, breathCountB LOCK_AT)
 const BREATH_MAX_ALPHA = 0.5
 // Same proportions as the pulse/hold ring in GatesBoxBreathingD.jsx (that
 // file's PULSE_RING_TUBE/PULSE_RING_SCALE aren't exported, so the derivation
@@ -1152,7 +1152,7 @@ float dissolveHash(vec3 p) {
           // smooth fade in from 0 rather than an instant pop -- reversing
           // before locking still fades the ring back out, just at the same
           // capped rate rather than instantly.
-          const target = maxAlpha * progress
+          const target = maxAlpha * THREE.MathUtils.smoothstep(progress, 0, 1)
           const cur = breathMaterials[activeIdx].opacity
           breathMaterials[activeIdx].opacity = target > cur
             ? Math.min(target, cur + maxDelta)
