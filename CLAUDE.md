@@ -79,6 +79,7 @@ Two looping crossfade pairs, played with the Web Audio API (`createAudioEngine`;
   - **Otherwise** (tutorial, Own Pace): `null`, which means silent. It fades in or out over `PACE_FADE_S` 2 s when the pace starts or stops.
 - **Groups:** each 5-breath palette change (`handleBreathPaletteCycle` → `setCycle`) moves each pair to its next group, wrapping around, with a `GROUP_FADE_S` 2 s crossfade. `audioGroupIndexRef` resets on Start/Restart.
 - **Start/stop:** the audio starts on the Start/Restart tap (`handleSelectMode` calls `unlock()` + `start(0)` inside the tap, as browser autoplay rules require) and fades out on Home (`handleBackFromExperience` → `stop()`).
+- **Staying alive:** iOS puts the context in `'interrupted'` (other browsers use `'suspended'`) when the phone locks or the tab goes to the background. `ensureRunning()` resumes it from any state that isn't running; if it's still not running `RESUME_CHECK_MS` 300 ms later, or is `'closed'`, it rebuilds the context and restarts the current group's voices. Decoded buffers are reused. Any `touchend`/`pointerup`/`keydown` while playing calls it, so touching a slider after returning restores the sound; `visibilitychange` also tries a resume.
 
 ## Morph material
 - Base color: `palette.tertiaryColor` (active Teal Palette: `#276d8c` blue-teal)

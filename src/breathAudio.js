@@ -19,6 +19,7 @@ const SMOOTHING_S = 0.03          // time constant for per-frame gain changes (n
 const GROUP_FADE_S = 2            // crossfade between groups
 const PACE_FADE_S = 2             // paced pair fades in/out when the pace starts/stops
 const STOP_FADE_S = 0.5
+const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context
 
 // { slider: [1, 2, ...], pace: [1, ...] } -- only groups with both a and b.
 function findGroups() {
@@ -55,11 +56,14 @@ export function createAudioEngine() {
   let paceOn = false
   // Per pair: the currently audible voice set { group, level GainNode, a/b { src, gain } }.
   const current = { slider: null, pace: null }
+  let lastCycleIndex = 0
+  let resumeCheck = null
 
   function load(file) {
     if (!buffers[file]) {
       buffers[file] = fetch(AUDIO_DIR + file)
         .then((r) => r.arrayBuffer())
+        // Decoded AudioBuffers aren't tied to a context, so they survive a rebuild.
         .then((data) => new Promise((resolve, reject) => ctx.decodeAudioData(data, resolve, reject)))
         .catch((e) => { console.warn('Audio load failed:', file, e); delete buffers[file]; return null })
     }
@@ -132,22 +136,66 @@ export function createAudioEngine() {
     g.linearRampToValueAtTime(on ? 1 : 0, t + PACE_FADE_S)
   }
 
+  function createContext() {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) return false
+    ctx = new AC()
+    master = ctx.createGain()
+    master.connect(ctx.destination)
+    return true
+  }
+
+  // iOS puts the context in 'interrupted' (others: 'suspended') when the phone
+  // locks or the tab is backgrounded; a long interruption can leave it unable
+  // to resume, or 'closed'. Resume it, and if that doesn't take, start over
+  // with a fresh context and restart whatever was playing.
+  function ensureRunning() {
+    if (!ctx || ctx.state === 'closed') {
+      if (!createContext()) return
+      if (running) restartVoices()
+      return
+    }
+    if (ctx.state === 'running') return
+    ctx.resume().catch(() => {})
+    clearTimeout(resumeCheck)
+    resumeCheck = setTimeout(() => {
+      if (!ctx || ctx.state === 'running') return
+      try { ctx.close() } catch { /* ignore */ }
+      if (!createContext()) return
+      if (running) restartVoices()
+    }, RESUME_CHECK_MS)
+  }
+
+  // Old voices belong to the dead context; just drop them and rebuild.
+  function restartVoices() {
+    current.slider = null
+    current.pace = null
+    paceOn = false
+    current.slider = makeVoices('slider', lastCycleIndex, 0.5, 1)
+    current.pace = makeVoices('pace', lastCycleIndex, 0.5, 0)
+  }
+
+  // Any tap (a user gesture) while playing brings a stalled context back, so
+  // touching a slider after returning to the phone restores the sound.
+  if (typeof document !== 'undefined') {
+    const onGesture = () => { if (running && (!ctx || ctx.state !== 'running')) ensureRunning() }
+    for (const type of ['touchend', 'pointerup', 'keydown']) document.addEventListener(type, onGesture, { passive: true })
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && running && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
+    })
+  }
+
   return {
     // Must run inside a tap handler (browser autoplay rules).
     unlock() {
-      if (!ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext
-        if (!AC) return
-        ctx = new AC()
-        master = ctx.createGain()
-        master.connect(ctx.destination)
-      }
-      if (ctx.state === 'suspended') ctx.resume()
+      ensureRunning()
     },
 
     start(cycleIndex = 0) {
+      ensureRunning()
       if (!ctx) return
       this.stop(0.05)
+      lastCycleIndex = cycleIndex
       running = true
       paceOn = false
       paceV = 0
@@ -181,6 +229,7 @@ export function createAudioEngine() {
     // Next 5-breath cycle: move each pair to its group for this cycle.
     setCycle(cycleIndex) {
       if (!running) return
+      lastCycleIndex = cycleIndex
       for (const pair of ['slider', 'pace']) {
         const list = groups[pair]
         if (!list.length || !current[pair]) continue
