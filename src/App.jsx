@@ -85,6 +85,8 @@ const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 const PALETTE_LERP_DURATION = 1.0
 
 const LABEL_LERP_S = 1   // slider label tertiary <-> text color lerp (paced Box / Slowing Down)
+const LABEL_DIM_OPACITY = 0.5   // label opacity in its tertiary state (1 when lit)
+const LABEL_GLOW_MULT = 5       // lit label's primary-color glow strength (text-shadow blur px per layer)
 const _labelColor = new THREE.Color()
 
 function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef, getLabelPhase }) {
@@ -129,8 +131,15 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
       for (const key of ['inhale', 'exhale']) {
         const target = phase === key ? 1 : 0
         lp[key] = target > lp[key] ? Math.min(target, lp[key] + step) : Math.max(target, lp[key] - step)
-        _labelColor.copy(live.tertiary).lerp(live.text, THREE.MathUtils.smoothstep(lp[key], 0, 1))
+        const k = THREE.MathUtils.smoothstep(lp[key], 0, 1)
+        _labelColor.copy(live.tertiary).lerp(live.text, k)
         wrapperRef.current.style.setProperty(`--${key}-label-color`, '#' + _labelColor.getHexString())
+        wrapperRef.current.style.setProperty(`--${key}-label-opacity`, String(THREE.MathUtils.lerp(LABEL_DIM_OPACITY, 1, k)))
+        // "Emissive" for DOM text: a stacked primary-color glow that eases in with k.
+        const g = LABEL_GLOW_MULT
+        const rgb = `${Math.round(live.primary.r * 255)}, ${Math.round(live.primary.g * 255)}, ${Math.round(live.primary.b * 255)}`
+        wrapperRef.current.style.setProperty(`--${key}-label-glow`, k < 0.001 ? 'none'
+          : `0 0 ${g}px rgba(${rgb}, ${k.toFixed(3)}), 0 0 ${2 * g}px rgba(${rgb}, ${k.toFixed(3)}), 0 0 ${4 * g}px rgba(${rgb}, ${(0.75 * k).toFixed(3)})`)
       }
       wrapperRef.current.style.setProperty('--live-tertiary-color', '#' + live.tertiary.getHexString())
     }

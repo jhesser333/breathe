@@ -134,7 +134,10 @@ const isSolidSet = (set) => set >= CUBE_SET
 // Optional testing override: the first cycles use these sets, then the
 // normal pattern (set = cycle % BREATH_SET_COUNT) takes over.
 const TEMP_FIRST_CYCLES = []   // set e.g. [SQUASH_RING_SET] to preview a set first while testing
-const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : c % BREATH_SET_COUNT)
+// Rotation order of the sets (set ids stay fixed): the sculpture
+// tetrahedrons come first and the still rings take their old 5th slot.
+const SET_ORDER = [TETRA_SET, 1, 2, 3, 0, 5, 6, 7]
+const setForCycle = (c) => (c < TEMP_FIRST_CYCLES.length ? TEMP_FIRST_CYCLES[c] : SET_ORDER[c % BREATH_SET_COUNT])
 const maxAlphaFor = (i) => {
   const set = Math.floor(i / BREATH_RING_COUNT)
   return isSolidSet(set) || set === BREATH_SPIN_FROM_APPEAR_SET ? CUBE_MAX_ALPHA : BREATH_MAX_ALPHA
