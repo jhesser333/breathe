@@ -61,7 +61,7 @@ const MODE_CAPTION_TOP = 16
 const MODE_CAPTION_LINE_PX = 16
 // TEMP (testing): drive the paced audio pair from the right slider in every
 // mode instead of the app's pace. Set false to restore the paced behavior.
-const PACE_AUDIO_FROM_RIGHT_SLIDER = true
+const PACE_AUDIO_FROM_RIGHT_SLIDER = false
 const MODE_INTRO_MS = 10000  // mode explanation shown before each tutorial, then fades out (FADE_TRANSITION_MS)
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
