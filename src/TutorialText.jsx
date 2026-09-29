@@ -65,7 +65,9 @@ function roundAlphaMultiplier(totalElapsed, interval) {
   return ROUND_ALPHA[roundIndex] ?? 1
 }
 
-export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+// topPx: pin the text's top edge this far from the top of the screen (the mode
+// explanation) instead of the usual spot over the Morph's lower third.
+export default function TutorialText({ topPx = null, text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
@@ -124,8 +126,8 @@ export default function TutorialText({ text, visible, opacity, fadeMs = 2000, pu
   return (
     <div style={{
       position: 'absolute',
-      top: 'calc(44% + 24px)', left: 0, right: 0,   // in front of the Morph's lower third, nudged down ~1/4 inch
-      transform: 'translateY(-50%)',
+      top: topPx !== null ? topPx : 'calc(44% + 24px)', left: 0, right: 0,   // default: in front of the Morph's lower third, nudged down ~1/4 inch
+      transform: topPx !== null ? 'none' : 'translateY(-50%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
       zIndex: 100,   // always above the canvas, sliders and nav buttons

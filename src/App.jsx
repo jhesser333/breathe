@@ -55,7 +55,11 @@ const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
-const MODE_INTRO_MS = 5000   // mode explanation shown before each tutorial, then fades out (FADE_TRANSITION_MS)
+// Mode-name caption at top-center; the mode explanation starts one blank
+// caption line below it (the label breaks after its colon: 2 lines, else 1).
+const MODE_CAPTION_TOP = 16
+const MODE_CAPTION_LINE_PX = 16
+const MODE_INTRO_MS = 10000  // mode explanation shown before each tutorial, then fades out (FADE_TRANSITION_MS)
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
 const TARGET_STROKES_B = 6  // 3 full up+down oscillations
@@ -219,6 +223,7 @@ export default function App() {
   const [tutorialVisible, setTutorialVisible] = useState(false)
   const [tutorialOpacity, setTutorialOpacity] = useState(null)
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
+  const [tutorialAtTop, setTutorialAtTop] = useState(false)   // mode explanation: shown up under the mode name
   const [shapeOption, setShapeOptionState] = useState(() => {
     let saved = localStorage.getItem('shapeOption') || 'd'
     // Rotating Rings (e) is hidden from Art Options; move anyone who last
@@ -1162,6 +1167,7 @@ export default function App() {
     // Tutorial start (Text A / Diagonal A1), run after the mode explanation.
     const beginTutorial = () => {
     introActiveRef.current = false
+    setTutorialAtTop(false)
     if (sliderLayout === 'diagonal') {
       stageRef.current = 'done'
       diagStageRef.current = 'A1'
@@ -1200,6 +1206,7 @@ export default function App() {
     const intro = MODE_INTRO[m]
     if (intro) {
       introActiveRef.current = true
+      setTutorialAtTop(true)
       stageRef.current = 'intro'
       diagStageRef.current = 'intro'
       currentMainTextRef.current = intro
@@ -1238,6 +1245,7 @@ export default function App() {
     audioRef.current.stop()
     clearTimeout(introTimerRef.current)
     introActiveRef.current = false
+    setTutorialAtTop(false)
     gatesEnabledRef.current = false
     pacedWaitForBottomRef.current = false
     countTutorialRef.current = { active: false, mode: null }
@@ -1406,9 +1414,9 @@ export default function App() {
             ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />
             : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />}
         </div>
-        <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)' }}>
+        <div style={{ position: 'absolute', top: MODE_CAPTION_TOP, left: '50%', transform: 'translateX(-50%)' }}>
           <span style={{
-            color: 'var(--live-text-color, rgba(255,255,255,0.7))', fontSize: 13, fontFamily: 'sans-serif',
+            color: 'var(--live-text-color, rgba(255,255,255,0.7))', fontSize: 13, lineHeight: `${MODE_CAPTION_LINE_PX}px`, fontFamily: 'sans-serif',
             letterSpacing: '0.08em', textTransform: 'uppercase',
             display: 'block', textAlign: 'center', whiteSpace: 'pre',
           }}>
@@ -1430,7 +1438,7 @@ export default function App() {
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />
         )}
-        <TutorialText text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+        <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 3 : 2) * MODE_CAPTION_LINE_PX : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}
