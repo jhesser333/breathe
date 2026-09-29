@@ -59,6 +59,9 @@ const FADE_TRANSITION_MS = 2000
 // caption line below it (the label breaks after its colon: 2 lines, else 1).
 const MODE_CAPTION_TOP = 16
 const MODE_CAPTION_LINE_PX = 16
+// TEMP (testing): drive the paced audio pair from the right slider in every
+// mode instead of the app's pace. Set false to restore the paced behavior.
+const PACE_AUDIO_FROM_RIGHT_SLIDER = true
 const MODE_INTRO_MS = 10000  // mode explanation shown before each tutorial, then fades out (FADE_TRANSITION_MS)
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
@@ -715,6 +718,7 @@ export default function App() {
   // eased over each paced phase's duration), or null = silent.
   const paceAudioPhaseRef = useRef({ phase: null, start: 0 })
   const getPaceProgress = useCallback(() => {
+    if (PACE_AUDIO_FROM_RIGHT_SLIDER) return THREE.MathUtils.smoothstep(1 - rightVal.current, 0, 1)
     if (mode === 'box') {
       const p = boxPhaseNow()
       if (p === null) return null
