@@ -8,52 +8,51 @@ export const CURVE_BOX_H = 200
 export const TRACK_THICKNESS = 54
 export const THUMB_SIZE = 60
 
-// Quadratic Bezier control points as fractions of (CURVE_BOX_W, CURVE_BOX_H),
-// defined for the LEFT "(" orientation. P0 = exhale end (arc-length s=0,
-// near bottom/center), P2 = inhale end (s=1, near top-outer corner). A single
-// control point (P1) guarantees one simple bow with no inflection ("C" shape,
-// not "S") — P1 sits mostly above P0 so the curve leaves near-vertical ("up"),
-// and mostly left of P2 so it arrives on a ~45° diagonal ("out").
-// P2 is inset from the box's outer edge so the thumb clears the screen edge.
-// The right side mirrors x -> 1 - x.
+// Each track is a circular arc (even radius) between two endpoints, given as
+// fractions of (CURVE_BOX_W, CURVE_BOX_H) for the LEFT track. P0 = exhale end
+// (arc-length s=0, near bottom/center), P2 = inhale end (s=1, up and out,
+// inset from the box's outer edge so the thumb clears the screen edge).
+// ARC_DEGREES is how far the arc turns between them: the circle's center
+// sits on the outer/lower side, so the track leaves P0 close to vertical and
+// bends outward toward P2. The right side mirrors x -> 1 - x.
 export const P0_FRAC = { x: 0.76, y: 0.89 }
-export const P1_FRAC = { x: 0.68, y: 0.57 }
 export const P2_FRAC = { x: 0.21, y: 0.20 }
+export const ARC_DEGREES = 60
 
 export const CURVE_SAMPLES = 48
 
-function fracToPoint(f, w, h) {
-  return { x: f.x * w, y: f.y * h }
-}
-
-export function getSideControlPoints(side, w = CURVE_BOX_W, h = CURVE_BOX_H) {
-  const p0 = fracToPoint(P0_FRAC, w, h)
-  const p1 = fracToPoint(P1_FRAC, w, h)
-  const p2 = fracToPoint(P2_FRAC, w, h)
-  if (side === 'left') return { p0, p1, p2 }
-  const mirror = (p) => ({ x: w - p.x, y: p.y })
-  return { p0: mirror(p0), p1: mirror(p1), p2: mirror(p2) }
-}
-
-export function quadraticBezierPoint(s, p0, p1, p2) {
-  const mt = 1 - s
-  const a = mt * mt
-  const b = 2 * mt * s
-  const c = s * s
-  return {
-    x: a * p0.x + b * p1.x + c * p2.x,
-    y: a * p0.y + b * p1.y + c * p2.y,
-  }
+// Circle through the side's endpoints: center, radius, start/end angles
+// (y-down screen coordinates).
+function getArc(side, w, h) {
+  const mx = (x) => (side === 'left' ? x : w - x)
+  const p0 = { x: mx(P0_FRAC.x * w), y: P0_FRAC.y * h }
+  const p2 = { x: mx(P2_FRAC.x * w), y: P2_FRAC.y * h }
+  const vx = p2.x - p0.x, vy = p2.y - p0.y
+  const chord = Math.hypot(vx, vy)
+  const half = (ARC_DEGREES * Math.PI / 180) / 2
+  const r = chord / (2 * Math.sin(half))
+  // Perpendicular to the chord, pointing outward (same x direction as P0 -> P2).
+  let nx = vy / chord, ny = -vx / chord
+  if (Math.sign(nx) !== Math.sign(vx)) { nx = -nx; ny = -ny }
+  const d = r * Math.cos(half)
+  const c = { x: (p0.x + p2.x) / 2 + nx * d, y: (p0.y + p2.y) / 2 + ny * d }
+  const a0 = Math.atan2(p0.y - c.y, p0.x - c.x)
+  let a2 = Math.atan2(p2.y - c.y, p2.x - c.x)
+  // Take the short way round (the arc is well under 180°).
+  if (a2 - a0 > Math.PI) a2 -= 2 * Math.PI
+  if (a2 - a0 < -Math.PI) a2 += 2 * Math.PI
+  return { p0, p2, c, r, a0, a2 }
 }
 
 export function sampleCurve(side, w = CURVE_BOX_W, h = CURVE_BOX_H, n = CURVE_SAMPLES) {
-  const { p0, p1, p2 } = getSideControlPoints(side, w, h)
+  const { c, r, a0, a2 } = getArc(side, w, h)
   const points = []
   let totalLength = 0
   let prev = null
   for (let i = 0; i <= n; i++) {
     const s = i / n
-    const pt = quadraticBezierPoint(s, p0, p1, p2)
+    const a = a0 + (a2 - a0) * s
+    const pt = { x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) }
     if (prev) totalLength += Math.hypot(pt.x - prev.x, pt.y - prev.y)
     points.push({ x: pt.x, y: pt.y, s, dist: totalLength })
     prev = pt
@@ -125,8 +124,8 @@ export function pointAtArcFrac(side, arcFrac, w = CURVE_BOX_W, h = CURVE_BOX_H) 
 }
 
 export function getPathD(side, w = CURVE_BOX_W, h = CURVE_BOX_H) {
-  const { p0, p1, p2 } = getSideControlPoints(side, w, h)
-  return `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y}, ${p2.x} ${p2.y}`
+  const { p0, p2, r, a0, a2 } = getArc(side, w, h)
+  return `M ${p0.x} ${p0.y} A ${r} ${r} 0 0 ${a2 > a0 ? 1 : 0} ${p2.x} ${p2.y}`
 }
 
 export function getCurveLength(side, w = CURVE_BOX_W, h = CURVE_BOX_H) {

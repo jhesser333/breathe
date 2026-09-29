@@ -14,6 +14,10 @@ const trackInner = {
   position: 'relative',
 }
 
+// Tertiary by default; the phase to breathe now eases to the text color in
+// paced Box Breathing / Slowing Down (App.jsx's PaletteLerpDriver).
+const labelColor = (label) => `var(--${label}-label-color, var(--live-tertiary-color, #276d8c))`
+
 const labelStyle = {
   color: 'var(--live-text-color, rgba(255,255,255,0.7))',
   fontSize: 11,
@@ -54,7 +58,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', gap: 6,
     }}>
-      <span style={labelStyle}>{topLabel}</span>
+      <span style={{ ...labelStyle, color: labelColor(topLabel) }}>{topLabel}</span>
       <div
         ref={sliderRef}
         style={{
@@ -76,7 +80,7 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
           <ThumbDot value={value} />
         </div>
       </div>
-      <span style={labelStyle}>{bottomLabel}</span>
+      <span style={{ ...labelStyle, color: labelColor(bottomLabel) }}>{bottomLabel}</span>
     </div>
   )
 }

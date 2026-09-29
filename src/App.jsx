@@ -84,8 +84,13 @@ const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 // palette-consuming piece of the live scene, not just MorphC's own colors.
 const PALETTE_LERP_DURATION = 1.0
 
-function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef }) {
-  useFrame((state) => {
+const LABEL_LERP_S = 1   // slider label tertiary <-> text color lerp (paced Box / Slowing Down)
+const _labelColor = new THREE.Color()
+
+function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef, getLabelPhase }) {
+  // Slider inhale/exhale labels: 0 = tertiary, 1 = text color (the phase to breathe now).
+  const labelPRef = useRef({ inhale: 0, exhale: 0 })
+  useFrame((state, delta) => {
     if (paletteLerpRef.current) {
       const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime } = paletteLerpRef.current
       const now = state.clock.elapsedTime
@@ -113,6 +118,21 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
     if (wrapperRef?.current) {
       const hex = live.primary.getHexString()
       wrapperRef.current.style.setProperty('--live-primary-rgb', `${parseInt(hex.slice(0, 2), 16)}, ${parseInt(hex.slice(2, 4), 16)}, ${parseInt(hex.slice(4, 6), 16)}`)
+    }
+    // Slider labels: tertiary, except the phase to breathe now in the paced
+    // part of Box Breathing / Slowing Down, which eases to the text color
+    // over LABEL_LERP_S (and back when the other phase begins).
+    if (wrapperRef?.current) {
+      const phase = getLabelPhase ? getLabelPhase() : null
+      const lp = labelPRef.current
+      const step = Math.min(delta, 0.1) / LABEL_LERP_S
+      for (const key of ['inhale', 'exhale']) {
+        const target = phase === key ? 1 : 0
+        lp[key] = target > lp[key] ? Math.min(target, lp[key] + step) : Math.max(target, lp[key] - step)
+        _labelColor.copy(live.tertiary).lerp(live.text, THREE.MathUtils.smoothstep(lp[key], 0, 1))
+        wrapperRef.current.style.setProperty(`--${key}-label-color`, '#' + _labelColor.getHexString())
+      }
+      wrapperRef.current.style.setProperty('--live-tertiary-color', '#' + live.tertiary.getHexString())
     }
   })
   return null
@@ -630,6 +650,24 @@ export default function App() {
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
   }, [])
+
+  // Which slider label is lit (text color) in the paced part of the session:
+  // Box Breathing follows the caption clock (Inhale + Hold-in -> 'inhale',
+  // Exhale + Hold-out -> 'exhale'); Slowing Down follows the paced art's
+  // breathPhaseRef (the phase to breathe now). null = both tertiary.
+  const getLabelPhase = useCallback(() => {
+    if (mode === 'box') {
+      if (!boxCaptionsStartedRef.current) return null
+      const interval = Math.max(0.05, spawnIntervalRef.current)
+      const elapsed = Math.max(0, (performance.now() - boxClockStartRef.current) / 1000)
+      return Math.floor((elapsed % (4 * interval)) / interval) < 2 ? 'inhale' : 'exhale'
+    }
+    if (mode === 'slowing') {
+      if (!gatesEnabledRef.current || pacedCueStageRef.current === 'off') return null
+      return breathPhaseRef.current === 'inhale' || breathPhaseRef.current === 'exhale' ? breathPhaseRef.current : null
+    }
+    return null
+  }, [mode])
 
   const showCountText = useCallback((text) => {
     clearTimeout(tutorialTimerRef.current)
@@ -1186,7 +1224,7 @@ export default function App() {
         <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
-        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} />
+        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}

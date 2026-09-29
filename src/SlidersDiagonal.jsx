@@ -13,7 +13,7 @@ const EXHALE_LABEL_GAP = 6  // bottom of the track caps to label top
 
 const labelStyle = {
   position: 'absolute',
-  color: 'var(--live-text-color, rgba(255,255,255,0.7))',
+  color: 'var(--live-tertiary-color, #276d8c)',
   fontSize: 22,
   lineHeight: 1,
   whiteSpace: 'nowrap',
@@ -49,6 +49,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
     }}>
       <span style={{
         ...labelStyle,
+        color: 'var(--inhale-label-color, var(--live-tertiary-color, #276d8c))',
         left: (isLeft ? P2_FRAC.x : 1 - P2_FRAC.x) * w,
         top: P2_FRAC.y * h - THUMB_SIZE / 2 - INHALE_LABEL_GAP,
         transform: 'translate(-50%, -100%)',
@@ -109,7 +110,7 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawR
     <div style={{ position: 'absolute', inset: 0, transform: `translateY(-${shiftUp}px)` }}>
       <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" />
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
-      <span style={{ ...labelStyle, bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
+      <span style={{ ...labelStyle, color: 'var(--exhale-label-color, var(--live-tertiary-color, #276d8c))', bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
         exhale
       </span>
     </div>
