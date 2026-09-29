@@ -298,7 +298,7 @@ export default function MorphB({ rightVal, palette, breathCountingEnabledRef, br
     const countSource = breathCountSourceRef && breathCountSourceRef.current
     const countRaw = countSource ? countSource.current : 1 - rightVal.current   // right slider, 0 exhale -> 1 inhale
     const countingEnabled = !!(breathCountingEnabledRef && breathCountingEnabledRef.current)
-    breathCount.update(now, countRaw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef, onBreathCountEvent)
+    breathCount.update(now, countRaw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef, onBreathCountEvent, !countSource)
 
     // Follow the app-wide breath-cycle palette (App.jsx owns the lerp).
     if (livePaletteRef && livePaletteRef.current) {

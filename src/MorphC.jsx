@@ -385,6 +385,10 @@ const BREATH_EMISSIVE_FALL_TARGET = 1  // ramped down to this over the first sec
 const BREATH_EMISSIVE_FALL_RAMP_S = 1.0
 const BREATH_FADE_IN_DURATION_S = 1.5  // time to fade a ring from 0 to full opacity, independent of slider speed
 const BREATH_FADE_RATE = BREATH_MAX_ALPHA / BREATH_FADE_IN_DURATION_S  // alpha/sec, slew-rate limits opacity changes
+// Slider-driven count (no paced source): each piece is counted the moment an
+// Inhale starts and fades in on its own clock over this long (smoothstepped),
+// with no failed state -- reversing early doesn't undo it.
+const USER_APPEAR_S = 1
 // "Backlight" glow: rather than relying on transparent-object draw order
 // (which didn't reliably show the rings through the Morph's own surface),
 // each ring's position/intensity is fed into the Morph's own fragment
@@ -555,6 +559,7 @@ export default function MorphC({ rightVal, palette, shapeOption, breathCountingE
   const breathFallSpinRef = useRef(new Array(BREATH_TOTAL).fill(null))
   const breathSpinStartRef = useRef(new Array(BREATH_TOTAL).fill(null))   // set when spin began on appearance (see BREATH_SPIN_FROM_APPEAR_SET)
   const breathTumbleRef = useRef(new Array(BREATH_TOTAL).fill(null))   // cube stack: all-axis spin added once each piece starts falling
+  const breathAppearStartRef = useRef(new Array(BREATH_TOTAL).fill(null))   // slider-driven count: when each piece's timed fade-in began (USER_APPEAR_S)
   const squashMeshRefs = useMemo(() => Array.from({ length: BREATH_RING_COUNT }, () => ({ current: null })), [])
   const spiralZSpinRef = useRef(0)   // sphere-tetra spiral: one shared Z speed per series
   const spiralTetraRefs = useMemo(() => Array.from({ length: BREATH_RING_COUNT * 2 }, () => ({ current: null })), [])
@@ -946,6 +951,12 @@ float dissolveHash(vec3 p) {
     // 0 (exhale) -> 1 (inhale) progress ref chosen by App.jsx.
     const countSource = breathCountSourceRef && breathCountSourceRef.current
     const raw = countSource ? countSource.current : 1 - rightVal.current   // right slider, 0 exhale -> 1 inhale
+    const userDriven = !countSource
+    // Timed fade-in progress (0..1) of a slider-driven piece; 1 for paced pieces.
+    const appearFactor = (i) => {
+      const start = breathAppearStartRef.current[i]
+      return start === null ? 1 : THREE.MathUtils.smoothstep((now - start) / USER_APPEAR_S, 0, 1)
+    }
     const resetBreathSet = (set) => {
       breathSetFallingRef.current[set] = false
       for (let i = set * BREATH_RING_COUNT; i < (set + 1) * BREATH_RING_COUNT; i++) {
@@ -953,6 +964,7 @@ float dissolveHash(vec3 p) {
         breathFallSpinRef.current[i] = null
         breathSpinStartRef.current[i] = null
         breathTumbleRef.current[i] = null
+        breathAppearStartRef.current[i] = null
         const group = breathGroupRefs[i].current
         const b = breathBaseRef.current[i]
         if (group) {
@@ -1083,7 +1095,7 @@ float dissolveHash(vec3 p) {
           if (breathSpinStartRef.current[i] === null) group.rotation.set(b.rx + spin.rx * t, b.ry + spin.ry * t, b.rz + spin.rz * t)
         }
         const fadeT = THREE.MathUtils.clamp((t - BREATH_FALL_HOLD_S) / BREATH_FALL_FADE_S, 0, 1)
-        breathMaterials[i].opacity = maxAlphaFor(i) * (1 - fadeT)
+        breathMaterials[i].opacity = maxAlphaFor(i) * appearFactor(i) * (1 - fadeT)
         const emissiveT = THREE.MathUtils.clamp(t / BREATH_EMISSIVE_FALL_RAMP_S, 0, 1)
         breathMaterials[i].emissiveIntensity = THREE.MathUtils.lerp(emissiveMultFor(i), BREATH_EMISSIVE_FALL_TARGET, emissiveT)
         if (fadeT < 1) allDone = false
@@ -1094,6 +1106,7 @@ float dissolveHash(vec3 p) {
     if (countingEnabled) {
       const base = breathActiveSetRef.current * BREATH_RING_COUNT
       const maxAlpha = maxAlphaFor(base)
+      let risingStarted = false
 
       // Deadband rise/fall tracker: only a confirmed reversal from a real
       // trough back to rising re-arms the next ring, so holding the
@@ -1113,6 +1126,7 @@ float dissolveHash(vec3 p) {
           breathDirRef.current = 1
           breathExtremeRef.current = raw
           breathArmedRef.current = true
+          risingStarted = true
           if (paletteLerpPendingRef.current) {
             paletteLerpPendingRef.current = false
             if (onBreathPaletteCycle) onBreathPaletteCycle(now)
@@ -1126,21 +1140,45 @@ float dissolveHash(vec3 p) {
       const maxDelta = BREATH_FADE_RATE * delta
       for (let i = 0; i < breathLockedCountRef.current; i++) {
         const cur = breathMaterials[base + i].opacity
-        if (cur < maxAlpha) breathMaterials[base + i].opacity = Math.min(maxAlpha, cur + maxDelta)
+        if (breathAppearStartRef.current[base + i] !== null) {
+          breathMaterials[base + i].opacity = maxAlpha * appearFactor(base + i)
+        } else if (cur < maxAlpha) {
+          breathMaterials[base + i].opacity = Math.min(maxAlpha, cur + maxDelta)
+        }
+      }
+
+      const startAppearSpin = (activeIdx) => {
+        const activeSet = breathActiveSetRef.current
+        if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null) {
+          breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin()
+            : activeSet === SPHERE_ROW_SET ? makeZSpin()
+            : activeSet === SQUASH_RING_SET ? makeSquashSpin()
+            : activeSet === SPIRAL_SET ? { rx: 0, ry: 0, rz: spiralZSpinRef.current }
+            : makeBreathSpin()
+          breathSpinStartRef.current[activeIdx] = now
+        }
+      }
+
+      if (userDriven) {
+        // Slider-driven: the start of each Inhale counts the next piece right
+        // away; it fades in on its own timer (loop above), so turning back
+        // early never undoes it and fast breaths overlap their fade-ins.
+        if (risingStarted && breathLockedCountRef.current < BREATH_RING_COUNT) {
+          const activeIdx = base + breathLockedCountRef.current
+          breathAppearStartRef.current[activeIdx] = now
+          breathMaterials[activeIdx].opacity = 0
+          startAppearSpin(activeIdx)
+          breathEventFiredRef.current = breathCycleIndexRef.current + ':' + breathLockedCountRef.current
+          if (onBreathCountEvent) onBreathCountEvent('breath', breathCycleIndexRef.current, breathLockedCountRef.current + 1)
+          breathLockedCountRef.current += 1
+          breathArmedRef.current = false
+        }
       }
 
       if (breathLockedCountRef.current < BREATH_RING_COUNT) {
-        if (breathArmedRef.current) {
+        if (breathArmedRef.current && !userDriven) {
           const activeIdx = base + breathLockedCountRef.current
-          const activeSet = breathActiveSetRef.current
-          if ((activeSet === BREATH_SPIN_FROM_APPEAR_SET || isSolidSet(activeSet)) && breathSpinStartRef.current[activeIdx] === null && breathMaterials[activeIdx].opacity > 0) {
-            breathFallSpinRef.current[activeIdx] = activeSet === CUBE_STACK_SET ? makeStackSpin()
-              : activeSet === SPHERE_ROW_SET ? makeZSpin()
-              : activeSet === SQUASH_RING_SET ? makeSquashSpin()
-              : activeSet === SPIRAL_SET ? { rx: 0, ry: 0, rz: spiralZSpinRef.current }
-              : makeBreathSpin()
-            breathSpinStartRef.current[activeIdx] = now
-          }
+          if (breathMaterials[activeIdx].opacity > 0) startAppearSpin(activeIdx)
           const progress = THREE.MathUtils.clamp((raw - BREATH_FADE_START) / (BREATH_FADE_THRESHOLD - BREATH_FADE_START), 0, 1)
           const eventKey = breathCycleIndexRef.current + ':' + breathLockedCountRef.current
           if (progress > 0 && breathEventFiredRef.current !== eventKey) {

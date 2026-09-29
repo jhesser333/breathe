@@ -27,6 +27,10 @@ const LOCK_AT = 0.98
 const SHRINK_S = 1
 const SHRINK_STAGGER_S = 0.25
 const REVERSAL_DEADBAND = 0.08           // same as MorphC
+// Slider-driven count (no paced source): each piece is counted the moment an
+// Inhale starts and grows in on its own clock over this long (smoothstepped),
+// with no failed state -- reversing early doesn't undo it.
+const USER_APPEAR_S = 1
 const MAX_ALPHA = 0.5                    // MorphC's Count Cube material, in the secondary color
 const EMISSIVE = 4
 
@@ -206,7 +210,7 @@ function makeSpin(set) {
   return null
 }
 
-const makePieceState = () => ({ grow: 0, shrinkStart: null, spinStart: null, spin: null })
+const makePieceState = () => ({ grow: 0, appearStart: null, shrinkStart: null, spinStart: null, spin: null })
 
 export function useBreathCountB(palette) {
   const total = COUNT * SET_COUNT
@@ -255,8 +259,9 @@ export function useBreathCountB(palette) {
     s.current.activeSet = set
   }
 
-  // raw: count source (0 exhale -> 1 inhale); countingEnabled: from App.
-  const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef, onBreathCountEvent) => {
+  // raw: count source (0 exhale -> 1 inhale); countingEnabled: from App;
+  // userDriven: raw is the slider (not a paced progress ref).
+  const update = (now, raw, countingEnabled, onBreathPaletteCycle, livePaletteRef, landscapeIndexRef, onBreathCountEvent, userDriven = false) => {
     const st = s.current
     if (countingEnabled !== st.wasEnabled) {
       // Arm the first piece only if the source starts low; otherwise (e.g.
@@ -284,11 +289,23 @@ export function useBreathCountB(palette) {
           if (onBreathPaletteCycle) onBreathPaletteCycle(now)
           if (landscapeIndexRef) landscapeIndexRef.current += 1   // next landscape, with the palette change
         }
+        if (userDriven && st.locked < COUNT) {
+          // Slider-driven: the start of the Inhale counts the next piece right
+          // away; it grows in on its own timer (pose loop), so turning back
+          // early never undoes it and fast breaths overlap their grow-ins.
+          const ps = pieceStateRef.current[st.activeSet * COUNT + st.locked]
+          ps.appearStart = now
+          ps.spinStart = now
+          ps.spin = makeSpin(st.activeSet)
+          if (onBreathCountEvent) onBreathCountEvent('breath', st.cycle, st.locked + 1)
+          st.locked += 1
+          st.armed = false
+        }
       }
 
       const base = st.activeSet * COUNT
       if (st.locked < COUNT) {
-        if (st.armed) {
+        if (st.armed && !userDriven) {
           const i = base + st.locked
           const ps = pieceStateRef.current[i]
           ps.grow = smooth((raw - GROW_START) / (LOCK_AT - GROW_START))
@@ -324,7 +341,7 @@ export function useBreathCountB(palette) {
       if (!p) continue
       const ps = pieceStateRef.current[i]
       const b = layoutRef.current[i]
-      let f = ps.grow
+      let f = ps.appearStart !== null ? smooth((now - ps.appearStart) / USER_APPEAR_S) : ps.grow
       if (ps.shrinkStart !== null && now >= ps.shrinkStart) {
         const t = (now - ps.shrinkStart) / SHRINK_S
         if (t >= 1) { pieceStateRef.current[i] = makePieceState(); p.visible = false; continue }
