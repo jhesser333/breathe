@@ -9,7 +9,8 @@
 // The list of files is found at build time (vite.config.js, __AUDIO_FILES__).
 //
 // Each file loops sample-accurately (AudioBufferSourceNode.loop), and each
-// pair crossfades a <-> b with an equal-power curve so the middle doesn't dip.
+// pair layers them: a plays at full level all the time, and b fades in with
+// the Inhale (0 -> 1) and back out with the Exhale.
 
 /* global __AUDIO_FILES__ */
 const AUDIO_FILES = typeof __AUDIO_FILES__ !== 'undefined' ? __AUDIO_FILES__ : []
@@ -115,8 +116,8 @@ export function createAudioEngine() {
   }
 
   const valueFor = (pair) => (pair === 'slider' ? sliderV : paceV)
-  const crossA = (pair) => Math.cos(valueFor(pair) * Math.PI / 2)
-  const crossB = (pair) => Math.sin(valueFor(pair) * Math.PI / 2)
+  const crossA = () => 1                       // a: always on
+  const crossB = (pair) => valueFor(pair)       // b: layered in with the breath (value already eased)
 
   function applyCross(pair) {
     const voices = current[pair]
