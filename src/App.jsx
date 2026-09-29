@@ -55,7 +55,7 @@ const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
-// Mode-name caption at top-center; the mode explanation starts one blank
+// Mode-name caption at top-center; the mode explanation starts two blank
 // caption line below it (the label breaks after its colon: 2 lines, else 1).
 const MODE_CAPTION_TOP = 16
 const MODE_CAPTION_LINE_PX = 16
@@ -1442,7 +1442,7 @@ export default function App() {
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />
         )}
-        <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 3 : 2) * MODE_CAPTION_LINE_PX : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+        <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}
