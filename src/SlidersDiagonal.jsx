@@ -3,18 +3,22 @@ import { useTouchSlider } from './useTouchSlider'
 import { UI_EDGE, UI_INTERIOR, UI_FILL, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
 import {
   CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE,
-  P0_FRAC, sampleCurve, getPathD, pointAtArcFrac,
+  P0_FRAC, P2_FRAC, sampleCurve, getPathD, pointAtArcFrac,
 } from './diagonalCurveGeometry'
 
-const INNER_GAP = 50
+const INNER_GAP = 20
 const BOTTOM_INSET = 16
+const INHALE_LABEL_GAP = 14 // label bottom to top of the thumb at the inhale end
+const EXHALE_LABEL_GAP = 6  // bottom of the track caps to label top
 
 const labelStyle = {
   position: 'absolute',
   color: 'var(--live-text-color, rgba(255,255,255,0.7))',
-  fontSize: 11,
+  fontSize: 22,
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
   fontFamily: 'sans-serif',
-  fontWeight: 400,
+  fontWeight: 700,
   letterSpacing: '0.06em',
   userSelect: 'none',
   pointerEvents: 'none',
@@ -43,7 +47,12 @@ function DiagonalTrack({ sliderRef, value, side }) {
       width: w, height: h,
       ...edgeStyle,
     }}>
-      <span style={{ ...labelStyle, top: -28, [isLeft ? 'left' : 'right']: 0 }}>
+      <span style={{
+        ...labelStyle,
+        left: (isLeft ? P2_FRAC.x : 1 - P2_FRAC.x) * w,
+        top: P2_FRAC.y * h - THUMB_SIZE / 2 - INHALE_LABEL_GAP,
+        transform: 'translate(-50%, -100%)',
+      }}>
         inhale
       </span>
       <div
@@ -94,12 +103,13 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawR
   useEffect(() => { onRight(rightVal) }, [rightVal])
 
   const exhaleLabelBottom = BOTTOM_INSET + (1 - P0_FRAC.y) * CURVE_BOX_H
+    - TRACK_THICKNESS / 2 - EXHALE_LABEL_GAP
 
   return (
     <div style={{ position: 'absolute', inset: 0, transform: `translateY(-${shiftUp}px)` }}>
       <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" />
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
-      <span style={{ ...labelStyle, bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 50%)' }}>
+      <span style={{ ...labelStyle, bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
         exhale
       </span>
     </div>

@@ -2,22 +2,23 @@
 // Single source of truth for both rendering (SlidersDiagonal.jsx) and
 // touch/drag hit-testing (useTouchSlider.js).
 
-export const CURVE_BOX_W = 150
-export const CURVE_BOX_H = 220
+export const CURVE_BOX_W = 160
+export const CURVE_BOX_H = 200
 
-export const TRACK_THICKNESS = 38
-export const THUMB_SIZE = 42
+export const TRACK_THICKNESS = 54
+export const THUMB_SIZE = 60
 
 // Quadratic Bezier control points as fractions of (CURVE_BOX_W, CURVE_BOX_H),
 // defined for the LEFT "(" orientation. P0 = exhale end (arc-length s=0,
 // near bottom/center), P2 = inhale end (s=1, near top-outer corner). A single
 // control point (P1) guarantees one simple bow with no inflection ("C" shape,
 // not "S") — P1 sits mostly above P0 so the curve leaves near-vertical ("up"),
-// and mostly left of P2 so it arrives on a diagonal ("out").
+// and mostly left of P2 so it arrives on a ~45° diagonal ("out").
+// P2 is inset from the box's outer edge so the thumb clears the screen edge.
 // The right side mirrors x -> 1 - x.
-export const P0_FRAC = { x: 0.82, y: 0.95 }
-export const P1_FRAC = { x: 0.78, y: 0.45 }
-export const P2_FRAC = { x: 0.00, y: 0.05 }
+export const P0_FRAC = { x: 0.76, y: 0.89 }
+export const P1_FRAC = { x: 0.68, y: 0.57 }
+export const P2_FRAC = { x: 0.21, y: 0.20 }
 
 export const CURVE_SAMPLES = 48
 
