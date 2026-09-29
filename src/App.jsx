@@ -36,7 +36,7 @@ import { RESET_ON_UNLOCK, TESTING_DEFAULTS } from './passcode'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
-import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
+import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 import { createAudioEngine } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
@@ -55,6 +55,7 @@ const STILLNESS_MS = 10000
 const MOVEMENT_FADE_DELAY_MS = 2000
 const TEXT_C_DISPLAY_MS = 5000
 const FADE_TRANSITION_MS = 2000
+const MODE_INTRO_MS = 5000   // mode explanation shown before each tutorial, then fades out (FADE_TRANSITION_MS)
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
 const TARGET_STROKES_B = 6  // 3 full up+down oscillations
@@ -283,6 +284,8 @@ export default function App() {
   const lastMoveTime = useRef(0)
   const tutorialVisibleRef = useRef(false)
   const tutorialTimerRef = useRef(null)
+  const introTimerRef = useRef(null)
+  const introActiveRef = useRef(false)   // mode explanation showing / fading (tutorial not started yet)
   const awaitingMovementRef = useRef(false)
   const stageRef = useRef('done')
   const pendingGatesFnRef = useRef(null) // null = not pending; thunk = fn to call when Text B finishes
@@ -997,6 +1000,7 @@ export default function App() {
       // Box Breathing's captions are driven by their own clock-based poll
       // below, not by user interaction -- "stillness" is meaningless here.
       if (mode === 'box') return
+      if (introActiveRef.current) return
       if (mode === 'slowing' && pacedCueStageRef.current === 'captions') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
       if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
@@ -1155,6 +1159,9 @@ export default function App() {
     livePaletteRef.current.background.set(PALETTES.teal.background)
     livePaletteRef.current.text.set(PALETTES.teal.textColor)
 
+    // Tutorial start (Text A / Diagonal A1), run after the mode explanation.
+    const beginTutorial = () => {
+    introActiveRef.current = false
     if (sliderLayout === 'diagonal') {
       stageRef.current = 'done'
       diagStageRef.current = 'A1'
@@ -1163,8 +1170,10 @@ export default function App() {
       diagReversalCountRef.current = 0
       currentMainTextRef.current = TEXT_A1_DIAGONAL
       setTutorialText(TEXT_A1_DIAGONAL)
-      setTutorialFadeMs(2000)
-      setTutorialOpacity(1 - breathRef.current)
+      // Fade in (after the mode explanation); the first slider movement
+      // switches it to the slider-bound opacity (updateDiagonalSequence).
+      setTutorialFadeMs(DIAG_FADE_IN_MS)
+      setTutorialOpacity(null)
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
     } else {
@@ -1181,6 +1190,32 @@ export default function App() {
       setTutorialText(TEXT_A)
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
+    }
+    }
+
+    // Mode explanation first (MODE_INTRO_MS), then fade out and start the
+    // tutorial. The tutorial stages sit at 'intro' meanwhile, so slider
+    // movement doesn't advance them.
+    clearTimeout(introTimerRef.current)
+    const intro = MODE_INTRO[m]
+    if (intro) {
+      introActiveRef.current = true
+      stageRef.current = 'intro'
+      diagStageRef.current = 'intro'
+      currentMainTextRef.current = intro
+      setTutorialOpacity(null)
+      setTutorialFadeMs(FADE_TRANSITION_MS)
+      setTutorialText(intro)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
+      introTimerRef.current = setTimeout(() => {
+        setTutorialVisible(false)
+        tutorialVisibleRef.current = false
+        introTimerRef.current = setTimeout(beginTutorial, FADE_TRANSITION_MS)
+      }, MODE_INTRO_MS)
+    } else {
+      introActiveRef.current = false
+      beginTutorial()
     }
     if (m === 'timed') pendingGatesFnRef.current = showGatesText
 
@@ -1201,6 +1236,8 @@ export default function App() {
 
   const handleBackFromExperience = useCallback(() => {
     audioRef.current.stop()
+    clearTimeout(introTimerRef.current)
+    introActiveRef.current = false
     gatesEnabledRef.current = false
     pacedWaitForBottomRef.current = false
     countTutorialRef.current = { active: false, mode: null }

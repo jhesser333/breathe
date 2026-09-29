@@ -259,6 +259,10 @@ While any mode is playing, the current mode's display name (from `MODE_LABELS` i
 - Constants in `SlowingDownController.jsx`: `DEADBAND=0.08`, `MIN_BREATH_SECONDS=1.5`, `SLACK_FACTOR=1.15`, `WARMUP_CYCLES=3`, `RECORD_CYCLES=2`, `TEXT_D_CYCLES=3`, `TEXT_E_CYCLES=4`, `RAMP_SECONDS=60`
 
 ## Tutorial text rules
+- **Mode explanation (first):** at the start of Box Breathing, Slowing Down and Own Pace (`MODE_INTRO` in `copy.js`, keyed by mode id), an explanation of the mode and its tutorial shows for `MODE_INTRO_MS` 5 s, then fades out (`FADE_TRANSITION_MS`) before the tutorial begins (`beginTutorial` in `handleSelectMode`: Text A, or Diagonal A1, which fades in over `DIAG_FADE_IN_MS` and switches to slider-bound opacity on the first movement).
+  - While it shows, `stageRef`/`diagStageRef` sit at `'intro'` so slider movement doesn't advance the tutorial, and `introActiveRef` blocks idle re-show.
+  - Its timer is `introTimerRef`, cleared on Restart and Home.
+  - Paced Breathing (hidden) has no explanation.
 Universal A/B sequence, then mode-specific C/D (defined in `src/copy.js`). **This A/B sequence is Vertical-slider-layout only** — the Diagonal layout uses a completely different Text A1/A2/B1/B2 sequence instead (see below); both hand off to the same mode-specific Text C onward.
 
 - **Text A** (Vertical layout only) — "Move the sliders / in opposite directions / with your thumbs" (3 lines via `\n`). Shown at mode start. Stays visible until the **right slider** has completed **2 full up+down oscillations** (4 direction reversals detected with an 8% deadband, tracked in `rightStrokeCountRef`), then fades out over 2 seconds. If the user never moves the right slider, Text A stays up indefinitely.
