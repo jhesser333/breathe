@@ -625,9 +625,8 @@ export default function App() {
     phase2StartRef.current = Date.now() / 1000
     pacedCueStageRef.current = 'captions'
     pacedBreathNumRef.current = 0
-    // Counting is already on (count tutorial); just switch its source, so
-    // the count carries on into the next set instead of restarting.
-    breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? ringPaceProgressRef : null
+    // Counting is already on (count tutorial) and stays on the slider: every
+    // Inhale the user takes adds a piece, in sync with the pace or not.
     gatesEnabledRef.current = true
   }, [])
 
@@ -641,8 +640,7 @@ export default function App() {
     gatesEnabledRef.current = true
     boxClockStartRef.current = performance.now()
     boxCaptionIndexRef.current = 0
-    // Counting is already on; switch to the paced source without a reset.
-    breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? boxProgressRef : null
+    // Counting is already on and stays on the slider (see startPacedArt).
     clearTimeout(tutorialTimerRef.current)
     setTutorialFadeMs(FADE_TRANSITION_MS)
     currentMainTextRef.current = TEXTS.boxInhale
