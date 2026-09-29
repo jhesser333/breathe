@@ -197,6 +197,8 @@ export function usePaceRings({ gateColor, emissiveColor }) {
     }
     exhaleMat.opacity = holdExhaleRing ? fade * PULSE_MOVE_ALPHA_TARGET : innerIsOwn ? otherAlpha : ownAlpha
     exhaleMat.emissiveIntensity = holdExhaleRing ? fade * PULSE_MOVE_EMISSIVE_TARGET : innerIsOwn ? otherEmissive : ownEmissive
+    // Hold-out pulses as bright as Hold-in: same primary base color swap.
+    if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
     if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
 
     // Staggered count rings: instance i starts i seconds into the side and
