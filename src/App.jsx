@@ -38,6 +38,7 @@ import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
+import { createAudioEngine } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
 
 const navPillStyle = {
@@ -181,11 +182,21 @@ function PacedPhaseWatcher({ gatesEnabledRef, breathPhaseRef, onPhaseChange }) {
   return null
 }
 
+// Feeds the paced audio pair its 0 (exhale) -> 1 (inhale) value every frame,
+// or null (silent) outside the app-paced part of Box Breathing / Slowing Down.
+function PaceAudioDriver({ audioRef, getPaceProgress }) {
+  useFrame(() => { audioRef.current.setPace(getPaceProgress()) })
+  return null
+}
+
 const PACED_CAPTION_BREATHS = 5
 const PACED_CAPTION_ALPHA = [1, 1, 1, 0.5, 0.15]   // per breath: last two fade out, like Box Breathing's ROUND_ALPHA
 
 export default function App() {
   const leftVal = useRef(0)
+  const audioRef = useRef(null)
+  if (audioRef.current === null) audioRef.current = createAudioEngine()
+  const audioGroupIndexRef = useRef(0)   // 5-breath cycles since Start, picks the audio group
   const rightVal = useRef(1)
   // Everything (visuals, tutorial text, breath recording) is driven by the
   // right slider for now; the left slider stays on screen and works but
@@ -330,6 +341,9 @@ export default function App() {
     text: new THREE.Color(PALETTES.teal.textColor),
   })
   const handleBreathPaletteCycle = useCallback((now) => {
+    // Audio moves to its next group with the palette (breathAudio.js).
+    audioGroupIndexRef.current += 1
+    audioRef.current.setCycle(audioGroupIndexRef.current)
     const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
     const live = livePaletteRef.current
     paletteLerpRef.current = {
@@ -662,19 +676,56 @@ export default function App() {
   // Box Breathing follows the caption clock (Inhale + Hold-in -> 'inhale',
   // Exhale + Hold-out -> 'exhale'); Slowing Down follows the paced art's
   // breathPhaseRef (the phase to breathe now). null = both tertiary.
+  // Box Breathing caption clock: phase index (0 Inhale, 1 Hold-in, 2 Exhale,
+  // 3 Hold-out) and progress 0-1 through it, or null before the paced part.
+  const boxPhaseNow = useCallback(() => {
+    if (!boxCaptionsStartedRef.current) return null
+    const interval = Math.max(0.05, spawnIntervalRef.current)
+    const elapsed = Math.max(0, (performance.now() - boxClockStartRef.current) / 1000)
+    const inCycle = elapsed % (4 * interval)
+    const index = Math.floor(inCycle / interval)
+    return { index, t: (inCycle - index * interval) / interval }
+  }, [])
+
+  // Slowing Down's paced phase ('inhale'/'exhale'), or null before the paced art.
+  const slowingPhaseNow = useCallback(() => {
+    if (!gatesEnabledRef.current || pacedCueStageRef.current === 'off') return null
+    return breathPhaseRef.current === 'inhale' || breathPhaseRef.current === 'exhale' ? breathPhaseRef.current : null
+  }, [])
+
   const getLabelPhase = useCallback(() => {
     if (mode === 'box') {
-      if (!boxCaptionsStartedRef.current) return null
-      const interval = Math.max(0.05, spawnIntervalRef.current)
-      const elapsed = Math.max(0, (performance.now() - boxClockStartRef.current) / 1000)
-      return Math.floor((elapsed % (4 * interval)) / interval) < 2 ? 'inhale' : 'exhale'
+      const p = boxPhaseNow()
+      return p === null ? null : p.index < 2 ? 'inhale' : 'exhale'
+    }
+    if (mode === 'slowing') return slowingPhaseNow()
+    return null
+  }, [mode, boxPhaseNow, slowingPhaseNow])
+
+  // Paced audio pair: 0 exhale -> 1 inhale following the app's paced breath
+  // (Box: eased over Inhale/Exhale, held through the Holds; Slowing Down:
+  // eased over each paced phase's duration), or null = silent.
+  const paceAudioPhaseRef = useRef({ phase: null, start: 0 })
+  const getPaceProgress = useCallback(() => {
+    if (mode === 'box') {
+      const p = boxPhaseNow()
+      if (p === null) return null
+      const e = THREE.MathUtils.smoothstep(p.t, 0, 1)
+      return [e, 1, 1 - e, 0][p.index]
     }
     if (mode === 'slowing') {
-      if (!gatesEnabledRef.current || pacedCueStageRef.current === 'off') return null
-      return breathPhaseRef.current === 'inhale' || breathPhaseRef.current === 'exhale' ? breathPhaseRef.current : null
+      const phase = slowingPhaseNow()
+      const track = paceAudioPhaseRef.current
+      if (phase === null) { track.phase = null; return null }
+      const now = performance.now() / 1000
+      if (phase !== track.phase) { track.phase = phase; track.start = now }
+      const d = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
+      const dur = Math.max(0.05, phase === 'inhale' ? d.inhaleDuration : d.exhaleDuration)
+      const e = THREE.MathUtils.smoothstep((now - track.start) / dur, 0, 1)
+      return phase === 'inhale' ? e : 1 - e
     }
     return null
-  }, [mode])
+  }, [mode, boxPhaseNow, slowingPhaseNow])
 
   const showCountText = useCallback((text) => {
     clearTimeout(tutorialTimerRef.current)
@@ -1009,6 +1060,7 @@ export default function App() {
   // Left slider: kept working, but drives nothing for now (see breathRef).
   const setLeft = useCallback((v) => {
     leftVal.current = v
+    audioRef.current.setSlider(v)   // left slider drives the slider audio pair
   }, [])
 
   const setRight = useCallback((v) => {
@@ -1057,6 +1109,11 @@ export default function App() {
   }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, updatePacedText])
 
   const handleSelectMode = useCallback((m) => {
+    // Start/Restart taps: unlock and (re)start the breath audio.
+    audioGroupIndexRef.current = 0
+    audioRef.current.unlock()
+    audioRef.current.start(0)
+    audioRef.current.setSlider(leftVal.current)
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
     spawnIntervalRef.current = m === 'timed' ? 12 : m === 'box' ? 4 : 8
@@ -1143,6 +1200,7 @@ export default function App() {
   }, [mode, handleSelectMode])
 
   const handleBackFromExperience = useCallback(() => {
+    audioRef.current.stop()
     gatesEnabledRef.current = false
     pacedWaitForBottomRef.current = false
     countTutorialRef.current = { active: false, mode: null }
@@ -1232,6 +1290,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} />
+        <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}

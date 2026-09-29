@@ -66,6 +66,20 @@ The mappings below are for **Shape A** (`MorphA.jsx`). **Shape B** (`MorphB.jsx`
 - The left slider also exposes a raw (unclamped) ratio via `leftRawRef`, tracking the thumb's true position even past the slider's visual bounds — used by `SlowingDownController` for breath-cycle timing in "Slowing Down" mode.
 - **Slider Layout**: a persisted preference (`sliderLayout`, localStorage key `sliderLayout`, values `'vertical'`/`'diagonal'`, default `'vertical'`), chosen on the **Slider Layouts** screen (see Personalization system below). `'vertical'` renders `Sliders.jsx` (unchanged, described above); `'diagonal'` renders `SlidersDiagonal.jsx` — two curved "hook" tracks (an SVG circular-arc path per side) rendered near the bottom of the screen (`bottom: 16`, matching the Home/Restart nav), each a circular arc (even radius, `ARC_DEGREES` 60° of turn, radius ≈ 164px) rising near-vertically from a close-together exhale end at the bottom and bending outward (~62° at the top) to an inhale end inset from the screen edge (~136px from center); track 54px thick, thumb 60px; labels 22px bold in the live tertiary color (the phase to breathe now eases to the text color — see Color Palettes) — "inhale" centered above each thumb's top position (14px gap), "exhale" centered just below the tracks' bottom caps (6px gap); Home/Restart nav pinned to the bottom corners. Slider *value* semantics are identical regardless of layout (0/1 mean the same thing for `lv`/`rv` either way) — only the on-screen orientation changes. `useTouchSlider.js` takes a 3rd `orientation` param (`'vertical'` default, `'diagonal-left'`, `'diagonal-right'`) that changes how the ratio is computed from a drag point: `'vertical'` uses the single-axis `1 - (coord - start)/size` formula as before (on `clientY`/`rect.top`/`rect.height`); the two diagonal orientations normalize the raw `(clientX, clientY)` point into the track's local curve-box coordinates and call `projectToCurve` (from `diagonalCurveGeometry.js`) to find the nearest point on that side's arc, returning an arc-length fraction (0=exhale end, 1=inhale end) used as the ratio (mirrored for the right side). See `diagonalCurveGeometry.js` below for the curve math shared by rendering and hit-testing.
 
+## Audio (`breathAudio.js`)
+Two looping crossfade pairs, played with the Web Audio API (`createAudioEngine`; `audioRef` in App.jsx). Each file is a looping `AudioBufferSourceNode`, so loops are seamless, with its own gain. Each pair crossfades a↔b on an equal-power curve (`cos`/`sin`).
+- **Files:** `public/audio/<pair>_<group><a|b>.wav`.
+  - `pair` = `slider` (user-driven) or `pace` (app-paced breath); `a` = exhale/default, `b` = inhale.
+  - `group` = 1, 2, 3…; only complete a/b pairs are used.
+  - The file list is read at build time (`vite.config.js` defines `__AUDIO_FILES__`), so new groups need no code change.
+- **Slider pair:** follows the **left slider** (`setLeft` → `setSlider`, smoothstepped).
+- **Paced pair:** follows `getPaceProgress` (App.jsx), fed every frame by `PaceAudioDriver`:
+  - **Box Breathing** (from `startBoxArt`): the caption clock (`boxPhaseNow`). Values are Inhale eased 0→1, Hold-in 1, Exhale 1→0, Hold-out 0, so the holds keep looping b or a.
+  - **Slowing Down** (from `startPacedArt`): `breathPhaseRef`, eased over each phase's `computePhaseDurations` length.
+  - **Otherwise** (tutorial, Own Pace): `null`, which means silent. It fades in or out over `PACE_FADE_S` 2 s when the pace starts or stops.
+- **Groups:** each 5-breath palette change (`handleBreathPaletteCycle` → `setCycle`) moves each pair to its next group, wrapping around, with a `GROUP_FADE_S` 2 s crossfade. `audioGroupIndexRef` resets on Start/Restart.
+- **Start/stop:** the audio starts on the Start/Restart tap (`handleSelectMode` calls `unlock()` + `start(0)` inside the tap, as browser autoplay rules require) and fades out on Home (`handleBackFromExperience` → `stop()`).
+
 ## Morph material
 - Base color: `palette.tertiaryColor` (active Teal Palette: `#276d8c` blue-teal)
 - Emissive color: `palette.primaryColor` (active Teal Palette: `#8db1a1` sage green)
