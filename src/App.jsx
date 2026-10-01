@@ -62,7 +62,9 @@ const MODE_CAPTION_LINE_PX = 16
 // TEMP (testing): drive the paced audio pair from the right slider in every
 // mode instead of the app's pace. Set false to restore the paced behavior.
 const PACE_AUDIO_FROM_RIGHT_SLIDER = false
-const MODE_INTRO_MS = 10000  // mode explanation shown before each tutorial, then fades out (FADE_TRANSITION_MS)
+const MODE_INTRO_MS = 10000  // mode explanation shown before each tutorial, then fades out (MODE_INTRO_FADE_OUT_MS)
+const MODE_INTRO_FADE_OUT_MS = 4000
+const A1_FADE_IN_MS = 2000   // Diagonal Text A1's fade-in after the mode explanation
 const RIGHT_DEADBAND = 0.08
 const TARGET_STROKES_A = 4  // 2 full up+down oscillations
 const TARGET_STROKES_B = 6  // 3 full up+down oscillations
@@ -1180,12 +1182,22 @@ export default function App() {
       diagReversalCountRef.current = 0
       currentMainTextRef.current = TEXT_A1_DIAGONAL
       setTutorialText(TEXT_A1_DIAGONAL)
-      // Fade in (after the mode explanation); the first slider movement
-      // switches it to the slider-bound opacity (updateDiagonalSequence).
-      setTutorialFadeMs(DIAG_FADE_IN_MS)
-      setTutorialOpacity(null)
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
+      // Fade in over A1_FADE_IN_MS, multiplied by the slider-bound opacity
+      // (1 - breath) so moving a slider meanwhile doesn't pop it to full.
+      // Then 'A1' hands it to updateDiagonalSequence.
+      diagStageRef.current = 'A1-appear'
+      setTutorialOpacity(0)
+      const appearStart = performance.now()
+      const appearTick = () => {
+        if (diagStageRef.current !== 'A1-appear') return
+        const t = Math.min(1, (performance.now() - appearStart) / A1_FADE_IN_MS)
+        setTutorialOpacity(THREE.MathUtils.smoothstep(t, 0, 1) * (1 - breathRef.current))
+        if (t < 1) requestAnimationFrame(appearTick)
+        else diagStageRef.current = 'A1'
+      }
+      requestAnimationFrame(appearTick)
     } else {
       diagStageRef.current = 'done'
       setTutorialOpacity(null)
@@ -1220,9 +1232,10 @@ export default function App() {
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
       introTimerRef.current = setTimeout(() => {
+        setTutorialFadeMs(MODE_INTRO_FADE_OUT_MS)
         setTutorialVisible(false)
         tutorialVisibleRef.current = false
-        introTimerRef.current = setTimeout(beginTutorial, FADE_TRANSITION_MS)
+        introTimerRef.current = setTimeout(beginTutorial, MODE_INTRO_FADE_OUT_MS)
       }, MODE_INTRO_MS)
     } else {
       introActiveRef.current = false
