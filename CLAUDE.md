@@ -73,7 +73,7 @@ Two looping crossfade pairs, played with the Web Audio API (`createAudioEngine`;
   - `group` = 1, 2, 3…; only complete a/b pairs are used.
   - The file list is read at build time (`vite.config.js` defines `__AUDIO_FILES__`), so new groups need no code change.
 - **Slider pair:** follows the **left slider** (`setLeft` → `setSlider`, smoothstepped).
-- **Paced pair:** follows `getPaceProgress` (App.jsx), fed every frame by `PaceAudioDriver`:
+- **Paced pair:** currently off (`PACE_PAIR_ENABLED = false` in `breathAudio.js`; no `pace_*` files in `public/audio` either), so only the slider pair plays. When on, it follows `getPaceProgress` (App.jsx), fed every frame by `PaceAudioDriver`:
   - **Box Breathing** (from `startBoxArt`): the caption clock (`boxPhaseNow`). Values are Inhale eased 0→1, Hold-in 1, Exhale 1→0, Hold-out 0, so the holds keep looping b or a.
   - **Slowing Down** (from `startPacedArt`): `breathPhaseRef`, eased over each phase's `computePhaseDurations` length.
   - **Otherwise** (tutorial, Own Pace): `null`, which means silent. It fades in or out over `PACE_FADE_S` 2 s when the pace starts or stops.

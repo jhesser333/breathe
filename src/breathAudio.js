@@ -22,6 +22,8 @@ const PACE_FADE_S = 2             // paced pair fades in/out when the pace start
 const STOP_FADE_S = 0.5
 // TEMP (testing): false = the slider pair (left slider) is silent. Set true to restore.
 const SLIDER_PAIR_ENABLED = true
+// false = the paced pair is off (only the slider pair plays). Set true to restore.
+const PACE_PAIR_ENABLED = false
 const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context
 
 // { slider: [1, 2, ...], pace: [1, ...] } -- only groups with both a and b.
@@ -76,6 +78,7 @@ export function createAudioEngine() {
   // Build one pair's voices for a group, starting silent and fading in.
   function makeVoices(pair, cycleIndex, fadeS, levelTarget) {
     if (pair === 'slider' && !SLIDER_PAIR_ENABLED) return null
+    if (pair === 'pace' && !PACE_PAIR_ENABLED) return null
     const list = groups[pair]
     if (!list.length) return null
     const entry = list[cycleIndex % list.length]
