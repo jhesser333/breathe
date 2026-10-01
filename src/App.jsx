@@ -228,10 +228,10 @@ export default function App() {
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
   const [tutorialAtTop, setTutorialAtTop] = useState(false)   // mode explanation: shown up under the mode name
   const [shapeOption, setShapeOptionState] = useState(() => {
-    let saved = localStorage.getItem('shapeOption') || 'd'
+    let saved = localStorage.getItem('shapeOption') || 'b'
     // Rotating Rings (e) is hidden from Art Options; move anyone who last
     // picked it to the default so they aren't stuck on a shape with no card.
-    if (saved === 'e') saved = 'd'
+    if (saved === 'e') saved = 'b'
     return ['a', 'b', 'c', 'd', 'e'].includes(saved) ? saved : 'a'
   })
   const [sliderLayout, setSliderLayoutState] = useState(() => {

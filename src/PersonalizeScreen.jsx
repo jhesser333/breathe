@@ -29,11 +29,11 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         display: 'flex', flexDirection: 'column', gap: 16,
       }}>
-        <button style={optionBtn(shapeOption === 'd', palette)} onClick={() => onSelectShape('d')}>
-          <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Sphere that Disappears {shapeOption === 'd' && '✓'}</div>
-        </button>
         <button style={optionBtn(shapeOption === 'b', palette)} onClick={() => onSelectShape('b')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Cube with Targets {shapeOption === 'b' && '✓'}</div>
+        </button>
+        <button style={optionBtn(shapeOption === 'd', palette)} onClick={() => onSelectShape('d')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Sphere that Disappears {shapeOption === 'd' && '✓'}</div>
         </button>
       </div>
 

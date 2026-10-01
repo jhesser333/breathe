@@ -12,7 +12,7 @@ export const PASSCODE = 'j333'
 export const RESET_ON_UNLOCK = true
 export const TESTING_DEFAULTS = {
   selectedMode: 'box',     // Box Breathing
-  shapeOption: 'd',        // Morphing Sphere that Disappears
+  shapeOption: 'b',        // Morphing Cube with Targets
   sliderLayout: 'diagonal',
   targetPace: '5-5',       // Slowing Down: 5 in, 5 out
 }
