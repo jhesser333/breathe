@@ -4,7 +4,7 @@
 // characters (letters or digits); capitalization is ignored when checking.
 // Note: this keeps casual visitors out, but the code is readable in the
 // site's files -- it isn't real security.
-export const PASSCODE = 'j333'
+export const PASSCODE = 'DEMO'
 
 // Testing: when true, entering the code resets everyone to these settings,
 // whatever they picked before. Set to false to go back to remembering each

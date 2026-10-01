@@ -27,7 +27,7 @@ const PACE_PAIR_ENABLED = false
 // Per-file volume (1 = as exported). Lets a file be balanced without
 // re-exporting it. Names are case-insensitive.
 const FILE_GAIN = {
-  'slider_3a.wav': 2,      // doubled
+  'slider_1a.wav': 3,      // ~twice as loud to the ear (+9.5 dB)
   'slider_3b.wav': 0.75,   // 25% quieter
 }
 const fileGain = (f) => FILE_GAIN[f.toLowerCase()] ?? 1
