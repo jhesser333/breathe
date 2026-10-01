@@ -33,6 +33,10 @@ const REVERSAL_DEADBAND = 0.08           // same as MorphC
 const USER_APPEAR_S = 1
 const MAX_ALPHA = 0.5                    // MorphC's Count Cube material, in the secondary color
 const EMISSIVE = 4
+// Nested rounded cubes cover ~55% more of the screen than the nested ovoids
+// (flat faces fill the Morph's corners), so the same alpha reads as a solid,
+// overbright block. This scales their alpha to match the ovoids' look.
+const NEST_CUBE_ALPHA_MULT = 0.5
 
 // Sets take turns, one per 5-breath group, in this order.
 const SPHERE_SET = 0       // sphere tower
@@ -216,14 +220,14 @@ export function useBreathCountB(palette) {
   const total = COUNT * SET_COUNT
   const wrapperRefs = useMemo(() => Array.from({ length: total }, () => ({ current: null })), [total])
   const pieceRefs = useMemo(() => Array.from({ length: total }, () => ({ current: null })), [total])
-  const materials = useMemo(() => Array.from({ length: total }, () => new THREE.MeshStandardMaterial({
+  const materials = useMemo(() => Array.from({ length: total }, (_, i) => new THREE.MeshStandardMaterial({
     color: new THREE.Color(palette.secondaryColor),
     emissive: new THREE.Color(palette.secondaryColor),
     emissiveIntensity: EMISSIVE,
     roughness: 1,
     metalness: 0,
     transparent: true,
-    opacity: MAX_ALPHA,
+    opacity: MAX_ALPHA * (Math.floor(i / COUNT) === NEST_CUBE_SET ? NEST_CUBE_ALPHA_MULT : 1),
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: false,

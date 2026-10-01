@@ -28,7 +28,8 @@ const PACE_PAIR_ENABLED = false
 // re-exporting it. Names are case-insensitive.
 const FILE_GAIN = {
   'slider_1a.wav': 3,      // ~twice as loud to the ear (+9.5 dB)
-  'slider_3b.wav': 0.75,   // 25% quieter
+  'slider_3a.wav': 0.32,   // ~half as loud to the ear (-10 dB)
+  'slider_3b.wav': 0.24,   // was 0.75; ~half as loud again (-10 dB)
 }
 const fileGain = (f) => FILE_GAIN[f.toLowerCase()] ?? 1
 const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context

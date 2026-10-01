@@ -77,7 +77,7 @@ Two looping crossfade pairs, played with the Web Audio API (`createAudioEngine`;
   - **Box Breathing** (from `startBoxArt`): the caption clock (`boxPhaseNow`). Values are Inhale eased 0→1, Hold-in 1, Exhale 1→0, Hold-out 0, so the holds keep looping b or a.
   - **Slowing Down** (from `startPacedArt`): `breathPhaseRef`, eased over each phase's `computePhaseDurations` length.
   - **Otherwise** (tutorial, Own Pace): `null`, which means silent. It fades in or out over `PACE_FADE_S` 2 s when the pace starts or stops.
-- **Per-file volume:** `FILE_GAIN` in `breathAudio.js` scales individual files without re-exporting (currently slider_1a ×3, slider_3b ×0.75).
+- **Per-file volume:** `FILE_GAIN` in `breathAudio.js` scales individual files without re-exporting (currently slider_1a ×3, slider_3a ×0.32, slider_3b ×0.24).
 - **Groups:** each 5-breath palette change (`handleBreathPaletteCycle` → `setCycle`) moves each pair to its next group, wrapping around, with a `GROUP_FADE_S` 2 s crossfade. `audioGroupIndexRef` resets on Start/Restart.
 - **Start/stop:** the audio starts on the Start/Restart tap (`handleSelectMode` calls `unlock()` + `start(0)` inside the tap, as browser autoplay rules require) and fades out on Home (`handleBackFromExperience` → `stop()`).
 - **Staying alive:** iOS puts the context in `'interrupted'` (other browsers use `'suspended'`) when the phone locks or the tab goes to the background. `ensureRunning()` resumes it from any state that isn't running; if it's still not running `RESUME_CHECK_MS` 300 ms later, or is `'closed'`, it rebuilds the context and restarts the current group's voices. Decoded buffers are reused. Any `touchend`/`pointerup`/`keydown` while playing calls it, so touching a slider after returning restores the sound; `visibilitychange` also tries a resume.
@@ -175,7 +175,7 @@ Cube-only 5-breath count, driven by MorphB via `useBreathCountB`. It starts at t
   - 5 = **nested rings**: Pulse/Hold ring proportions (tube 0.045 on radius 1, `RING_TUBE`); set 2's nested sizes with #5's outer edge on the #5 ovoid, random appearance order, random Y angle, Y spin.
   - 6 = **circular-ring tower**: outer diameter 1.0 (the tower spheres'), same tower layout and X/Z offsets as set 0, Pulse/Hold proportions, random angles, spin on all axes.
   - Spins use `STACK_SPIN_SPEED` per axis. Shrink order: top-down (stack), largest first (nested ovoids/cubes), random otherwise.
-- **Material:** MorphC's Count Cube look: **secondary** color/emissive, emissive 4, alpha 0.5, additive, no depth test.
+- **Material:** MorphC's Count Cube look: **secondary** color/emissive, emissive 4, alpha 0.5, additive, no depth test. The nested rounded cubes (set 3) use half that alpha (`NEST_CUBE_ALPHA_MULT` 0.5): their flat faces cover ~55% more screen than the ovoids, so full alpha read as a solid, overbright block.
 - **Palette cycle:** the whole cube skin follows `livePaletteRef`: Morph (tertiary base, primary emissive), surface sparkles and count pieces (secondary), targets (secondary base, primary emissive), ties and target bursts (primary).
 
 ## Landscape (Shape B, Morphing Cube — `LandscapeB.jsx`)
