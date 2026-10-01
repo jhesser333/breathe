@@ -24,6 +24,13 @@ const STOP_FADE_S = 0.5
 const SLIDER_PAIR_ENABLED = true
 // false = the paced pair is off (only the slider pair plays). Set true to restore.
 const PACE_PAIR_ENABLED = false
+// Per-file volume (1 = as exported). Lets a file be balanced without
+// re-exporting it. Names are case-insensitive.
+const FILE_GAIN = {
+  'slider_3a.wav': 2,      // doubled
+  'slider_3b.wav': 0.75,   // 25% quieter
+}
+const fileGain = (f) => FILE_GAIN[f.toLowerCase()] ?? 1
 const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context
 
 // { slider: [1, 2, ...], pace: [1, ...] } -- only groups with both a and b.
@@ -96,10 +103,11 @@ export function createAudioEngine() {
         src.buffer = buf
         src.loop = true
         const gain = ctx.createGain()
-        gain.gain.value = side === 'a' ? crossA(pair) : crossB(pair)
+        const trim = fileGain(entry[side])
+        gain.gain.value = (side === 'a' ? crossA(pair) : crossB(pair)) * trim
         src.connect(gain).connect(level)
         src.start()
-        voices[side] = { src, gain }
+        voices[side] = { src, gain, trim }
       })
     }
     return voices
@@ -129,8 +137,8 @@ export function createAudioEngine() {
     const voices = current[pair]
     if (!ctx || !voices) return
     const t = ctx.currentTime
-    if (voices.a) voices.a.gain.gain.setTargetAtTime(crossA(pair), t, SMOOTHING_S)
-    if (voices.b) voices.b.gain.gain.setTargetAtTime(crossB(pair), t, SMOOTHING_S)
+    if (voices.a) voices.a.gain.gain.setTargetAtTime(crossA(pair) * voices.a.trim, t, SMOOTHING_S)
+    if (voices.b) voices.b.gain.gain.setTargetAtTime(crossB(pair) * voices.b.trim, t, SMOOTHING_S)
   }
 
   function setPaceLevel(on) {
