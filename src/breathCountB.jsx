@@ -33,10 +33,11 @@ const REVERSAL_DEADBAND = 0.08           // same as MorphC
 const USER_APPEAR_S = 1
 const MAX_ALPHA = 0.5                    // MorphC's Count Cube material, in the secondary color
 const EMISSIVE = 4
-// Nested rounded cubes cover ~55% more of the screen than the nested ovoids
-// (flat faces fill the Morph's corners), so the same alpha reads as a solid,
-// overbright block. This scales their alpha to match the ovoids' look.
-const NEST_CUBE_ALPHA_MULT = 0.5
+// Count pieces glow additively in the palette's secondary color. Most
+// palettes' secondaries are dark (luminance ~0.03); a light one (Light Blue's
+// #a9bf8b, ~0.48) would read as a solid, overbright block. Alpha scales by
+// REF_LUMINANCE / luminance, capped at 1, so dark palettes are unchanged.
+const REF_LUMINANCE = 0.035
 
 // Sets take turns, one per 5-breath group, in this order.
 const SPHERE_SET = 0       // sphere tower
@@ -220,14 +221,14 @@ export function useBreathCountB(palette) {
   const total = COUNT * SET_COUNT
   const wrapperRefs = useMemo(() => Array.from({ length: total }, () => ({ current: null })), [total])
   const pieceRefs = useMemo(() => Array.from({ length: total }, () => ({ current: null })), [total])
-  const materials = useMemo(() => Array.from({ length: total }, (_, i) => new THREE.MeshStandardMaterial({
+  const materials = useMemo(() => Array.from({ length: total }, () => new THREE.MeshStandardMaterial({
     color: new THREE.Color(palette.secondaryColor),
     emissive: new THREE.Color(palette.secondaryColor),
     emissiveIntensity: EMISSIVE,
     roughness: 1,
     metalness: 0,
     transparent: true,
-    opacity: MAX_ALPHA * (Math.floor(i / COUNT) === NEST_CUBE_SET ? NEST_CUBE_ALPHA_MULT : 1),
+    opacity: MAX_ALPHA,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: false,
@@ -362,7 +363,10 @@ export function useBreathCountB(palette) {
 
     if (livePaletteRef && livePaletteRef.current) {
       const live = livePaletteRef.current
-      materials.forEach((m) => { m.color.copy(live.secondary); m.emissive.copy(live.secondary) })
+      const c = live.secondary
+      const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b   // live colors are linear
+      const alpha = MAX_ALPHA * Math.min(1, REF_LUMINANCE / Math.max(lum, 1e-4))
+      materials.forEach((m) => { m.color.copy(c); m.emissive.copy(c); m.opacity = alpha })
     }
   }
 

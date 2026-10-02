@@ -175,7 +175,7 @@ Cube-only 5-breath count, driven by MorphB via `useBreathCountB`. It starts at t
   - 5 = **nested rings**: Pulse/Hold ring proportions (tube 0.045 on radius 1, `RING_TUBE`); set 2's nested sizes with #5's outer edge on the #5 ovoid, random appearance order, random Y angle, Y spin.
   - 6 = **circular-ring tower**: outer diameter 1.0 (the tower spheres'), same tower layout and X/Z offsets as set 0, Pulse/Hold proportions, random angles, spin on all axes.
   - Spins use `STACK_SPIN_SPEED` per axis. Shrink order: top-down (stack), largest first (nested ovoids/cubes), random otherwise.
-- **Material:** MorphC's Count Cube look: **secondary** color/emissive, emissive 4, alpha 0.5, additive, no depth test. The nested rounded cubes (set 3) use half that alpha (`NEST_CUBE_ALPHA_MULT` 0.5): their flat faces cover ~55% more screen than the ovoids, so full alpha read as a solid, overbright block.
+- **Material:** MorphC's Count Cube look: **secondary** color/emissive, emissive 4, alpha 0.5, additive, no depth test. Alpha is scaled by `REF_LUMINANCE` 0.035 ÷ the live secondary's luminance (capped at 1): dark-secondary palettes are unchanged, and Light Blue's light secondary (#a9bf8b) is dimmed to match instead of reading as a solid, overbright block.
 - **Palette cycle:** the whole cube skin follows `livePaletteRef`: Morph (tertiary base, primary emissive), surface sparkles and count pieces (secondary), targets (secondary base, primary emissive), ties and target bursts (primary).
 
 ## Landscape (Shape B, Morphing Cube — `LandscapeB.jsx`)
