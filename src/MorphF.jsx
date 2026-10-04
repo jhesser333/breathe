@@ -6,7 +6,7 @@ import { RoundedBox } from '@react-three/drei'
 const BASKET_SIZE = 0.1
 const BASKET_RADIUS = 0.02
 const ENVELOPE_RADIUS = 0.1875
-const ENVELOPE_GAP = 0.15  // basket top -> envelope bottom
+const ENVELOPE_GAP = 0.075 // basket top -> envelope bottom (0.3 world at BALLOON_SCALE 4)
 const BALLOON_SCALE = 4    // scales the basket and, through it, the whole balloon
 
 export default function MorphF({ palette }) {
