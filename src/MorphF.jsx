@@ -11,8 +11,8 @@ const BASKET_SIZE = 0.1
 const BASKET_RADIUS = 0.02
 const BALLOON_SCALE = 3    // scales the basket and, through it, the whole balloon
 // Envelope sizes are given in world units and divided down to the basket's local space
-const ENVELOPE_RADIUS = 1 / BALLOON_SCALE
-const ENVELOPE_GAP = 0.5 / BALLOON_SCALE   // basket top -> envelope bottom
+const ENVELOPE_RADIUS = 0.8 / BALLOON_SCALE
+const ENVELOPE_GAP = 0.3 / BALLOON_SCALE   // basket top -> envelope bottom
 
 // Exhale (slider bottom) -> Inhale (slider top)
 const EXHALE_BASKET_Y = -2
