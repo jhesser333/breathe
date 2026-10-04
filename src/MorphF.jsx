@@ -7,10 +7,11 @@ const BASKET_SIZE = 0.1
 const BASKET_RADIUS = 0.02
 const ENVELOPE_RADIUS = 0.25
 const ENVELOPE_GAP = 0.2   // basket top -> envelope bottom
+const BALLOON_SCALE = 2    // scales the basket and, through it, the whole balloon
 
 export default function MorphF({ palette }) {
   return (
-    <RoundedBox args={[BASKET_SIZE, BASKET_SIZE, BASKET_SIZE]} radius={BASKET_RADIUS} position={[0, 0, 0]}>
+    <RoundedBox args={[BASKET_SIZE, BASKET_SIZE, BASKET_SIZE]} radius={BASKET_RADIUS} position={[0, 0, 0]} scale={BALLOON_SCALE}>
       <meshStandardMaterial color={palette.primaryColor} />
       {/* Envelope pivot sits at the sphere's bottom */}
       <group position={[0, BASKET_SIZE / 2 + ENVELOPE_GAP, 0]}>
