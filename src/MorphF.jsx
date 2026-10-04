@@ -5,9 +5,9 @@ import { RoundedBox } from '@react-three/drei'
 // drive or pace art yet; slider props are accepted and ignored.
 const BASKET_SIZE = 0.1
 const BASKET_RADIUS = 0.02
-const ENVELOPE_RADIUS = 0.25
-const ENVELOPE_GAP = 0.2   // basket top -> envelope bottom
-const BALLOON_SCALE = 2    // scales the basket and, through it, the whole balloon
+const ENVELOPE_RADIUS = 0.1875
+const ENVELOPE_GAP = 0.15  // basket top -> envelope bottom
+const BALLOON_SCALE = 4    // scales the basket and, through it, the whole balloon
 
 export default function MorphF({ palette }) {
   return (
