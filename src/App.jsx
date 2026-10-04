@@ -6,6 +6,7 @@ import LandscapeB from './LandscapeB'
 import MorphB from './MorphB'
 import MorphC from './MorphC'
 import MorphE from './MorphE'
+import MorphF from './MorphF'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import GatesC from './GatesC'
@@ -86,6 +87,7 @@ const CAMERA_BY_SHAPE = {
   c: { position: [0, 3.5, 5], fov: 50 },
   d: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
+  f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },   // same as the Sphere Morph (d)
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
@@ -234,7 +236,7 @@ export default function App() {
     // Rotating Rings (e) is hidden from Art Options; move anyone who last
     // picked it to the default so they aren't stuck on a shape with no card.
     if (saved === 'e') saved = 'b'
-    return ['a', 'b', 'c', 'd', 'e'].includes(saved) ? saved : 'a'
+    return ['a', 'b', 'c', 'd', 'e', 'f'].includes(saved) ? saved : 'a'
   })
   const [sliderLayout, setSliderLayoutState] = useState(() => {
     const saved = localStorage.getItem('sliderLayout') || 'vertical'
@@ -1337,7 +1339,7 @@ export default function App() {
     )
   }
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
-  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : MorphA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : MorphA
   const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
   const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
@@ -1353,7 +1355,7 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} />
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} />
-        {shapeOption === 'd' && <CameraVerticalShift />}
+        {(shapeOption === 'd' || shapeOption === 'f') && <CameraVerticalShift />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
@@ -1365,7 +1367,7 @@ export default function App() {
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
-        {hasGates && mode !== 'box' && (
+        {hasGates && mode !== 'box' && shapeOption !== 'f' && (
           <GatesComponent
             rightVal={rightVal}
             gatesEnabledRef={gatesEnabledRef}
@@ -1380,7 +1382,7 @@ export default function App() {
             startOnInhale={mode === 'slowing'}
           />
         )}
-        {mode === 'box' && hasGates && (
+        {mode === 'box' && hasGates && shapeOption !== 'f' && (
           <BoxGatesComponent
             rightVal={rightVal}
             gatesEnabledRef={gatesEnabledRef}

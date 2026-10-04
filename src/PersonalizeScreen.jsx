@@ -35,6 +35,9 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         <button style={optionBtn(shapeOption === 'd', palette)} onClick={() => onSelectShape('d')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Morphing Sphere that Disappears {shapeOption === 'd' && '✓'}</div>
         </button>
+        <button style={optionBtn(shapeOption === 'f', palette)} onClick={() => onSelectShape('f')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Hot Air Balloon (in-progress) {shapeOption === 'f' && '✓'}</div>
+        </button>
       </div>
 
       <div style={{
