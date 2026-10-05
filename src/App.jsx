@@ -87,7 +87,7 @@ const CAMERA_BY_SHAPE = {
   c: { position: [0, 3.5, 5], fov: 50 },
   d: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
-  f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },   // same as the Sphere Morph (d)
+  f: { position: [0, 1, 12], rotation: [0, 0, 0], fov: 50 },   // Sphere Morph's (d), raised 1 to follow the balloon's +1 Y range
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
