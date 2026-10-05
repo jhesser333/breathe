@@ -13,21 +13,24 @@ const EXTRA_HEIGHT_FRACTION = 0.6  // how much taller the virtual frame is than 
 const SHIFT_FRACTION = 0.65        // how much of that headroom to use (0 = centered/no shift, 1 = maximum downward crop)
 const EXTRA_SHIFT_PX = 24          // additional fixed rise in CSS px (~1/4 inch) on top of SHIFT_FRACTION
 
-export default function CameraVerticalShift() {
+// lowerWorldUnits: shifts the crop back up so the z=0 plane appears this many
+// world units lower on screen than the default crop (exact for objects at z=0).
+export default function CameraVerticalShift({ lowerWorldUnits = 0 }) {
   const { camera, size } = useThree()
 
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera)) return
     const fullHeight = size.height * (1 + EXTRA_HEIGHT_FRACTION)
     const extra = fullHeight - size.height
-    const yOffset = Math.min(extra, extra * SHIFT_FRACTION + EXTRA_SHIFT_PX)
+    const pxPerUnit = fullHeight / (2 * Math.abs(camera.position.z) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2))
+    const yOffset = THREE.MathUtils.clamp(extra * SHIFT_FRACTION + EXTRA_SHIFT_PX - lowerWorldUnits * pxPerUnit, 0, extra)
     camera.setViewOffset(size.width, fullHeight, 0, yOffset, size.width, size.height)
     camera.updateProjectionMatrix()
     return () => {
       camera.clearViewOffset()
       camera.updateProjectionMatrix()
     }
-  }, [camera, size])
+  }, [camera, size, lowerWorldUnits])
 
   return null
 }

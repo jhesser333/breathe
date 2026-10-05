@@ -87,7 +87,7 @@ const CAMERA_BY_SHAPE = {
   c: { position: [0, 3.5, 5], fov: 50 },
   d: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
-  f: { position: [0, 1, 12], rotation: [0, 0, 0], fov: 50 },   // Sphere Morph's (d), raised 1 to follow the balloon's +1 Y range
+  f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },   // same as the Sphere Morph (d)
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
@@ -1355,7 +1355,8 @@ export default function App() {
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} />
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} />
-        {(shapeOption === 'd' || shapeOption === 'f') && <CameraVerticalShift />}
+        {shapeOption === 'd' && <CameraVerticalShift />}
+        {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={1} />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
