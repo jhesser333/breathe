@@ -87,7 +87,7 @@ const CAMERA_BY_SHAPE = {
   c: { position: [0, 3.5, 5], fov: 50 },
   d: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
-  f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 100 },  // Sphere Morph's (d) placement, wider fov
+  f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 135 },  // Sphere Morph's (d) placement, wider fov
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
