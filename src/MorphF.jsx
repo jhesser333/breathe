@@ -9,10 +9,10 @@ import * as THREE from 'three'
 // inhale/top). No pace art yet.
 const BASKET_SIZE = 0.1
 const BASKET_RADIUS = 0.02
-const BALLOON_SCALE = 3    // scales the basket and, through it, the whole balloon
-// Envelope sizes are given in world units and divided down to the basket's local space
-const ENVELOPE_RADIUS = 0.8 / BALLOON_SCALE
-const ENVELOPE_GAP = 0.3 / BALLOON_SCALE   // basket top -> envelope bottom
+const BALLOON_SCALE = 4    // scales the basket and, through it, the whole balloon
+// Envelope sizes in the basket's local (unscaled) space; world size = value x BALLOON_SCALE
+const ENVELOPE_RADIUS = 0.8 / 3
+const ENVELOPE_GAP = 0.3 / 3   // basket top -> envelope bottom
 
 // Exhale (slider bottom) -> Inhale (slider top)
 const EXHALE_BASKET_Y = -3
