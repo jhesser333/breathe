@@ -15,8 +15,8 @@ const ENVELOPE_RADIUS = 0.8 / BALLOON_SCALE
 const ENVELOPE_GAP = 0.3 / BALLOON_SCALE   // basket top -> envelope bottom
 
 // Exhale (slider bottom) -> Inhale (slider top)
-const EXHALE_BASKET_Y = -1
-const INHALE_BASKET_Y = 1
+const EXHALE_BASKET_Y = -3
+const INHALE_BASKET_Y = 3
 const EXHALE_ENVELOPE_SCALE = [0.2, 1, 0.2]
 const INHALE_ENVELOPE_SCALE = [1, 1, 1]
 
