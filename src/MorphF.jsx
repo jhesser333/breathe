@@ -16,7 +16,7 @@ const ENVELOPE_GAP = 0.3 / 3   // basket top -> envelope bottom
 
 // Exhale (slider bottom) -> Inhale (slider top)
 const EXHALE_BASKET_Y = -8
-const INHALE_BASKET_Y = 6
+const INHALE_BASKET_Y = 8
 const EXHALE_ENVELOPE_SCALE = [0.4, 2, 0.4]
 const INHALE_ENVELOPE_SCALE = [1, 1, 1]
 
