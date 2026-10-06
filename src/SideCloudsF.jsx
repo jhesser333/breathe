@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { makeCloud, applyCloud, CLOUD_MESH_COUNT, EMISSIVE_INTENSITY } from './cloudShapeF'
 
 // Shape F (Hot Air Balloon): side clouds, scenery like the cube's landscape.
-// A row on each side (X -20 / +20, y -12) drifts toward the camera at half the
+// A row on each side (X -20 / +20, y -10) drifts toward the camera at half the
 // gate clouds' speed, one new random cloud (cloudShapeF's makeCloud) every
 // SPACING units per side. The slider blows them around: Inhale slides them in
 // to X -10 / +10, Exhale back out to -20 / +20. Each cloud follows the slider
@@ -14,9 +14,9 @@ const POOL = 16
 const SPAWN_Z = -30
 const DESPAWN_Z = 14          // just behind the camera (z 12)
 const SPACING = 10            // gate clouds' Exhale -> Inhale spacing (Slowing Down)
-const Y = -12
+const Y = -10
 const SIDE_OPACITY = 0.3
-const CLOUD_SCALE = 2       // whole cloud (parent and children) scaled up
+const CLOUD_SCALE = [4, 1, 4]   // whole cloud (parent and children): wide and flat
 const EXHALE_X = 20
 const INHALE_X = 10
 const FADE_S = 1
