@@ -15,6 +15,7 @@ const SPAWN_Z = -30
 const DESPAWN_Z = 14          // just behind the camera (z 12)
 const SPACING = 10            // gate clouds' Exhale -> Inhale spacing (Slowing Down)
 const Y = -6
+const CLOUD_SCALE = 3       // whole cloud (parent and children) scaled up
 const EXHALE_X = 20
 const INHALE_X = 10
 const FADE_S = 1
@@ -120,7 +121,7 @@ export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, livePalet
   return (
     <>
       {Array.from({ length: POOL }, (_, i) => (
-        <group key={i} ref={(el) => { groupRefs.current[i] = el }} visible={false}>
+        <group key={i} ref={(el) => { groupRefs.current[i] = el }} visible={false} scale={CLOUD_SCALE}>
           {Array.from({ length: CLOUD_MESH_COUNT }, (_, k) => (
             <mesh key={k} ref={(el) => { meshRefs.current[i][k] = el }} geometry={geometry} material={materials[i]} />
           ))}
