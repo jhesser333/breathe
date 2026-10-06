@@ -35,8 +35,8 @@ const USER_APPEAR_S = 1
 const MAX_ALPHA = 0.5                    // MorphC's Count Cube material, in the secondary color
 const EMISSIVE = 4
 // Count pieces glow additively in the palette's secondary color. Most
-// palettes' secondaries are dark (luminance ~0.03); a light one (Light Blue's
-// #a9bf8b, ~0.48) would read as a solid, overbright block. Alpha scales by
+// palettes' secondaries are dark (luminance ~0.03); a lighter one (Light Blue's
+// #526539, ~0.11) would read as a solid, overbright block. Alpha scales by
 // REF_LUMINANCE / luminance, capped at 1, so dark palettes are unchanged.
 const REF_LUMINANCE = 0.035
 

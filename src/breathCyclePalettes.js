@@ -37,7 +37,7 @@ export const YELLOW_OCHRE = {
 export const LIGHT_BLUE = {
   tertiaryColor: '#305173',
   primaryColor: '#358aff',
-  secondaryColor: '#a9bf8b',
+  secondaryColor: '#526539',
   background: '#0a1712',
   textColor: '#e3d299',
 }
