@@ -2,13 +2,13 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
-import { useBreathCountB, COUNT_INHALE_SCALE } from './breathCountB'
+import { useBreathCountF } from './breathCountF'
 import { EXHALE_OPACITY } from './cubeMaterialB'
 
 // Shape F: Hot Air Balloon (in-progress). Simplified balloon -- a small
 // rounded basket cube with the envelope sphere parented to it. Driven by the
 // right slider via `leftVal` (App passes breathRef: 0 exhale/bottom -> 1
-// inhale/top). The cube Morph's 5-breath count (breathCountB) sits inside the
+// inhale/top). The balloon's own 5-breath count (breathCountF) sits inside the
 // envelope and travels/squashes with it.
 const BASKET_SIZE = 0.1
 const BASKET_RADIUS = 0.02
@@ -29,14 +29,13 @@ const INHALE_BASKET_Y = 8
 const EXHALE_ENVELOPE_SCALE = [0.3, 2, 0.3]
 const INHALE_ENVELOPE_SCALE = [1.5, 1, 1.25]
 
-// Count pieces: the cube's layouts (made for its Inhale box, half-extents
-// COUNT_INHALE_SCALE / 2) scaled up uniformly by COUNT_FIT, the largest that
-// keeps that box inside the Inhale envelope, with a small margin.
+// Count pieces (breathCountF) are laid out in world units at full Inhale,
+// inside the envelope's Inhale ellipsoid (world half-extents below). The
+// count group's local scale cancels the basket and Inhale envelope scales, so
+// its local units are those world units at Inhale; at Exhale the pieces
+// squash with the envelope.
 const ENVELOPE_INHALE_HALF = INHALE_ENVELOPE_SCALE.map((v) => v * ENVELOPE_RADIUS * BALLOON_SCALE)
-const COUNT_FIT = 0.97 / Math.hypot(...COUNT_INHALE_SCALE.map((v, a) => (v / 2) / ENVELOPE_INHALE_HALF[a]))
-// Local scale of the count group (inside basket x envelope), so pieces are
-// the cube's layouts x COUNT_FIT at full Inhale and squash with the envelope.
-const COUNT_GROUP_SCALE = COUNT_INHALE_SCALE.map((v, a) => COUNT_FIT * v / (BALLOON_SCALE * INHALE_ENVELOPE_SCALE[a]))
+const COUNT_GROUP_SCALE = INHALE_ENVELOPE_SCALE.map((v) => 1 / (BALLOON_SCALE * v))
 
 export default function MorphF({ leftVal, rightVal, palette, breathCountingEnabledRef, breathCountSourceRef, livePaletteRef, onBreathPaletteCycle, onBreathCountEvent, landscapeIndexRef }) {
   const basketRef = useRef()
@@ -59,7 +58,7 @@ export default function MorphF({ leftVal, rightVal, palette, breathCountingEnabl
   }), [palette])
   useEffect(() => () => { basketMaterial.dispose(); envelopeMaterial.dispose(); shellMaterial.dispose() }, [basketMaterial, envelopeMaterial, shellMaterial])
 
-  const breathCount = useBreathCountB(palette)
+  const breathCount = useBreathCountF(palette, ENVELOPE_INHALE_HALF)
 
   useFrame((state) => {
     const now = state.clock.elapsedTime
