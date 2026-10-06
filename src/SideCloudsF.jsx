@@ -20,6 +20,9 @@ const CLOUD_SCALE = [3, 1, 3]   // whole cloud (parent and children): wide and f
 const EXHALE_X = 20
 const INHALE_X = 10
 const FADE_S = 1
+// When the cloud gates start (gatesEnabledRef), every side cloud fades out
+// over HIDE_FADE_S, then they stay hidden for the rest of the session.
+const HIDE_FADE_S = 2
 const SLIDE_DELAY_S = 1       // delay of the farthest clouds (SPAWN_Z); nearest 0
 const HISTORY_S = SLIDE_DELAY_S + 0.5
 // Half the gate clouds' travel per interval: Box 6 -> 3, others 20 -> 10.
@@ -29,7 +32,7 @@ const OWN_PACE_INTERVAL = 12
 
 const makeSlot = () => ({ active: false, side: 1, z: 0, born: 0, cloud: makeCloud() })
 
-export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, livePaletteRef, palette }) {
+export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, gatesEnabledRef, livePaletteRef, palette }) {
   const slots = useRef(Array.from({ length: POOL }, makeSlot))
   const groupRefs = useRef([])
   const meshRefs = useRef(Array.from({ length: POOL }, () => []))
@@ -48,6 +51,8 @@ export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, livePalet
 
   const travelRef = useRef(0)
   const filled = useRef(false)
+  const hideStartRef = useRef(null)   // time the cloud gates started
+  const hiddenRef = useRef(false)
   // Eased slider history: [time, lv] samples, oldest first.
   const history = useRef([])
 
@@ -75,6 +80,14 @@ export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, livePalet
 
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
+    if (hiddenRef.current) return
+    if (hideStartRef.current === null && gatesEnabledRef && gatesEnabledRef.current) hideStartRef.current = now
+    const hideFade = hideStartRef.current === null ? 1 : 1 - THREE.MathUtils.smoothstep((now - hideStartRef.current) / HIDE_FADE_S, 0, 1)
+    if (hideFade <= 0) {
+      hiddenRef.current = true
+      groupRefs.current.forEach((g) => { if (g) g.visible = false })
+      return
+    }
 
     const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
     history.current.push([now, lv])
@@ -114,7 +127,7 @@ export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, livePalet
       g.position.set(o.side * THREE.MathUtils.lerp(EXHALE_X, INHALE_X, v), Y, o.z)
 
       const m = materials[i]
-      m.opacity = SIDE_OPACITY * THREE.MathUtils.smoothstep((now - o.born) / FADE_S, 0, 1)
+      m.opacity = SIDE_OPACITY * hideFade * THREE.MathUtils.smoothstep((now - o.born) / FADE_S, 0, 1)
       if (live) { m.color.copy(live.tertiary); m.emissive.copy(live.tertiary) }
     })
   })
