@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGateBurstB, isSuccess, missFactor, CUBE_INHALE_MAX_ABS_X } from './gateReactionsB'
-import { makeCloud, applyCloud, sampleCloudSurface, cloudMaxAbsX, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S } from './cloudShapeF'
+import { makeCloud, applyCloud, sampleCloudSurface, cloudMaxAbsX, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S, CLOUD_BURST_SIZE, randomCloudX } from './cloudShapeF'
 
 // Shape F (Hot Air Balloon), Slowing Down / Paced: cloud gates with GatesB's
 // timing (no ties). Exhale clouds spawn at SPAWN_Z every interval; each one
@@ -14,7 +14,7 @@ const SPAWN_Z = -20
 const GATE_B_FADE_Z = -20
 const DESPAWN_Z = 6
 const EXHALE_Y = 8
-const INHALE_Y = 0
+const INHALE_Y = -4
 
 // Same as GatesB: the Inhale cloud arrives `inhale` seconds after the Exhale
 // cloud it spawns with (ratio 1.5 outside Slowing Down's ramp).
@@ -27,7 +27,7 @@ function computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef) {
 }
 
 function makeSlot() {
-  return { active: false, type: 'exhale', z: 0, speed: 0, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, cloud: makeCloud() }
+  return { active: false, x: 0, type: 'exhale', z: 0, speed: 0, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, cloud: makeCloud() }
 }
 
 export default function GatesF({ gatesEnabledRef, spawnIntervalRef, palette, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, rightVal, livePaletteRef, paceProgressRef, startOnInhale = false }) {
@@ -40,7 +40,7 @@ export default function GatesF({ gatesEnabledRef, spawnIntervalRef, palette, bre
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials])
 
-  const gateBurst = useGateBurstB(palette.primaryColor)
+  const gateBurst = useGateBurstB(palette.primaryColor, CLOUD_BURST_SIZE)
 
   // Paced breath progress (paceProgressRef, 0 exhale -> 1 inhale): 1 as each
   // Inhale cloud passes, 0 as each Exhale cloud passes, ramping between them
@@ -67,7 +67,7 @@ export default function GatesF({ gatesEnabledRef, spawnIntervalRef, palette, bre
       const i = slots.current.findIndex((s) => !s.active)
       if (i === -1) return
       const s = slots.current[i]
-      Object.assign(s, makeSlot(), { active: true, type, z, speed })
+      Object.assign(s, makeSlot(), { active: true, type, z, speed, x: randomCloudX() })
       applyCloud(meshRefs.current[i], s.cloud)
     }
     const spawnA = () => {
@@ -107,8 +107,8 @@ export default function GatesF({ gatesEnabledRef, spawnIntervalRef, palette, bre
           const maxX = cloudMaxAbsX(s.cloud)
           gateBurst.burstFrom(() => {
             const p = sampleCloudSurface(s.cloud)
-            return [p[0], p[1] + y, p[2] + z]
-          }, maxX, now, maxX / CUBE_INHALE_MAX_ABS_X)   // speed scaled to the cloud's size
+            return [p[0] + s.x, p[1] + y, p[2] + z]
+          }, maxX, now, maxX / CUBE_INHALE_MAX_ABS_X, s.x)   // speed scaled to the cloud's size
         } else {
           s.missElapsed = 0
         }
@@ -126,7 +126,7 @@ export default function GatesF({ gatesEnabledRef, spawnIntervalRef, palette, bre
       s.fadeElapsed += delta
       if (s.missElapsed != null) s.missElapsed += delta
       applyCloudLook(materials[i], s.z, s.fadeElapsed, s.judgedElapsed, missFactor(s.missElapsed), live)
-      group.position.set(0, s.type === 'exhale' ? EXHALE_Y : INHALE_Y, s.z)
+      group.position.set(s.x, s.type === 'exhale' ? EXHALE_Y : INHALE_Y, s.z)
       group.visible = true
     })
 

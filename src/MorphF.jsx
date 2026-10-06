@@ -26,8 +26,8 @@ const SHELL_RADIUS = ENVELOPE_RADIUS + SHELL_EXTRA / BALLOON_SCALE
 // Exhale (slider bottom) -> Inhale (slider top)
 const EXHALE_BASKET_Y = -8
 const INHALE_BASKET_Y = 8
-const EXHALE_ENVELOPE_SCALE = [0.4, 2, 0.4]
-const INHALE_ENVELOPE_SCALE = [1.25, 1, 1.25]
+const EXHALE_ENVELOPE_SCALE = [0.3, 2, 0.3]
+const INHALE_ENVELOPE_SCALE = [1.5, 1, 1.25]
 
 // Count pieces: the cube's layouts (made for its Inhale box, half-extents
 // COUNT_INHALE_SCALE / 2) scaled up uniformly by COUNT_FIT, the largest that

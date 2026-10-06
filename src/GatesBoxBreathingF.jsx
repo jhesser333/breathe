@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGateBurstB, isSuccess, missFactor, CUBE_INHALE_MAX_ABS_X } from './gateReactionsB'
-import { makeCloud, applyCloud, sampleCloudSurface, cloudMaxAbsX, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S } from './cloudShapeF'
+import { makeCloud, applyCloud, sampleCloudSurface, cloudMaxAbsX, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S, CLOUD_BURST_SIZE, randomCloudX } from './cloudShapeF'
 
 // Shape F (Hot Air Balloon), Box Breathing: cloud gates with
 // GatesBoxBreathingB's series timing -- N (= interval seconds) clouds per
@@ -14,10 +14,10 @@ const POOL_SIZE = 28
 const SPAWN_Z = -6
 const DESPAWN_Z = 6
 const EXHALE_Y = 8
-const INHALE_Y = 0
+const INHALE_Y = -4
 
 function makeSlot() {
-  return { active: false, type: 'inhale', z: 0, speed: 0, isFirst: false, isLast: false, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, hasTriggeredFirst: false, hasPreTriggeredLast: false, cloud: makeCloud() }
+  return { active: false, x: 0, type: 'inhale', z: 0, speed: 0, isFirst: false, isLast: false, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, hasTriggeredFirst: false, hasPreTriggeredLast: false, cloud: makeCloud() }
 }
 
 export default function GatesBoxBreathingF({ gatesEnabledRef, spawnIntervalRef, palette, onFirstGate, onLastGate, rightVal, livePaletteRef, boxProgressRef }) {
@@ -31,7 +31,7 @@ export default function GatesBoxBreathingF({ gatesEnabledRef, spawnIntervalRef, 
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials])
 
-  const gateBurst = useGateBurstB(palette.primaryColor)
+  const gateBurst = useGateBurstB(palette.primaryColor, CLOUD_BURST_SIZE)
 
   // Paced breath progress for the 5-breath count (boxProgressRef, same
   // meaning as GatesBoxBreathingB's).
@@ -52,7 +52,7 @@ export default function GatesBoxBreathingF({ gatesEnabledRef, spawnIntervalRef, 
         const i = ss.findIndex((s) => !s.active)
         if (i === -1) continue
         const s = ss[i]
-        Object.assign(s, makeSlot(), { active: true, type, z: SPAWN_Z - n * spacing, speed, isFirst: n === 0, isLast: n === N - 1 })
+        Object.assign(s, makeSlot(), { active: true, type, z: SPAWN_Z - n * spacing, speed, isFirst: n === 0, isLast: n === N - 1, x: randomCloudX() })
         applyCloud(meshRefs.current[i], s.cloud)
       }
     }
@@ -92,8 +92,8 @@ export default function GatesBoxBreathingF({ gatesEnabledRef, spawnIntervalRef, 
           const maxX = cloudMaxAbsX(s.cloud)
             gateBurst.burstFrom(() => {
               const p = sampleCloudSurface(s.cloud)
-              return [p[0], p[1] + y, p[2] + z]
-            }, maxX, now, maxX / CUBE_INHALE_MAX_ABS_X)   // speed scaled to the cloud's size
+              return [p[0] + s.x, p[1] + y, p[2] + z]
+            }, maxX, now, maxX / CUBE_INHALE_MAX_ABS_X, s.x)   // speed scaled to the cloud's size
           } else {
             s.missElapsed = 0
           }
@@ -107,7 +107,7 @@ export default function GatesBoxBreathingF({ gatesEnabledRef, spawnIntervalRef, 
 
         if (s.missElapsed != null) s.missElapsed += delta
         applyCloudLook(materials[i], s.z, s.fadeElapsed, s.judgedElapsed, missFactor(s.missElapsed), live)
-        g.position.set(0, y, s.z)
+        g.position.set(s.x, y, s.z)
         g.visible = true
       }
     } else {

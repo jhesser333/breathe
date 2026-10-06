@@ -13,6 +13,15 @@ export const CHILD_COUNT = 4
 export const EDGE_CHILD_COUNT = 2   // one at the furthest -X point, one at the furthest +X
 export const CLOUD_MESH_COUNT = 1 + CHILD_COUNT + EDGE_CHILD_COUNT   // parent + children
 export const EMISSIVE_INTENSITY = 4
+export const CLOUD_BURST_SIZE = 120   // burst particle size, 2x the cube targets' 60
+// Each cloud gets a random X offset: +-[CLOUD_X_MIN, CLOUD_X_MAX], never near the middle.
+export const CLOUD_X_MIN = 0.5
+export const CLOUD_X_MAX = 2
+
+export function randomCloudX() {
+  const side = Math.random() < 0.5 ? -1 : 1
+  return side * (CLOUD_X_MIN + Math.random() * (CLOUD_X_MAX - CLOUD_X_MIN))
+}
 export const OPACITY = 0.5
 
 function randScale([min, max]) {

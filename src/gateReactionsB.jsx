@@ -102,7 +102,8 @@ export function applyMissScale(mesh, f) {
 
 // Pooled burst particles. Returns the <points> element to render, burst() to
 // fire one target's burst, and tick() to advance time each frame.
-export function useGateBurstB(emissiveColor) {
+// size: point size (uSize); clouds use a larger one than the cube's targets.
+export function useGateBurstB(emissiveColor, size = GATE_BURST_SIZE) {
   const data = useMemo(() => {
     const geometry = new THREE.BufferGeometry()
     const positionAttr = new THREE.BufferAttribute(new Float32Array(GATE_BURST_POOL * 3), 3).setUsage(THREE.DynamicDrawUsage)
@@ -121,7 +122,7 @@ export function useGateBurstB(emissiveColor) {
 
   const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
-      uSize:  { value: GATE_BURST_SIZE },
+      uSize:  { value: size },
       uColor: { value: new THREE.Color(emissiveColor) },
       uTime:  { value: 0 },
     },
@@ -131,14 +132,15 @@ export function useGateBurstB(emissiveColor) {
     depthWrite: false,
     depthTest: false,
     blending: THREE.AdditiveBlending,
-  }), [emissiveColor])
+  }), [emissiveColor, size])
 
   const cursorRef = useRef(0)
 
   // sample(k) -> [x, y, z] world spawn point of particle k. Velocity is X only,
   // scaled by x / maxAbsX (0 at x = 0, full at the outer edge), times
-  // speedScale (for targets larger than the cube's).
-  const burstFrom = (sample, maxAbsX, now, speedScale = 1) => {
+  // speedScale (for targets larger than the cube's). centerX: the target's
+  // own center, which speed is measured from (targets off the Morph's axis).
+  const burstFrom = (sample, maxAbsX, now, speedScale = 1, centerX = 0) => {
     const { positionAttr, velAttr, spawnTimeAttr, lifetimeAttr } = data
     for (let k = 0; k < GATE_BURST_COUNT; k++) {
       const idx = cursorRef.current % GATE_BURST_POOL
@@ -147,7 +149,7 @@ export function useGateBurstB(emissiveColor) {
       positionAttr.array[idx * 3]     = x
       positionAttr.array[idx * 3 + 1] = y
       positionAttr.array[idx * 3 + 2] = z
-      velAttr.array[idx * 3]     = (x / maxAbsX) * speedScale * THREE.MathUtils.randFloat(...GATE_BURST_SPEED)
+      velAttr.array[idx * 3]     = ((x - centerX) / maxAbsX) * speedScale * THREE.MathUtils.randFloat(...GATE_BURST_SPEED)
       velAttr.array[idx * 3 + 1] = 0
       velAttr.array[idx * 3 + 2] = 0
       spawnTimeAttr.array[idx] = now
