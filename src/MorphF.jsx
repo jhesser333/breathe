@@ -25,7 +25,7 @@ const SHELL_RADIUS = ENVELOPE_RADIUS + SHELL_EXTRA / BALLOON_SCALE
 
 // Exhale (slider bottom) -> Inhale (slider top)
 const EXHALE_BASKET_Y = -8
-const INHALE_BASKET_Y = 8
+const INHALE_BASKET_Y = 6
 const EXHALE_ENVELOPE_SCALE = [0.3, 2, 0.3]
 const INHALE_ENVELOPE_SCALE = [1.5, 1, 1.25]
 

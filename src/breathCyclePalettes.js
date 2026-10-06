@@ -34,6 +34,7 @@ export const YELLOW_OCHRE = {
   textColor: '#e3d299',
 }
 
+// Kept in storage but not in the rotation below.
 export const LIGHT_BLUE = {
   tertiaryColor: '#305173',
   primaryColor: '#358aff',
@@ -51,4 +52,4 @@ export const RUST_ORANGE = {
   textColor: '#fada92',
 }
 
-export const BREATH_CYCLE_PALETTES = [PALETTES.teal, BURNT_SIENNA, PINK, LIGHT_BLUE]
+export const BREATH_CYCLE_PALETTES = [PALETTES.teal, BURNT_SIENNA, PINK]
