@@ -1,10 +1,10 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { makeCloud, applyCloud, CLOUD_MESH_COUNT, EMISSIVE_INTENSITY, OPACITY } from './cloudShapeF'
+import { makeCloud, applyCloud, CLOUD_MESH_COUNT, EMISSIVE_INTENSITY } from './cloudShapeF'
 
 // Shape F (Hot Air Balloon): side clouds, scenery like the cube's landscape.
-// A row on each side (X -20 / +20, y -6) drifts toward the camera at half the
+// A row on each side (X -20 / +20, y -12) drifts toward the camera at half the
 // gate clouds' speed, one new random cloud (cloudShapeF's makeCloud) every
 // SPACING units per side. The slider blows them around: Inhale slides them in
 // to X -10 / +10, Exhale back out to -20 / +20. Each cloud follows the slider
@@ -14,7 +14,8 @@ const POOL = 16
 const SPAWN_Z = -30
 const DESPAWN_Z = 14          // just behind the camera (z 12)
 const SPACING = 10            // gate clouds' Exhale -> Inhale spacing (Slowing Down)
-const Y = -6
+const Y = -12
+const SIDE_OPACITY = 0.3
 const CLOUD_SCALE = 2       // whole cloud (parent and children) scaled up
 const EXHALE_X = 20
 const INHALE_X = 10
@@ -113,7 +114,7 @@ export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, livePalet
       g.position.set(o.side * THREE.MathUtils.lerp(EXHALE_X, INHALE_X, v), Y, o.z)
 
       const m = materials[i]
-      m.opacity = OPACITY * THREE.MathUtils.smoothstep((now - o.born) / FADE_S, 0, 1)
+      m.opacity = SIDE_OPACITY * THREE.MathUtils.smoothstep((now - o.born) / FADE_S, 0, 1)
       if (live) { m.color.copy(live.tertiary); m.emissive.copy(live.tertiary) }
     })
   })
