@@ -19,6 +19,7 @@ import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 
 export const COUNT = 5
 const INHALE_SCALE = [1.2, 3.5, 1.2]     // MorphB's group scale at full Inhale (unit cube)
+export const COUNT_INHALE_SCALE = INHALE_SCALE   // for hosts other than MorphB (MorphF)
 const HALF = INHALE_SCALE.map((v) => v / 2)
 const MORPH_CORNER_RADIUS = 0.15         // MorphB's RoundedBox radius (unit cube)
 const FIT_MARGIN = 0.01                  // local units kept clear of the cube's surface

@@ -7,7 +7,8 @@ import MorphB from './MorphB'
 import MorphC from './MorphC'
 import MorphE from './MorphE'
 import MorphF from './MorphF'
-import CloudGateF from './CloudGateF'
+import GatesF from './GatesF'
+import GatesBoxBreathingF from './GatesBoxBreathingF'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import GatesC from './GatesC'
@@ -91,6 +92,10 @@ const CAMERA_BY_SHAPE = {
   f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 135 },  // Sphere Morph's (d) placement, wider fov
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
+
+// Shapes that use the Morphing Cube's count/tutorial flow (the Hot Air
+// Balloon reuses the cube's 5-breath count and target timing).
+const usesCubeFlow = (shape) => shape === 'b' || shape === 'f'
 
 // Breath-count palette cycle (see MorphC.jsx / breathCyclePalettes.js):
 // MorphC decides WHEN to cycle (breath 1's inhale of a new group) and calls
@@ -547,7 +552,7 @@ export default function App() {
   // Slowing Down (D/E): show Text D or E the way the Diagonal intro shows
   // Text B2 -- 1s fade-in, then hold for one left-slider breath cycle.
   const showPacedText = useCallback((which) => {
-    const isCube = shapeRef.current === 'b'
+    const isCube = usesCubeFlow(shapeRef.current)
     const text = which === 'D'
       ? (isCube ? TEXTS.slowingTextDCube : TEXTS.slowingTextDAmbient)
       : (isCube ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient)
@@ -610,7 +615,7 @@ export default function App() {
 
   const handleSlowingRecordingDone = useCallback(() => {
     // Shape B (Morphing Cube) follows the same tutorial as D/E.
-    if (shapeRef.current === 'd' || shapeRef.current === 'e' || shapeRef.current === 'b') {
+    if (shapeRef.current === 'd' || shapeRef.current === 'e' || usesCubeFlow(shapeRef.current)) {
       // Art waits for the count tutorial's third cycle (see startPacedArt);
       // hold the ramp at the recorded pace. Texts C/D/E are breath-driven
       // (handleBreathCountEvent).
@@ -788,7 +793,7 @@ export default function App() {
         if (!paced) ct.active = false
       }
     } else if (cycle === 1 && paced) {
-      const isCube = shapeRef.current === 'b'
+      const isCube = usesCubeFlow(shapeRef.current)
       if (m === 'slowing' && n === 1) recordingEnabledRef.current = true
       if (n === 2) showCountText(m === 'box' ? TEXTS.boxCountSoon : TEXTS.gatesSlowing)
       else if (n === 3) showCountText(m === 'box' ? TEXTS.boxCountPace : isCube ? TEXTS.slowingTextDCube : TEXTS.slowingTextDAmbient)
@@ -812,7 +817,7 @@ export default function App() {
         clearTimeout(tutorialTimerRef.current)
         setTutorialVisible(false)
         tutorialVisibleRef.current = false
-        currentMainTextRef.current = shapeRef.current === 'b' ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient
+        currentMainTextRef.current = usesCubeFlow(shapeRef.current) ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient
         return
       }
       pacedCaptionRef.current = {
@@ -1253,7 +1258,7 @@ export default function App() {
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
-    breathCountSourceRef.current = shapeRef.current === 'd' || shapeRef.current === 'b' ? ringPaceProgressRef : null
+    breathCountSourceRef.current = shapeRef.current === 'd' || usesCubeFlow(shapeRef.current) ? ringPaceProgressRef : null
     breathCountingEnabledRef.current = true
   }, [])
 
@@ -1341,8 +1346,8 @@ export default function App() {
   }
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : MorphA
-  const GatesComponent = shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
-  const BoxGatesComponent = shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
+  const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
+  const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
 
   return (
@@ -1359,19 +1364,19 @@ export default function App() {
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
-        {shapeOption === 'f' && <CloudGateF palette={palette} />}
         {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
         {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
-        {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && shapeOption !== 'b' && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
-        {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e' || shapeOption === 'b') && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
+        {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && !usesCubeFlow(shapeOption) && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
+        {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e' || usesCubeFlow(shapeOption)) && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
         {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
         {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
-        {hasGates && mode !== 'box' && shapeOption !== 'f' && (
+        {hasGates && mode !== 'box' && (
           <GatesComponent
+            palette={palette}
             rightVal={rightVal}
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
@@ -1385,8 +1390,9 @@ export default function App() {
             startOnInhale={mode === 'slowing'}
           />
         )}
-        {mode === 'box' && hasGates && shapeOption !== 'f' && (
+        {mode === 'box' && hasGates && (
           <BoxGatesComponent
+            palette={palette}
             rightVal={rightVal}
             gatesEnabledRef={gatesEnabledRef}
             spawnIntervalRef={spawnIntervalRef}
@@ -1411,8 +1417,8 @@ export default function App() {
             recordingEnabledRef={recordingEnabledRef}
             lastMaxTimeRef={lastMaxTimeRef}
             onGatesReady={handleSlowingRecordingDone}
-            onTextDone={shapeOption === 'd' || shapeOption === 'e' || shapeOption === 'b' ? () => {} : handleSlowingTextDDone}
-            onTextEDone={shapeOption === 'd' || shapeOption === 'e' || shapeOption === 'b' ? () => {} : handleSlowingTextEDone}
+            onTextDone={shapeOption === 'd' || shapeOption === 'e' || usesCubeFlow(shapeOption) ? () => {} : handleSlowingTextDDone}
+            onTextEDone={shapeOption === 'd' || shapeOption === 'e' || usesCubeFlow(shapeOption) ? () => {} : handleSlowingTextEDone}
             inhaleSecondsRef={inhaleSecondsRef}
             exhaleSecondsRef={exhaleSecondsRef}
             targetInhaleSeconds={targetPaceInfo.inhale}

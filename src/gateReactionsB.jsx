@@ -134,21 +134,17 @@ export function useGateBurstB(emissiveColor) {
 
   const cursorRef = useRef(0)
 
-  const burst = (type, z, now) => {
+  // sample(k) -> [x, y, z] world spawn point of particle k. Velocity is X only,
+  // scaled by x / maxAbsX (0 at x = 0, full at the outer edge).
+  const burstFrom = (sample, maxAbsX, now) => {
     const { positionAttr, velAttr, spawnTimeAttr, lifetimeAttr } = data
-    const centers = CUBE_CENTERS[type]
-    const maxAbsX = MAX_ABS_X[type]
     for (let k = 0; k < GATE_BURST_COUNT; k++) {
       const idx = cursorRef.current % GATE_BURST_POOL
       cursorRef.current += 1
-      // Uniform point on a random face of one of the two cubes.
-      const [cx, cy] = centers[k % 2]
-      const p = [Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5]
-      p[Math.floor(Math.random() * 3)] = Math.random() < 0.5 ? -0.5 : 0.5
-      const x = cx + p[0] * CUBE_SIZE
+      const [x, y, z] = sample(k)
       positionAttr.array[idx * 3]     = x
-      positionAttr.array[idx * 3 + 1] = cy + p[1] * CUBE_SIZE
-      positionAttr.array[idx * 3 + 2] = z + p[2] * CUBE_SIZE
+      positionAttr.array[idx * 3 + 1] = y
+      positionAttr.array[idx * 3 + 2] = z
       velAttr.array[idx * 3]     = (x / maxAbsX) * THREE.MathUtils.randFloat(...GATE_BURST_SPEED)
       velAttr.array[idx * 3 + 1] = 0
       velAttr.array[idx * 3 + 2] = 0
@@ -159,6 +155,17 @@ export function useGateBurstB(emissiveColor) {
     velAttr.needsUpdate = true
     spawnTimeAttr.needsUpdate = true
     lifetimeAttr.needsUpdate = true
+  }
+
+  // Cube targets: uniform points on a random face of one of the two cubes.
+  const burst = (type, z, now) => {
+    const centers = CUBE_CENTERS[type]
+    burstFrom((k) => {
+      const [cx, cy] = centers[k % 2]
+      const p = [Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5]
+      p[Math.floor(Math.random() * 3)] = Math.random() < 0.5 ? -0.5 : 0.5
+      return [cx + p[0] * CUBE_SIZE, cy + p[1] * CUBE_SIZE, z + p[2] * CUBE_SIZE]
+    }, MAX_ABS_X[type], now)
   }
 
   // livePaletteRef (optional): follow the app-wide breath-cycle palette.
@@ -174,5 +181,5 @@ export function useGateBurstB(emissiveColor) {
     </points>
   )
 
-  return { points, burst, tick }
+  return { points, burst, burstFrom, tick }
 }
