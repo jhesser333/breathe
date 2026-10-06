@@ -25,6 +25,7 @@ const CUBE_CENTERS = {
   exhale: [[0, GATE_A_TOP_Y], [0, GATE_A_BOT_Y]],
 }
 // Outermost |x| of each target, so speed runs 0 at the center -> full at the edge.
+export const CUBE_INHALE_MAX_ABS_X = GATE_B_X + CUBE_SIZE / 2   // widest cube target's outer edge
 const MAX_ABS_X = {
   inhale: GATE_B_X + CUBE_SIZE / 2,
   exhale: CUBE_SIZE / 2,
@@ -135,8 +136,9 @@ export function useGateBurstB(emissiveColor) {
   const cursorRef = useRef(0)
 
   // sample(k) -> [x, y, z] world spawn point of particle k. Velocity is X only,
-  // scaled by x / maxAbsX (0 at x = 0, full at the outer edge).
-  const burstFrom = (sample, maxAbsX, now) => {
+  // scaled by x / maxAbsX (0 at x = 0, full at the outer edge), times
+  // speedScale (for targets larger than the cube's).
+  const burstFrom = (sample, maxAbsX, now, speedScale = 1) => {
     const { positionAttr, velAttr, spawnTimeAttr, lifetimeAttr } = data
     for (let k = 0; k < GATE_BURST_COUNT; k++) {
       const idx = cursorRef.current % GATE_BURST_POOL
@@ -145,7 +147,7 @@ export function useGateBurstB(emissiveColor) {
       positionAttr.array[idx * 3]     = x
       positionAttr.array[idx * 3 + 1] = y
       positionAttr.array[idx * 3 + 2] = z
-      velAttr.array[idx * 3]     = (x / maxAbsX) * THREE.MathUtils.randFloat(...GATE_BURST_SPEED)
+      velAttr.array[idx * 3]     = (x / maxAbsX) * speedScale * THREE.MathUtils.randFloat(...GATE_BURST_SPEED)
       velAttr.array[idx * 3 + 1] = 0
       velAttr.array[idx * 3 + 2] = 0
       spawnTimeAttr.array[idx] = now

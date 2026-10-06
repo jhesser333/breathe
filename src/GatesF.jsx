@@ -1,7 +1,7 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useGateBurstB, isSuccess, missFactor } from './gateReactionsB'
+import { useGateBurstB, isSuccess, missFactor, CUBE_INHALE_MAX_ABS_X } from './gateReactionsB'
 import { makeCloud, applyCloud, sampleCloudSurface, cloudMaxAbsX, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S } from './cloudShapeF'
 
 // Shape F (Hot Air Balloon), Slowing Down / Paced: cloud gates with GatesB's
@@ -104,10 +104,11 @@ export default function GatesF({ gatesEnabledRef, spawnIntervalRef, palette, bre
         const y = s.type === 'exhale' ? EXHALE_Y : INHALE_Y
         if (rightVal && isSuccess(s.type, rightVal.current)) {
           const z = s.z
+          const maxX = cloudMaxAbsX(s.cloud)
           gateBurst.burstFrom(() => {
             const p = sampleCloudSurface(s.cloud)
             return [p[0], p[1] + y, p[2] + z]
-          }, cloudMaxAbsX(s.cloud), now)
+          }, maxX, now, maxX / CUBE_INHALE_MAX_ABS_X)   // speed scaled to the cloud's size
         } else {
           s.missElapsed = 0
         }

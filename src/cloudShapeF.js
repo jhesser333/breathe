@@ -4,11 +4,14 @@ import * as THREE from 'three'
 // GatesBoxBreathingF. A parent sphere with CHILD_COUNT child spheres centered
 // on the camera-facing half of its surface, half of them on -X and half on
 // +X. Scale lives on each mesh (not the group), so children don't inherit
-// the parent's scale. Every spawn gets a fresh random cloud.
+// the parent's scale. Every spawn gets a fresh random cloud. Then
+// EDGE_CHILD_COUNT more children widen it: one centered on the cloud's
+// furthest -X point and one on its furthest +X point (parent or child).
 export const PARENT_SCALE_RANGE = [3, 4]   // radius along each axis (unit-radius sphere geometry)
 export const CHILD_SCALE_RANGE = [1, 2.5]
 export const CHILD_COUNT = 4
-export const CLOUD_MESH_COUNT = CHILD_COUNT + 1   // parent + children
+export const EDGE_CHILD_COUNT = 2   // one at the furthest -X point, one at the furthest +X
+export const CLOUD_MESH_COUNT = 1 + CHILD_COUNT + EDGE_CHILD_COUNT   // parent + children
 export const EMISSIVE_INTENSITY = 4
 export const OPACITY = 0.5
 
@@ -45,6 +48,13 @@ export function makeCloud() {
       scale: randScale(CHILD_SCALE_RANGE),
     })
   }
+  // Edge children: centered on the furthest -X / +X points of the cloud so far.
+  const minP = pieces.reduce((a, p) => (p.position[0] - p.scale[0] < a.position[0] - a.scale[0] ? p : a))
+  const maxP = pieces.reduce((a, p) => (p.position[0] + p.scale[0] > a.position[0] + a.scale[0] ? p : a))
+  pieces.push(
+    { position: [minP.position[0] - minP.scale[0], minP.position[1], minP.position[2]], scale: randScale(CHILD_SCALE_RANGE) },
+    { position: [maxP.position[0] + maxP.scale[0], maxP.position[1], maxP.position[2]], scale: randScale(CHILD_SCALE_RANGE) },
+  )
   return pieces
 }
 
@@ -71,17 +81,17 @@ export function cloudMaxAbsX(cloud) {
 }
 
 // Gate look: current material settings on the approach, the cube targets'
-// emissive pulse (x1 -> x2 over z -0.5 -> 0, held after), then an opacity
+// emissive pulse (x1 -> x2 over z -0.5 -> 0, held after) with opacity
+// ramping to full on the same curve, then an opacity
 // fade over FADE_OUT_S once the cloud has been judged at z = 0. A miss ramps
 // the emissive to 0 (missFactor from gateReactionsB), with no shrink.
 export const FADE_IN_S = 1
 export const FADE_OUT_S = 0.5
 const PULSE_START_Z = -0.5
 
-function pulseMult(z) {
-  if (z >= 0) return 2
-  if (z >= PULSE_START_Z) return 1 + THREE.MathUtils.smoothstep((z - PULSE_START_Z) / -PULSE_START_Z, 0, 1)
-  return 1
+// 0 -> 1 over z PULSE_START_Z -> 0 (smoothstepped), held after.
+function pulseT(z) {
+  return THREE.MathUtils.smoothstep((z - PULSE_START_Z) / -PULSE_START_Z, 0, 1)
 }
 
 // fadeElapsed: seconds since the cloud appeared; judgedElapsed: seconds since
@@ -89,8 +99,9 @@ function pulseMult(z) {
 export function applyCloudLook(material, z, fadeElapsed, judgedElapsed, miss, live) {
   const fadeIn = THREE.MathUtils.smoothstep(fadeElapsed / FADE_IN_S, 0, 1)
   const fadeOut = judgedElapsed == null ? 1 : 1 - THREE.MathUtils.smoothstep(judgedElapsed / FADE_OUT_S, 0, 1)
-  material.opacity = OPACITY * fadeIn * fadeOut
-  material.emissiveIntensity = EMISSIVE_INTENSITY * pulseMult(z) * (1 - miss)
+  const t = pulseT(z)
+  material.opacity = THREE.MathUtils.lerp(OPACITY, 1, t) * fadeIn * fadeOut   // full opacity at z = 0
+  material.emissiveIntensity = EMISSIVE_INTENSITY * (1 + t) * (1 - miss)          // x1 -> x2
   if (live) {
     material.color.copy(live.text)
     material.emissive.copy(live.secondary)

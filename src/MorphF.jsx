@@ -17,6 +17,11 @@ const BALLOON_SCALE = 9    // scales the basket and, through it, the whole ballo
 const ENVELOPE_RADIUS = 0.8 / 3
 const ENVELOPE_GAP = 0.3 / 3   // basket top -> envelope bottom
 const ENVELOPE_OPACITY = EXHALE_OPACITY   // same as the cube Morph
+// Inner shell: an opaque, back-faces-only sphere sharing the envelope's
+// bottom pivot, SHELL_EXTRA world units larger in radius, so through the
+// see-through envelope you see the inside of the shell's far half.
+const SHELL_EXTRA = 0.1
+const SHELL_RADIUS = ENVELOPE_RADIUS + SHELL_EXTRA / BALLOON_SCALE
 
 // Exhale (slider bottom) -> Inhale (slider top)
 const EXHALE_BASKET_Y = -8
@@ -46,7 +51,13 @@ export default function MorphF({ leftVal, rightVal, palette, breathCountingEnabl
     opacity: ENVELOPE_OPACITY,
     depthWrite: false,
   }), [palette])
-  useEffect(() => () => { basketMaterial.dispose(); envelopeMaterial.dispose() }, [basketMaterial, envelopeMaterial])
+  const shellMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+    color: palette.primaryColor,
+    emissive: palette.primaryColor,
+    emissiveIntensity: 0.25,
+    side: THREE.BackSide,
+  }), [palette])
+  useEffect(() => () => { basketMaterial.dispose(); envelopeMaterial.dispose(); shellMaterial.dispose() }, [basketMaterial, envelopeMaterial, shellMaterial])
 
   const breathCount = useBreathCountB(palette)
 
@@ -74,6 +85,8 @@ export default function MorphF({ leftVal, rightVal, palette, breathCountingEnabl
       basketMaterial.color.copy(live.primary)
       envelopeMaterial.color.copy(live.primary)
       envelopeMaterial.emissive.copy(live.primary)
+      shellMaterial.color.copy(live.primary)
+      shellMaterial.emissive.copy(live.primary)
     }
   })
 
@@ -83,6 +96,9 @@ export default function MorphF({ leftVal, rightVal, palette, breathCountingEnabl
       <group ref={envelopeRef} position={[0, BASKET_SIZE / 2 + ENVELOPE_GAP, 0]} scale={EXHALE_ENVELOPE_SCALE}>
         <mesh position={[0, ENVELOPE_RADIUS, 0]} material={envelopeMaterial}>
           <sphereGeometry args={[ENVELOPE_RADIUS, 64, 32]} />
+        </mesh>
+        <mesh position={[0, SHELL_RADIUS, 0]} material={shellMaterial}>
+          <sphereGeometry args={[SHELL_RADIUS, 64, 32]} />
         </mesh>
         <group position={[0, ENVELOPE_RADIUS, 0]} scale={COUNT_GROUP_SCALE}>
           {breathCount.elements}
