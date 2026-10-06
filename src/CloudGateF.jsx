@@ -6,7 +6,7 @@ import * as THREE from 'three'
 // A parent sphere with CHILD_COUNT child spheres centered on the camera-facing
 // half of its surface, half of them on -X and half on +X. Scale lives on each
 // mesh (not the group), so children don't inherit the parent's scale.
-const SCALE_RANGE = [1, 2]     // radius along each axis (unit-radius sphere geometry)
+const SCALE_RANGE = [3, 5]     // radius along each axis (unit-radius sphere geometry)
 const CHILD_COUNT = 4
 const EMISSIVE_INTENSITY = 4
 const OPACITY = 0.5
