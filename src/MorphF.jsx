@@ -18,7 +18,7 @@ const ENVELOPE_GAP = 0.3 / 3   // basket top -> envelope bottom
 const EXHALE_BASKET_Y = -8
 const INHALE_BASKET_Y = 8
 const EXHALE_ENVELOPE_SCALE = [0.4, 2, 0.4]
-const INHALE_ENVELOPE_SCALE = [1, 1, 1]
+const INHALE_ENVELOPE_SCALE = [1.25, 1, 1.25]
 
 export default function MorphF({ leftVal, palette }) {
   const basketRef = useRef()

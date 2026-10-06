@@ -6,13 +6,14 @@ import * as THREE from 'three'
 // A parent sphere with CHILD_COUNT child spheres centered on the camera-facing
 // half of its surface, half of them on -X and half on +X. Scale lives on each
 // mesh (not the group), so children don't inherit the parent's scale.
-const SCALE_RANGE = [2, 3]     // radius along each axis (unit-radius sphere geometry)
+const PARENT_SCALE_RANGE = [3, 4]   // radius along each axis (unit-radius sphere geometry)
+const CHILD_SCALE_RANGE = [1, 2.5]
 const CHILD_COUNT = 4
 const EMISSIVE_INTENSITY = 4
 const OPACITY = 0.5
 
-function randScale() {
-  const r = () => SCALE_RANGE[0] + Math.random() * (SCALE_RANGE[1] - SCALE_RANGE[0])
+function randScale([min, max]) {
+  const r = () => min + Math.random() * (max - min)
   return [r(), r(), r()]
 }
 
@@ -30,12 +31,12 @@ function facingDirection(xSign) {
 
 export default function CloudGateF({ palette }) {
   const cloud = useMemo(() => {
-    const parentScale = randScale()
+    const parentScale = randScale(PARENT_SCALE_RANGE)
     const children = Array.from({ length: CHILD_COUNT }, (_, i) => {
       const d = facingDirection(i < CHILD_COUNT / 2 ? -1 : 1)
       return {
         position: [d[0] * parentScale[0], d[1] * parentScale[1], d[2] * parentScale[2]],
-        scale: randScale(),
+        scale: randScale(CHILD_SCALE_RANGE),
       }
     })
     return { parentScale, children }
