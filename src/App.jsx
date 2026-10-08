@@ -89,6 +89,7 @@ const VERTICAL_REVEAL_DELAY_MS = 2000   // Vertical layout: reveal this long aft
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
 const TEXT_SIZE_INTRO = 30
+const INTRO_EXTRA_LINES = 2   // blank intro-size lines added above the mode explanation (line height 1.2)
 const TEXT_SIZE_CAPTION = 60
 const TEXT_SIZE_TUTORIAL = 40
 
@@ -1525,7 +1526,7 @@ export default function App() {
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />
         )}
-        <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+        <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
