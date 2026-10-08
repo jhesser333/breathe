@@ -85,7 +85,6 @@ const DIAG_ROUNDS = 3             // A1/A2 (up/down) rounds before B1
 // color) through the mode explanation and Text A1's fade-in, then fade in
 // over SCENE_REVEAL_MS; the sliders become touchable when it finishes.
 const SCENE_REVEAL_MS = 3000
-const VERTICAL_REVEAL_DELAY_MS = 2000   // Vertical layout: reveal this long after Text A appears
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
 const TEXT_SIZE_INTRO = 30
@@ -1238,6 +1237,7 @@ export default function App() {
     // Tutorial start (Text A / Diagonal A1), run after the mode explanation.
     const beginTutorial = () => {
     introActiveRef.current = false
+    revealScene()   // scene + sliders fade in together with the first text
     setTutorialAtTop(false)
     if (sliderLayout === 'diagonal') {
       stageRef.current = 'done'
@@ -1260,7 +1260,7 @@ export default function App() {
         const t = Math.min(1, (performance.now() - appearStart) / A1_FADE_IN_MS)
         setTutorialOpacity(THREE.MathUtils.smoothstep(t, 0, 1) * (1 - breathRef.current))
         if (t < 1) requestAnimationFrame(appearTick)
-        else { diagStageRef.current = 'A1'; revealScene() }
+        else diagStageRef.current = 'A1'
       }
       requestAnimationFrame(appearTick)
     } else {
@@ -1278,7 +1278,6 @@ export default function App() {
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
       clearTimeout(revealTimerRef.current)
-      revealTimerRef.current = setTimeout(revealScene, VERTICAL_REVEAL_DELAY_MS)
     }
     }
 
