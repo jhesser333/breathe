@@ -964,6 +964,22 @@ export default function App() {
   // position-driven fades for A1/A2, then timed fade-in + 1-breath-cycle-hold
   // + timed fade-out for B1/B2. Runs entirely off setLeft (no useFrame needed,
   // consistent with the rest of App.jsx's event-driven tutorial state).
+  // Next up/down round: A1 fades back in, then tracks 1 - v again ('A1').
+  const showA1Again = useCallback(() => {
+    diagRoundRef.current++
+    diagStageRef.current = 'A1-reappear'
+    setTutorialOpacity(null)
+    currentMainTextRef.current = TEXT_A1_DIAGONAL
+    setTutorialText(TEXT_A1_DIAGONAL)
+    setTutorialFadeMs(DIAG_FADE_IN_MS)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    clearTimeout(tutorialTimerRef.current)
+    tutorialTimerRef.current = setTimeout(() => {
+      diagStageRef.current = 'A1'
+    }, DIAG_FADE_IN_MS)
+  }, [])
+
   const updateDiagonalSequence = useCallback((v) => {
     const stage = diagStageRef.current
     if (stage === 'A1') {
@@ -983,33 +999,26 @@ export default function App() {
       }
     } else if (stage === 'A2-track') {
       setTutorialOpacity(v)
-      if (v <= DIAG_EDGE_THRESHOLD && diagRoundRef.current < DIAG_ROUNDS) {
-        // Next up/down round: A1 fades back in, then tracks 1 - v again.
-        diagRoundRef.current++
-        diagStageRef.current = 'A1-reappear'
-        setTutorialOpacity(null)
-        currentMainTextRef.current = TEXT_A1_DIAGONAL
-        setTutorialText(TEXT_A1_DIAGONAL)
-        setTutorialFadeMs(DIAG_FADE_IN_MS)
-        setTutorialVisible(true)
-        tutorialVisibleRef.current = true
-        clearTimeout(tutorialTimerRef.current)
-        tutorialTimerRef.current = setTimeout(() => {
-          diagStageRef.current = 'A1'
-        }, DIAG_FADE_IN_MS)
-      } else if (v <= DIAG_EDGE_THRESHOLD) {
-        diagStageRef.current = 'B1-appear'
-        setTutorialOpacity(null)
-        currentMainTextRef.current = TEXT_B1_DIAGONAL
-        setTutorialText(TEXT_B1_DIAGONAL)
-        setTutorialFadeMs(DIAG_FADE_IN_MS)
-        setTutorialVisible(true)
-        tutorialVisibleRef.current = true
-        clearTimeout(tutorialTimerRef.current)
-        tutorialTimerRef.current = setTimeout(() => {
-          diagStageRef.current = 'B1-hold'
-          beginDiagonalHold(breathRef.current)
-        }, DIAG_FADE_IN_MS)
+      if (v <= DIAG_EDGE_THRESHOLD) {
+        // Order: round 1 -> B1 -> rounds 2..DIAG_ROUNDS -> B2 -> B3.
+        if (diagRoundRef.current === 1) {
+          diagStageRef.current = 'B1-appear'
+          setTutorialOpacity(null)
+          currentMainTextRef.current = TEXT_B1_DIAGONAL
+          setTutorialText(TEXT_B1_DIAGONAL)
+          setTutorialFadeMs(DIAG_FADE_IN_MS)
+          setTutorialVisible(true)
+          tutorialVisibleRef.current = true
+          clearTimeout(tutorialTimerRef.current)
+          tutorialTimerRef.current = setTimeout(() => {
+            diagStageRef.current = 'B1-hold'
+            beginDiagonalHold(breathRef.current)
+          }, DIAG_FADE_IN_MS)
+        } else if (diagRoundRef.current < DIAG_ROUNDS) {
+          showA1Again()
+        } else {
+          showDiagonalB2()
+        }
       }
     } else if (stage === 'B1-hold' || stage === 'B2-hold' || stage === 'B3-hold') {
       if (diagExtremeRef.current === null) {
@@ -1041,14 +1050,14 @@ export default function App() {
             setTutorialFadeMs(DIAG_FADE_OUT_MS)
             setTutorialVisible(false)
             tutorialVisibleRef.current = false
-            tutorialTimerRef.current = setTimeout(stage === 'B1-hold' ? showDiagonalB2 : showB3, DIAG_FADE_OUT_MS)
+            tutorialTimerRef.current = setTimeout(stage === 'B1-hold' ? showA1Again : showB3, DIAG_FADE_OUT_MS)
           } else {
             finishDiagonalSequence()
           }
         }
       }
     }
-  }, [beginDiagonalHold, showDiagonalB2, showB3, finishDiagonalSequence])
+  }, [beginDiagonalHold, showDiagonalB2, showB3, showA1Again, finishDiagonalSequence])
 
   useEffect(() => {
     if (screen !== 'experience') return
