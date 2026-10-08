@@ -17,7 +17,7 @@ export const TEXT_B3 = 'Now the art will change with each breath.'
 
 // Shown for MODE_INTRO_MS at the start of each mode, before its tutorial.
 export const MODE_INTRO = {
-  box: 'Box breathing is a four-step cycle: inhale, hold, exhale, and pause for equal counts.\n\nThe following tutorial will walk you through steps that conclude with the Box Breathing Mode.',
+  box: 'Box Breathing has 4 steps:\ninhale, hold, exhale, hold\nfor 4 count each.\n\nFollow the steps in this tutorial.\nYou will start Box Breathing at the end.',
   slowing: 'This mode will record the pace of your breathing and then help you slow it down.\n\nThe following tutorial will guide you into the Slowing Down Mode.',
   basic: 'In this mode, you can breathe at your own pace and use the audio and visual feedback to help you focus.\n\nThe following tutorial will guide you into the mode.',
 }

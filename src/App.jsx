@@ -88,7 +88,7 @@ const SCENE_REVEAL_MS = 3000
 const VERTICAL_REVEAL_DELAY_MS = 2000   // Vertical layout: reveal this long after Text A appears
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
-const TEXT_SIZE_INTRO = 20
+const TEXT_SIZE_INTRO = 30
 const TEXT_SIZE_CAPTION = 60
 const TEXT_SIZE_TUTORIAL = 40
 
