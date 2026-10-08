@@ -40,7 +40,7 @@ import { RESET_ON_UNLOCK, TESTING_DEFAULTS } from './passcode'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
-import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, MODE_LABELS } from './copy'
+import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 import { createAudioEngine } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
@@ -79,6 +79,18 @@ const DIAG_DEADBAND = 0.08
 const DIAG_CYCLE_STROKES = 2      // 2 strokes = 1 full up+down breath cycle
 const DIAG_FADE_IN_MS = 1000
 const DIAG_FADE_OUT_MS = 2000
+const DIAG_ROUNDS = 3             // A1/A2 (up/down) rounds before B1
+
+// Blank-background start: the scene and sliders stay covered (background
+// color) through the mode explanation and Text A1's fade-in, then fade in
+// over SCENE_REVEAL_MS; the sliders become touchable when it finishes.
+const SCENE_REVEAL_MS = 3000
+const VERTICAL_REVEAL_DELAY_MS = 2000   // Vertical layout: reveal this long after Text A appears
+
+// Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
+const TEXT_SIZE_INTRO = 20
+const TEXT_SIZE_CAPTION = 60
+const TEXT_SIZE_TUTORIAL = 40
 
 // Per-shape camera placement. Each art option is framed independently -- omitting
 // `rotation` lets R3F apply its default look-at-origin, which gives the ~35deg
@@ -106,7 +118,7 @@ const PALETTE_LERP_DURATION = 1.0
 
 const LABEL_LERP_S = 1   // slider label tertiary <-> text color lerp (paced Box / Slowing Down)
 const LABEL_DIM_OPACITY = 0.5   // label opacity in its tertiary state (1 when lit)
-const LABEL_GLOW_MULT = 5       // lit label's primary-color glow strength (text-shadow blur px per layer)
+const LABEL_GLOW_MULT = 10      // lit label's primary-color glow strength (text-shadow blur px per layer)
 const _labelColor = new THREE.Color()
 
 function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef, getLabelPhase }) {
@@ -237,6 +249,10 @@ export default function App() {
   const [tutorialVisible, setTutorialVisible] = useState(false)
   const [tutorialOpacity, setTutorialOpacity] = useState(null)
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
+  // Blank-background start: false = scene covered, sliders hidden (SCENE_REVEAL_MS fade when it turns true).
+  const [sceneRevealed, setSceneRevealed] = useState(false)
+  const [slidersTouchable, setSlidersTouchable] = useState(false)
+  const revealTimerRef = useRef(null)
   const [tutorialAtTop, setTutorialAtTop] = useState(false)   // mode explanation: shown up under the mode name
   const [shapeOption, setShapeOptionState] = useState(() => {
     let saved = localStorage.getItem('shapeOption') || 'b'
@@ -324,6 +340,7 @@ export default function App() {
 
   // Diagonal-layout-only Text A1/A2/B1/B2 tutorial sequence state
   const diagStageRef = useRef('done')
+  const diagRoundRef = useRef(1)   // current A1/A2 round (1..DIAG_ROUNDS)
   const diagDirectionRef = useRef(0)   // 0=unset, 1=up, -1=down
   const diagExtremeRef = useRef(null)
   const diagReversalCountRef = useRef(0)
@@ -789,16 +806,19 @@ export default function App() {
       if (n === 1) showCountText(TEXTS.countEachBreath)
       else if (n === 2) hideCountText()
       else if (n === 3) showCountText(TEXTS.countColors)
-      else if (n === 4) {
-        hideCountText()
-        if (!paced) ct.active = false
-      }
-    } else if (cycle === 1 && paced) {
-      const isCube = usesCubeFlow(shapeRef.current)
+      else if (n === 4) hideCountText()
+      else if (n === 5) showCountText(TEXTS.countResets)
+    } else if (cycle === 1) {
       if (m === 'slowing' && n === 1) recordingEnabledRef.current = true
-      if (n === 2) showCountText(m === 'box' ? TEXTS.boxCountSoon : TEXTS.gatesSlowing)
-      else if (n === 3) showCountText(m === 'box' ? TEXTS.boxCountPace : isCube ? TEXTS.slowingTextDCube : TEXTS.slowingTextDAmbient)
-      else if (n === 4) showCountText(m === 'box' ? TEXTS.boxCountTwoMore : isCube ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient)
+      if (n === 1) showCountText(TEXTS.countNewCycle)
+      else if (!paced) {
+        // Own Pace: the tutorial ends with the new-cycle text.
+        hideCountText()
+        ct.active = false
+      }
+      else if (n === 2) showCountText(m === 'box' ? TEXTS.boxCountSoon : TEXTS.gatesSlowing)
+      else if (n === 3) showCountText(m === 'box' ? TEXTS.boxCountPace : TEXTS.slowingCuesSoon)
+      else if (n === 4) showCountText(m === 'box' ? TEXTS.boxCountTwoMore : TEXTS.slowingCuesSync)
       else if (n === 5) hideCountText()
     }
   }, [showCountText, hideCountText])
@@ -818,7 +838,7 @@ export default function App() {
         clearTimeout(tutorialTimerRef.current)
         setTutorialVisible(false)
         tutorialVisibleRef.current = false
-        currentMainTextRef.current = usesCubeFlow(shapeRef.current) ? TEXTS.slowingTextECube : TEXTS.slowingTextEAmbient
+        currentMainTextRef.current = TEXTS.slowingCuesSync
         return
       }
       pacedCaptionRef.current = {
@@ -845,6 +865,33 @@ export default function App() {
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
   }, [])
+
+  const beginDiagonalHold = useCallback((seedV) => {
+    diagReversalCountRef.current = 0
+    diagDirectionRef.current = 0
+    diagExtremeRef.current = seedV
+  }, [])
+
+  // B2/B3: fade in over DIAG_FADE_IN_MS, then hold for one breath cycle
+  // (updateDiagonalSequence's '<step>-hold').
+  const showDiagonalStep = useCallback((step, text) => {
+    diagStageRef.current = step + '-hold-pending'
+    currentMainTextRef.current = text
+    setTutorialOpacity(null)
+    setTutorialText(text)
+    setTutorialFadeMs(DIAG_FADE_IN_MS)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    clearTimeout(tutorialTimerRef.current)
+    tutorialTimerRef.current = setTimeout(() => {
+      diagStageRef.current = step + '-hold'
+      beginDiagonalHold(breathRef.current)
+    }, DIAG_FADE_IN_MS)
+  }, [beginDiagonalHold])
+  const showDiagonalB2 = useCallback(() => showDiagonalStep('B2', TEXT_B2_DIAGONAL), [showDiagonalStep])
+  // "Now the art will change with each breath." -- last step before the count
+  // (both layouts); its fade-out hands off to the count (finishDiagonalSequence).
+  const showB3 = useCallback(() => showDiagonalStep('B3', TEXT_B3), [showDiagonalStep])
 
   const advanceSequence = useCallback(() => {
     if (stageRef.current !== 'A') return
@@ -877,15 +924,9 @@ export default function App() {
     tutorialVisibleRef.current = false
     tutorialTimerRef.current = setTimeout(() => {
       stageRef.current = 'done'
-      if (introStartsCountingRef.current) breathCountingEnabledRef.current = true
-      if (countTutorialRef.current.mode !== 'timed') countTutorialRef.current.active = true
-      if (pendingGatesFnRef.current !== null) {
-        const fn = pendingGatesFnRef.current
-        pendingGatesFnRef.current = null
-        fn()
-      }
+      showB3()   // then the count hand-off (finishDiagonalSequence)
     }, FADE_TRANSITION_MS)
-  }, [])
+  }, [showB3])
 
   const handleMovement = useCallback(() => {
     if (!awaitingMovementRef.current) return
@@ -900,14 +941,8 @@ export default function App() {
     }, MOVEMENT_FADE_DELAY_MS)
   }, [advanceSequence])
 
-  const beginDiagonalHold = useCallback((seedV) => {
-    diagReversalCountRef.current = 0
-    diagDirectionRef.current = 0
-    diagExtremeRef.current = seedV
-  }, [])
-
   const finishDiagonalSequence = useCallback(() => {
-    diagStageRef.current = 'B2-fadeout'
+    diagStageRef.current = 'B3-fadeout'
     clearTimeout(tutorialTimerRef.current)
     setTutorialFadeMs(DIAG_FADE_OUT_MS)
     setTutorialVisible(false)
@@ -923,20 +958,6 @@ export default function App() {
       }
     }, DIAG_FADE_OUT_MS)
   }, [])
-
-  const showDiagonalB2 = useCallback(() => {
-    diagStageRef.current = 'B2-hold-pending'
-    currentMainTextRef.current = TEXT_B2_DIAGONAL
-    setTutorialText(TEXT_B2_DIAGONAL)
-    setTutorialFadeMs(DIAG_FADE_IN_MS)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
-    clearTimeout(tutorialTimerRef.current)
-    tutorialTimerRef.current = setTimeout(() => {
-      diagStageRef.current = 'B2-hold'
-      beginDiagonalHold(breathRef.current)
-    }, DIAG_FADE_IN_MS)
-  }, [beginDiagonalHold])
 
   // Diagonal-slider-layout-only tutorial sequence: continuous, left-slider-
   // position-driven fades for A1/A2, then timed fade-in + 1-breath-cycle-hold
@@ -961,7 +982,21 @@ export default function App() {
       }
     } else if (stage === 'A2-track') {
       setTutorialOpacity(v)
-      if (v <= DIAG_EDGE_THRESHOLD) {
+      if (v <= DIAG_EDGE_THRESHOLD && diagRoundRef.current < DIAG_ROUNDS) {
+        // Next up/down round: A1 fades back in, then tracks 1 - v again.
+        diagRoundRef.current++
+        diagStageRef.current = 'A1-reappear'
+        setTutorialOpacity(null)
+        currentMainTextRef.current = TEXT_A1_DIAGONAL
+        setTutorialText(TEXT_A1_DIAGONAL)
+        setTutorialFadeMs(DIAG_FADE_IN_MS)
+        setTutorialVisible(true)
+        tutorialVisibleRef.current = true
+        clearTimeout(tutorialTimerRef.current)
+        tutorialTimerRef.current = setTimeout(() => {
+          diagStageRef.current = 'A1'
+        }, DIAG_FADE_IN_MS)
+      } else if (v <= DIAG_EDGE_THRESHOLD) {
         diagStageRef.current = 'B1-appear'
         setTutorialOpacity(null)
         currentMainTextRef.current = TEXT_B1_DIAGONAL
@@ -975,7 +1010,7 @@ export default function App() {
           beginDiagonalHold(breathRef.current)
         }, DIAG_FADE_IN_MS)
       }
-    } else if (stage === 'B1-hold' || stage === 'B2-hold') {
+    } else if (stage === 'B1-hold' || stage === 'B2-hold' || stage === 'B3-hold') {
       if (diagExtremeRef.current === null) {
         diagExtremeRef.current = v
         return
@@ -999,20 +1034,20 @@ export default function App() {
         }
 
         if (diagReversalCountRef.current >= DIAG_CYCLE_STROKES) {
-          if (stage === 'B1-hold') {
-            diagStageRef.current = 'B1-fadeout'
+          if (stage === 'B1-hold' || stage === 'B2-hold') {
+            diagStageRef.current = stage === 'B1-hold' ? 'B1-fadeout' : 'B2-fadeout'
             clearTimeout(tutorialTimerRef.current)
             setTutorialFadeMs(DIAG_FADE_OUT_MS)
             setTutorialVisible(false)
             tutorialVisibleRef.current = false
-            tutorialTimerRef.current = setTimeout(showDiagonalB2, DIAG_FADE_OUT_MS)
+            tutorialTimerRef.current = setTimeout(stage === 'B1-hold' ? showDiagonalB2 : showB3, DIAG_FADE_OUT_MS)
           } else {
             finishDiagonalSequence()
           }
         }
       }
     }
-  }, [beginDiagonalHold, showDiagonalB2, finishDiagonalSequence])
+  }, [beginDiagonalHold, showDiagonalB2, showB3, finishDiagonalSequence])
 
   useEffect(() => {
     if (screen !== 'experience') return
@@ -1092,7 +1127,7 @@ export default function App() {
     lastMoveTime.current = Date.now()
     // Breath position in the old left-slider convention (0 exhale -> 1 inhale).
     const b = 1 - v
-    if (sliderLayout === 'diagonal') updateDiagonalSequence(b)
+    if (sliderLayout === 'diagonal' || diagStageRef.current.startsWith('B3')) updateDiagonalSequence(b)
     updatePacedText(b)
     if (pacedWaitForBottomRef.current && b <= DIAG_EDGE_THRESHOLD && pacedStartFnRef.current) pacedStartFnRef.current()
 
@@ -1132,6 +1167,13 @@ export default function App() {
     handleMovement()
   }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, updatePacedText])
 
+  // Fade the scene and sliders in (see SCENE_REVEAL_MS).
+  const revealScene = useCallback(() => {
+    setSceneRevealed(true)
+    clearTimeout(revealTimerRef.current)
+    revealTimerRef.current = setTimeout(() => setSlidersTouchable(true), SCENE_REVEAL_MS)
+  }, [])
+
   const handleSelectMode = useCallback((m) => {
     // Start/Restart taps: unlock and (re)start the breath audio.
     audioGroupIndexRef.current = 0
@@ -1159,6 +1201,10 @@ export default function App() {
     pacedTextStrokesRef.current = 0
 
     clearTimeout(tutorialTimerRef.current)
+    clearTimeout(revealTimerRef.current)
+    setSceneRevealed(false)
+    setSlidersTouchable(false)
+    diagRoundRef.current = 1
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
     breathCountingEnabledRef.current = false
@@ -1204,7 +1250,7 @@ export default function App() {
         const t = Math.min(1, (performance.now() - appearStart) / A1_FADE_IN_MS)
         setTutorialOpacity(THREE.MathUtils.smoothstep(t, 0, 1) * (1 - breathRef.current))
         if (t < 1) requestAnimationFrame(appearTick)
-        else diagStageRef.current = 'A1'
+        else { diagStageRef.current = 'A1'; revealScene() }
       }
       requestAnimationFrame(appearTick)
     } else {
@@ -1221,6 +1267,8 @@ export default function App() {
       setTutorialText(TEXT_A)
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
+      clearTimeout(revealTimerRef.current)
+      revealTimerRef.current = setTimeout(revealScene, VERTICAL_REVEAL_DELAY_MS)
     }
     }
 
@@ -1255,7 +1303,7 @@ export default function App() {
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, sliderLayout, startBoxArt, startPacedArt])
+  }, [resetSlowingState, showGatesText, sliderLayout, startBoxArt, startPacedArt, revealScene])
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
@@ -1270,6 +1318,7 @@ export default function App() {
   const handleBackFromExperience = useCallback(() => {
     audioRef.current.stop()
     clearTimeout(introTimerRef.current)
+    clearTimeout(revealTimerRef.current)
     introActiveRef.current = false
     setTutorialAtTop(false)
     gatesEnabledRef.current = false
@@ -1439,7 +1488,15 @@ export default function App() {
         )}
       </Canvas>
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto' }}>
+        {/* Blank-background start: covers the scene until revealScene */}
+        <div style={{
+          position: 'absolute', inset: 0, background: 'var(--live-bg-color, ' + palette.background + ')',
+          opacity: sceneRevealed ? 0 : 1, transition: `opacity ${SCENE_REVEAL_MS}ms ease`, pointerEvents: 'none',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: slidersTouchable ? 'auto' : 'none',
+          opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
+        }}>
           {sliderLayout === 'diagonal'
             ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />
             : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />}
@@ -1469,6 +1526,9 @@ export default function App() {
                   }} />
         )}
         <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+          size={tutorialAtTop ? TEXT_SIZE_INTRO
+            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
+            : TEXT_SIZE_TUTORIAL}
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}

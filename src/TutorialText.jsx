@@ -67,7 +67,9 @@ function roundAlphaMultiplier(totalElapsed, interval) {
 
 // topPx: pin the text's top edge this far from the top of the screen (the mode
 // explanation) instead of the usual spot over the Morph's lower third.
-export default function TutorialText({ topPx = null, text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+// size: font size in px (App: 20 mode explanation, 60 paced captions, 40 the rest);
+// larger text gets a wider column so long lines still fit.
+export default function TutorialText({ size = 20, topPx = null, text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
@@ -131,16 +133,16 @@ export default function TutorialText({ topPx = null, text, visible, opacity, fad
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
       zIndex: 100,   // always above the canvas, sliders and nav buttons
-      padding: '0 80px',
+      padding: size > 20 ? '0 16px' : '0 80px',
     }}>
       <p ref={textRef} style={{
         color: 'var(--live-text-color, rgba(255,255,255,0.9))',
-        fontSize: 20,
+        fontSize: size,
         textAlign: 'center',
         fontFamily: 'sans-serif',
         fontWeight: 700,
-        lineHeight: 1.5,
-        maxWidth: 280,
+        lineHeight: size > 20 ? 1.2 : 1.5,
+        maxWidth: size > 20 ? '92vw' : 280,
         whiteSpace: 'pre-line',
         // Outline in the live background color so the text reads over both
         // light and dark art (8-way shadow ring + soft halo; text-shadow is

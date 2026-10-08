@@ -10,8 +10,10 @@ export const TEXT_B = 'The transforming object is named Morph.\nSync your breath
 
 export const TEXT_A1_DIAGONAL = 'Inhale and move the sliders up.'
 export const TEXT_A2_DIAGONAL = 'Exhale and move the sliders down.'
-export const TEXT_B1_DIAGONAL = 'Keep moving the sliders with your breath.'
-export const TEXT_B2_DIAGONAL = 'Notice how your breathing transforms the art.'
+export const TEXT_B1_DIAGONAL = 'Moving fingers with your breath is the core interaction in this app.'
+export const TEXT_B2_DIAGONAL = 'Notice how your breathing controls the art and sound.'
+// Last slider step (both layouts), right before the 5-breath count starts.
+export const TEXT_B3 = 'Now the art will change with each breath.'
 
 // Shown for MODE_INTRO_MS at the start of each mode, before its tutorial.
 export const MODE_INTRO = {
@@ -34,11 +36,16 @@ export const TEXTS = {
   slowingTextDCube: 'Gates will soon move in at the rate you recorded. Breathe so the art fits through the gates.',
   slowingTextECube: 'Keep your breathing in sync with the gates as they move farther apart.',
   // 5-breath count tutorial (all modes, the two user-paced cycles after the intro).
-  countEachBreath: 'Each breath will add an object.',
-  countColors:     'The colors will change after 5 breaths.',
-  boxCountSoon:    'In a few breaths, additional art will appear.',
-  boxCountPace:    'The new art will help pace your breath.',
-  boxCountTwoMore: 'Two more breaths on your own.',
+  countEachBreath: 'Notice how the art changed.',
+  countColors:     'These changes help count breaths.',
+  countResets:     'After 5 breaths, the counting resets. The colors and sounds will change.',
+  countNewCycle:   'This is a new 5-breath cycle.',
+  boxCountSoon:    'Box Breathing cues will appear after this cycle.',
+  boxCountPace:    'Follow these cues to inhale, hold, exhale and hold.',
+  boxCountTwoMore: 'The cues are about to start.',
+  // Slowing Down's count-tutorial texts 2-3 (all art options).
+  slowingCuesSoon: 'You will soon see cues at the rate you recorded.',
+  slowingCuesSync: 'Keep your breathing in sync with the cues as they slow down.',
   boxInhale:    'Inhale',
   boxHold:      'Hold',
   boxExhale:    'Exhale',
