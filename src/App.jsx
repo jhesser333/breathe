@@ -85,6 +85,7 @@ const DIAG_ROUNDS = 3             // A1/A2 (up/down) rounds before B1
 // color) through the mode explanation and Text A1's fade-in, then fade in
 // over SCENE_REVEAL_MS; the sliders become touchable when it finishes.
 const SCENE_REVEAL_MS = 3000
+const COUNT_FADE_MS = 1000   // count-tutorial texts: fade out, swap, fade in (each this long)
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
 const TEXT_SIZE_INTRO = 30
@@ -251,8 +252,7 @@ export default function App() {
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
   // Blank-background start: false = scene covered, sliders hidden (SCENE_REVEAL_MS fade when it turns true).
   const [sceneRevealed, setSceneRevealed] = useState(false)
-  const [slidersTouchable, setSlidersTouchable] = useState(false)
-  const revealTimerRef = useRef(null)
+  const textFadeOutEndRef = useRef(0)   // performance.now() when the current fade-out finishes
   const [tutorialAtTop, setTutorialAtTop] = useState(false)   // mode explanation: shown up under the mode name
   const [shapeOption, setShapeOptionState] = useState(() => {
     let saved = localStorage.getItem('shapeOption') || 'b'
@@ -767,23 +767,43 @@ export default function App() {
     return null
   }, [mode, boxPhaseNow, slowingPhaseNow])
 
-  const showCountText = useCallback((text) => {
+  // Fade the current text out (or wait for a fade-out already running),
+  // then swap in `text` and fade it in -- the words never change while visible.
+  const fadeToText = useCallback((text, fadeMs = COUNT_FADE_MS) => {
     clearTimeout(tutorialTimerRef.current)
-    awaitingMovementRef.current = false
     currentMainTextRef.current = text
-    setTutorialOpacity(null)
-    setTutorialFadeMs(FADE_TRANSITION_MS)
-    setTutorialText(text)
-    setTutorialVisible(true)
-    tutorialVisibleRef.current = true
+    const fadeIn = () => {
+      setTutorialOpacity(null)
+      setTutorialFadeMs(fadeMs)
+      setTutorialText(text)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
+    }
+    let wait = Math.max(0, textFadeOutEndRef.current - performance.now())
+    if (tutorialVisibleRef.current) {
+      setTutorialFadeMs(fadeMs)
+      setTutorialVisible(false)
+      tutorialVisibleRef.current = false
+      textFadeOutEndRef.current = performance.now() + fadeMs
+      wait = fadeMs
+    }
+    if (wait > 0) tutorialTimerRef.current = setTimeout(fadeIn, wait)
+    else fadeIn()
   }, [])
+
+  const showCountText = useCallback((text) => {
+    awaitingMovementRef.current = false
+    fadeToText(text)
+  }, [fadeToText])
 
   const hideCountText = useCallback(() => {
     clearTimeout(tutorialTimerRef.current)
     awaitingMovementRef.current = false
-    setTutorialFadeMs(FADE_TRANSITION_MS)
+    if (!tutorialVisibleRef.current) return
+    setTutorialFadeMs(COUNT_FADE_MS)
     setTutorialVisible(false)
     tutorialVisibleRef.current = false
+    textFadeOutEndRef.current = performance.now() + COUNT_FADE_MS
   }, [])
 
   // Breath events from the Morph's 5-breath counter: 'breath' as piece n
@@ -1067,7 +1087,7 @@ export default function App() {
       if (introActiveRef.current) return
       if (mode === 'slowing' && pacedCueStageRef.current === 'captions') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
-      if (!tutorialVisibleRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
+      if (!tutorialVisibleRef.current && performance.now() >= textFadeOutEndRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
         awaitingMovementRef.current = true
         setTutorialText(currentMainTextRef.current)
         setTutorialVisible(true)
@@ -1116,6 +1136,18 @@ export default function App() {
   }, [mode])
 
   useEffect(() => () => clearTimeout(tutorialTimerRef.current), [])
+
+  // iOS Safari ignores user-scalable=no: block its pinch gestures so a stray
+  // touch never zooms the page (the experience wrapper also has touch-action: none).
+  useEffect(() => {
+    const block = (e) => e.preventDefault()
+    document.addEventListener('gesturestart', block)
+    document.addEventListener('gesturechange', block)
+    return () => {
+      document.removeEventListener('gesturestart', block)
+      document.removeEventListener('gesturechange', block)
+    }
+  }, [])
 
   useEffect(() => {
     spawnIntervalRef.current = breathLength
@@ -1178,9 +1210,7 @@ export default function App() {
 
   // Fade the scene and sliders in (see SCENE_REVEAL_MS).
   const revealScene = useCallback(() => {
-    setSceneRevealed(true)
-    clearTimeout(revealTimerRef.current)
-    revealTimerRef.current = setTimeout(() => setSlidersTouchable(true), SCENE_REVEAL_MS)
+    setSceneRevealed(true)   // sliders are touchable from the start of the fade
   }, [])
 
   const handleSelectMode = useCallback((m) => {
@@ -1210,9 +1240,8 @@ export default function App() {
     pacedTextStrokesRef.current = 0
 
     clearTimeout(tutorialTimerRef.current)
-    clearTimeout(revealTimerRef.current)
     setSceneRevealed(false)
-    setSlidersTouchable(false)
+    textFadeOutEndRef.current = 0
     diagRoundRef.current = 1
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
@@ -1277,7 +1306,6 @@ export default function App() {
       setTutorialText(TEXT_A)
       setTutorialVisible(true)
       tutorialVisibleRef.current = true
-      clearTimeout(revealTimerRef.current)
     }
     }
 
@@ -1327,7 +1355,6 @@ export default function App() {
   const handleBackFromExperience = useCallback(() => {
     audioRef.current.stop()
     clearTimeout(introTimerRef.current)
-    clearTimeout(revealTimerRef.current)
     introActiveRef.current = false
     setTutorialAtTop(false)
     gatesEnabledRef.current = false
@@ -1410,7 +1437,7 @@ export default function App() {
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
 
   return (
-    <div key={modeKey} ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div key={modeKey} ref={wrapperRef} style={{ width: '100%', height: '100%', position: 'relative', touchAction: 'none' }}>
       <Canvas
         camera={CAMERA_BY_SHAPE[shapeOption] || DEFAULT_CAMERA}
         style={{ position: 'absolute', inset: 0 }}
@@ -1503,7 +1530,7 @@ export default function App() {
           opacity: sceneRevealed ? 0 : 1, transition: `opacity ${SCENE_REVEAL_MS}ms ease`, pointerEvents: 'none',
         }} />
         <div style={{
-          position: 'absolute', inset: 0, pointerEvents: slidersTouchable ? 'auto' : 'none',
+          position: 'absolute', inset: 0, pointerEvents: sceneRevealed ? 'auto' : 'none',
           opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
         }}>
           {sliderLayout === 'diagonal'
