@@ -21,8 +21,23 @@ export const MODE_INTRO = {
   box: 'Box Breathing\nhas 4 steps:\ninhale, hold, exhale, hold\nfor 4 counts each.\n\nFollow the steps\nin this tutorial.\nYou will start\nBox Breathing\nat the end.',
   slowing: 'This mode will record\nthe pace of your\nbreathing and then\nhelp you slow down.\n\nThe following tutorial\nwill guide you into the\nSlowing Down Mode.',
   basic: 'In this mode,\nyou can breathe\nat your own pace\nand use the audio\nand visual feedback\nto help focus.\n\nThe following tutorial will\nguide you into the mode.',
-  // Tutorial mode: copy of Own Pace's for now.
-  tutorial: 'In this mode,\nyou can breathe\nat your own pace\nand use the audio\nand visual feedback\nto help focus.\n\nThe following tutorial will\nguide you into the mode.',
+}
+
+// Guided Breathing: Tutorial mode (App.jsx, tutorialRef). The part* screens
+// show at the top with a Continue button.
+export const TUTORIAL = {
+  part1: 'Part 1:\nControl the art and sound\nwith your breath.\n\nMove your thumbs\nwith every breath.',
+  inhaleUp: 'Inhale and\nmove the sliders up.',
+  exhaleDown: 'Exhale and\nmove the sliders down.',
+  gotIt: 'You got it!\nJust keep\nmoving the sliders\nas you breathe.',
+  tryOwn: 'Try it on your own\nfor a few breaths.',
+  remember: 'Remember to\nmove the sliders\nwith your breath.',
+  notice: 'Notice how your breathing controls the art and sound.',
+  part2: 'Part 2:\nCounting\nyour breath.\n\nEvery breath,\nthe center art will change.\nEvery 5 breaths,\nthe art and sounds will change.\n\nBreathe in and out 10 times\nand notice these changes.',
+  part3a: 'Part 3:\nGuided Breathing\n\nVisual and audio guides\nwill help you pace your breath.\n\nWhen it is time to inhale,\nyou will hear a bell.\nWhen it is time to exhale,\nyou will hear the same bell.',
+  part3b: 'The text on the sliders\nwill also tell you\nwhen to inhale and exhale.\n\nIn addition, each art option\nhas its own visual cues.\n\nThis is the end of the tutorial.\nPress continue to start breathing.\nIf you want a review,\nuse the Restart button.',
+  prepare: 'Relax and prepare to inhale.',
+  countdown: ['3', '2', '1', 'Inhale'],
 }
 
 export const TEXTS = {

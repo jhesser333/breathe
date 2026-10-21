@@ -40,7 +40,7 @@ import { RESET_ON_UNLOCK, TESTING_DEFAULTS } from './passcode'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
-import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS } from './copy'
+import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
@@ -86,6 +86,16 @@ const DIAG_ROUNDS = 3             // A1/A2 (up/down) rounds before B1
 // over SCENE_REVEAL_MS; the sliders become touchable when it finishes.
 const SCENE_REVEAL_MS = 3000
 const COUNT_FADE_MS = 1000   // count-tutorial texts: fade out, swap, fade in (each this long)
+
+// Guided Breathing: Tutorial mode (tutorialRef).
+const TUTORIAL_SCREEN_FADE_MS = 2000   // Part screens + Continue button fade in/out
+const TUTORIAL_REMIND_MS = 5000        // sliders still this long -> "Remember to move the sliders..."
+const TUTORIAL_PREPARE_MS = 3000       // "Relax and prepare to inhale." shows this long before the countdown
+const COUNTDOWN_STEP_MS = 1000         // each of 3, 2, 1
+const COUNTDOWN_FADE_MS = 300          // each number fades in and out over this
+const COUNTDOWN_INHALE_MS = 2000       // "Inhale" (with the first paced Inhale) shows this long, then fades
+const PRACTICE_FREE_BREATHS = 2        // breaths with no text between "Try it on your own" and "Notice how..."
+const PRACTICE_AFTER_BREATHS = 2       // breaths after "Notice how..." before Part 2
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
 const TEXT_SIZE_INTRO = 30
@@ -476,6 +486,24 @@ export default function App() {
   const countTutorialRef = useRef({ active: false, mode: null })
   const pacedStartFnRef = useRef(null)
 
+  // Guided Breathing: Tutorial mode. part: 'off' | 'screen' (a Part text +
+  // Continue) | 'rounds' (Inhale/Exhale x3) | 'practice' | 'count' (Part 2's
+  // 10 breaths) | 'paced'. screen: which Part text is up. step/inhales:
+  // practice progress. stepText: the text the current step shows (restored
+  // after the reminder). dir/extreme: inhale/exhale-start detection.
+  const modeRef = useRef(null)
+  modeRef.current = mode
+  const newTutorialState = () => ({ part: 'off', screen: null, step: null, inhales: 0, stepText: null, reminding: false, dir: 0, extreme: null })
+  const tutorialRef = useRef(newTutorialState())
+  const tutorialTimersRef = useRef([])
+  const [continueVisible, setContinueVisible] = useState(false)
+  const [continuePressed, setContinuePressed] = useState(false)
+  const [tutorialArt, setTutorialArt] = useState('morph')   // 'morph' = Morph only, 'background' = plus the art option's landscape/background
+  const [tutorialPaced, setTutorialPaced] = useState(false)  // paced gates/art mounted (Part 3 end)
+  const [tutorialSub, setTutorialSub] = useState(null)       // countdown line under the text
+  const [tutorialSubVisible, setTutorialSubVisible] = useState(false)
+  const [tutorialSubFadeMs, setTutorialSubFadeMs] = useState(COUNTDOWN_FADE_MS)
+
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
     directionRef.current = 0
@@ -748,7 +776,7 @@ export default function App() {
       const p = boxPhaseNow()
       return p === null ? null : p.index < 2 ? 'inhale' : 'exhale'
     }
-    if (mode === 'slowing') return slowingPhaseNow()
+    if (mode === 'slowing' || mode === 'tutorial') return slowingPhaseNow()
     return null
   }, [mode, boxPhaseNow, slowingPhaseNow])
 
@@ -762,7 +790,7 @@ export default function App() {
       const p = boxPhaseNow()
       return p === null ? null : ['inhale', 'hold', 'exhale', 'hold-out'][p.index]
     }
-    if (mode === 'slowing') {
+    if (mode === 'slowing' || mode === 'tutorial') {
       const phase = slowingPhaseNow()
       if (phase === null) { bellSawInhaleRef.current = false; return null }
       if (phase === 'inhale') bellSawInhaleRef.current = true
@@ -783,7 +811,7 @@ export default function App() {
       const e = THREE.MathUtils.smoothstep(p.t, 0, 1)
       return [e, 1, 1 - e, 0][p.index]
     }
-    if (mode === 'slowing') {
+    if (mode === 'slowing' || mode === 'tutorial') {
       const phase = slowingPhaseNow()
       const track = paceAudioPhaseRef.current
       if (phase === null) { track.phase = null; return null }
@@ -836,11 +864,203 @@ export default function App() {
     textFadeOutEndRef.current = performance.now() + COUNT_FADE_MS
   }, [])
 
+  // ---- Guided Breathing: Tutorial mode ----
+  const tutorialLater = useCallback((fn, ms) => {
+    tutorialTimersRef.current.push(setTimeout(fn, ms))
+  }, [])
+  const clearTutorialTimers = useCallback(() => {
+    tutorialTimersRef.current.forEach(clearTimeout)
+    tutorialTimersRef.current = []
+  }, [])
+
+  // A Part text at the top (the mode explanation's spot) with the Continue button.
+  const showTutorialScreen = useCallback((screenId, text) => {
+    const t = tutorialRef.current
+    t.part = 'screen'
+    t.screen = screenId
+    t.reminding = false
+    clearTimeout(tutorialTimerRef.current)
+    setTutorialAtTop(true)
+    setTutorialOpacity(null)
+    setTutorialFadeMs(TUTORIAL_SCREEN_FADE_MS)
+    currentMainTextRef.current = text
+    setTutorialText(text)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    setContinueVisible(true)
+  }, [])
+
+  // Fade the Part text and Continue out, then run next.
+  const leaveTutorialScreen = useCallback((next) => {
+    tutorialRef.current.screen = null
+    setContinueVisible(false)
+    setTutorialFadeMs(TUTORIAL_SCREEN_FADE_MS)
+    setTutorialVisible(false)
+    tutorialVisibleRef.current = false
+    tutorialLater(() => { setTutorialAtTop(false); next() }, TUTORIAL_SCREEN_FADE_MS)
+  }, [tutorialLater])
+
+  // Fade everything back to the blank screen, then show the next Part text.
+  const tutorialGoBlank = useCallback((screenId, text) => {
+    const t = tutorialRef.current
+    t.part = 'blank'
+    t.reminding = false
+    t.stepText = null
+    hideCountText()
+    setSceneRevealed(false)
+    tutorialLater(() => showTutorialScreen(screenId, text), SCENE_REVEAL_MS)
+  }, [hideCountText, showTutorialScreen, tutorialLater])
+
+  // The text the current step shows (null = none); held back while the reminder is up.
+  const setTutorialStepText = useCallback((text) => {
+    const t = tutorialRef.current
+    t.stepText = text
+    if (t.reminding) return
+    if (text) showCountText(text)
+    else hideCountText()
+  }, [showCountText, hideCountText])
+
+  // After the 3 Inhale/Exhale rounds (sliders at the bottom).
+  const startTutorialPractice = useCallback(() => {
+    diagStageRef.current = 'done'
+    setTutorialOpacity(null)
+    const t = tutorialRef.current
+    Object.assign(t, { part: 'practice', step: 'gotIt', inhales: 0, reminding: false, dir: -1, extreme: breathRef.current })
+    lastMoveTime.current = Date.now()
+    setTutorialStepText(TUTORIAL.gotIt)
+  }, [setTutorialStepText])
+
+  // Practice steps, advanced on inhale starts / exhale starts (setRight).
+  const updateTutorialPractice = useCallback((b) => {
+    const t = tutorialRef.current
+    if (t.part !== 'practice') return
+    if (t.extreme === null) { t.extreme = b; return }
+    let event = null
+    if (t.dir !== 1 && b - t.extreme > DIAG_DEADBAND) { t.dir = 1; t.extreme = b; event = 'inhale' }
+    else if (t.dir !== -1 && b - t.extreme < -DIAG_DEADBAND) { t.dir = -1; t.extreme = b; event = 'exhale' }
+    else if (t.dir === 1 && b > t.extreme) t.extreme = b
+    else if (t.dir === -1 && b < t.extreme) t.extreme = b
+    if (!event) return
+    if (t.step === 'gotIt' && event === 'inhale') {
+      // One inhale + exhale on "You got it!", then "Try it on your own" for the next.
+      if (++t.inhales === 2) { t.step = 'try'; setTutorialStepText(TUTORIAL.tryOwn) }
+    } else if (t.step === 'try' && event === 'inhale') {
+      t.step = 'free'; t.inhales = 0; setTutorialStepText(null)
+    } else if (t.step === 'free' && event === 'inhale') {
+      if (++t.inhales === PRACTICE_FREE_BREATHS) { t.step = 'notice'; setTutorialStepText(TUTORIAL.notice) }
+    } else if (t.step === 'notice' && event === 'exhale') {
+      t.step = 'after'; t.inhales = 0; setTutorialStepText(null)
+    } else if (t.step === 'after' && event === 'inhale') {
+      // The "Notice" breath ends on the first inhale start, then PRACTICE_AFTER_BREATHS more.
+      if (++t.inhales === PRACTICE_AFTER_BREATHS + 1) tutorialGoBlank('part2', TUTORIAL.part2)
+    }
+  }, [setTutorialStepText, tutorialGoBlank])
+
+  // Part 3's last screen: fade in the scene with the paced 5-5 art ready,
+  // "Relax and prepare to inhale.", then 3, 2, 1 and "Inhale" exactly as the
+  // first paced Inhale starts (gates enabled, first bell).
+  const startTutorialPaced = useCallback(() => {
+    const pace = TARGET_PACES['5-5']
+    spawnIntervalRef.current = pace.inhale + pace.exhale
+    inhaleSecondsRef.current = pace.inhale
+    exhaleSecondsRef.current = pace.exhale
+    setTutorialPaced(true)
+    setTutorialSub('')
+    setTutorialSubVisible(false)
+    setTutorialSubFadeMs(COUNTDOWN_FADE_MS)
+    leaveTutorialScreen(() => {
+      tutorialRef.current.part = 'paced'
+      setSceneRevealed(true)
+      currentMainTextRef.current = TUTORIAL.prepare
+      setTutorialFadeMs(COUNT_FADE_MS)
+      setTutorialText(TUTORIAL.prepare)
+      setTutorialVisible(true)
+      tutorialVisibleRef.current = true
+      const t0 = TUTORIAL_PREPARE_MS
+      TUTORIAL.countdown.forEach((word, i) => {
+        const at = t0 + i * COUNTDOWN_STEP_MS
+        tutorialLater(() => { setTutorialSub(word); setTutorialSubVisible(true) }, at)
+        if (i < TUTORIAL.countdown.length - 1) tutorialLater(() => setTutorialSubVisible(false), at + COUNTDOWN_STEP_MS - COUNTDOWN_FADE_MS)
+      })
+      const inhaleAt = t0 + (TUTORIAL.countdown.length - 1) * COUNTDOWN_STEP_MS
+      tutorialLater(() => {
+        // Same start as Slowing Down's paced art, without its captions.
+        breathPhaseRef.current = 'exhale'
+        pacedCueStageRef.current = 'done'
+        gatesEnabledRef.current = true
+      }, inhaleAt)
+      tutorialLater(() => {
+        setTutorialSubFadeMs(COUNT_FADE_MS)
+        setTutorialSubVisible(false)
+        currentMainTextRef.current = ''
+        hideCountText()
+      }, inhaleAt + COUNTDOWN_INHALE_MS)
+    })
+  }, [leaveTutorialScreen, tutorialLater, hideCountText])
+
+  const handleTutorialContinue = useCallback(() => {
+    const screenId = tutorialRef.current.screen
+    if (screenId === 'part1') {
+      leaveTutorialScreen(() => {
+        // Inhale/Exhale rounds (updateDiagonalSequence): "Inhale and..." fades
+        // in, then the sliders and Morph fade in.
+        const t = tutorialRef.current
+        t.part = 'rounds'
+        stageRef.current = 'done'
+        diagRoundRef.current = 1
+        diagDirectionRef.current = 0
+        diagExtremeRef.current = null
+        diagReversalCountRef.current = 0
+        currentMainTextRef.current = TUTORIAL.inhaleUp
+        setTutorialText(TUTORIAL.inhaleUp)
+        setTutorialFadeMs(A1_FADE_IN_MS)
+        setTutorialOpacity(null)
+        setTutorialVisible(true)
+        tutorialVisibleRef.current = true
+        diagStageRef.current = 'A1-appear'
+        tutorialLater(() => {
+          diagStageRef.current = 'A1'
+          setSceneRevealed(true)
+        }, A1_FADE_IN_MS)
+      })
+    } else if (screenId === 'part2') {
+      setTutorialArt('background')   // mounts under the cover, fades in with the scene
+      leaveTutorialScreen(() => {
+        tutorialRef.current.part = 'count'
+        lastMoveTime.current = Date.now()
+        setSceneRevealed(true)
+        breathCountingEnabledRef.current = true
+      })
+    } else if (screenId === 'part3a') {
+      leaveTutorialScreen(() => showTutorialScreen('part3b', TUTORIAL.part3b))
+    } else if (screenId === 'part3b') {
+      startTutorialPaced()
+    }
+  }, [leaveTutorialScreen, showTutorialScreen, startTutorialPaced, tutorialLater])
+
+  // "Remember to move the sliders..." after TUTORIAL_REMIND_MS still (Parts 1 and 2).
+  useEffect(() => {
+    if (mode !== 'tutorial') return
+    const id = setInterval(() => {
+      const t = tutorialRef.current
+      if ((t.part !== 'practice' && t.part !== 'count') || t.reminding) return
+      if (Date.now() - lastMoveTime.current < TUTORIAL_REMIND_MS) return
+      t.reminding = true
+      showCountText(TUTORIAL.remember)
+    }, 500)
+    return () => clearInterval(id)
+  }, [mode, showCountText])
+
   // Breath events from the Morph's 5-breath counter: 'breath' as piece n
   // (1-5) of count cycle `cycle` (0-based) starts to appear, 'cycleDone' as
   // a cycle's pieces go away (breath 5's Exhale). Each text shows on its
   // breath and fades out on the next one.
   const handleBreathCountEvent = useCallback((type, cycle, n) => {
+    // Tutorial Part 2: after 10 breaths (2 count cycles), on to Part 3.
+    if (tutorialRef.current.part === 'count') {
+      if (type === 'cycleDone' && cycle === 1) tutorialGoBlank('part3a', TUTORIAL.part3a)
+      return
+    }
     const ct = countTutorialRef.current
     if (!ct.active) return
     const m = ct.mode
@@ -871,7 +1091,7 @@ export default function App() {
       else if (n === 4) showCountText(m === 'box' ? TEXTS.boxCountTwoMore : TEXTS.slowingCuesSync)
       else if (n === 5) hideCountText()
     }
-  }, [showCountText, hideCountText])
+  }, [showCountText, hideCountText, tutorialGoBlank])
 
   const handlePacedPhase = useCallback((phase) => {
     const stage = pacedCueStageRef.current
@@ -1018,8 +1238,9 @@ export default function App() {
     diagRoundRef.current++
     diagStageRef.current = 'A1-reappear'
     setTutorialOpacity(null)
-    currentMainTextRef.current = TEXT_A1_DIAGONAL
-    setTutorialText(TEXT_A1_DIAGONAL)
+    const text = modeRef.current === 'tutorial' ? TUTORIAL.inhaleUp : TEXT_A1_DIAGONAL
+    currentMainTextRef.current = text
+    setTutorialText(text)
     setTutorialFadeMs(DIAG_FADE_IN_MS)
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
@@ -1036,8 +1257,9 @@ export default function App() {
       if (v >= 1 - DIAG_EDGE_THRESHOLD) {
         diagStageRef.current = 'A2-appear'
         setTutorialOpacity(null)
-        currentMainTextRef.current = TEXT_A2_DIAGONAL
-        setTutorialText(TEXT_A2_DIAGONAL)
+        const text = modeRef.current === 'tutorial' ? TUTORIAL.exhaleDown : TEXT_A2_DIAGONAL
+        currentMainTextRef.current = text
+        setTutorialText(text)
         setTutorialFadeMs(DIAG_FADE_IN_MS)
         setTutorialVisible(true)
         tutorialVisibleRef.current = true
@@ -1050,7 +1272,11 @@ export default function App() {
       setTutorialOpacity(v)
       if (v <= DIAG_EDGE_THRESHOLD) {
         // Order: round 1 -> B1 -> rounds 2..DIAG_ROUNDS -> B2 -> B3.
-        if (diagRoundRef.current === 1) {
+        // Tutorial mode: the rounds back to back, then practice (no B texts).
+        if (modeRef.current === 'tutorial') {
+          if (diagRoundRef.current < DIAG_ROUNDS) showA1Again()
+          else startTutorialPractice()
+        } else if (diagRoundRef.current === 1) {
           diagStageRef.current = 'B1-appear'
           setTutorialOpacity(null)
           currentMainTextRef.current = TEXT_B1_DIAGONAL
@@ -1106,7 +1332,7 @@ export default function App() {
         }
       }
     }
-  }, [beginDiagonalHold, showDiagonalB2, showB3, showA1Again, finishDiagonalSequence])
+  }, [beginDiagonalHold, showDiagonalB2, showB3, showA1Again, finishDiagonalSequence, startTutorialPractice])
 
   useEffect(() => {
     if (screen !== 'experience') return
@@ -1114,6 +1340,7 @@ export default function App() {
       // Box Breathing's captions are driven by their own clock-based poll
       // below, not by user interaction -- "stillness" is meaningless here.
       if (mode === 'box') return
+      if (mode === 'tutorial') return   // has its own reminder (TUTORIAL_REMIND_MS)
       if (introActiveRef.current) return
       if (mode === 'slowing' && pacedCueStageRef.current === 'captions') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
@@ -1200,7 +1427,17 @@ export default function App() {
     lastMoveTime.current = Date.now()
     // Breath position in the old left-slider convention (0 exhale -> 1 inhale).
     const b = 1 - v
-    if (sliderLayout === 'diagonal' || diagStageRef.current.startsWith('B3')) updateDiagonalSequence(b)
+    if (modeRef.current === 'tutorial') {
+      // Moving again after the reminder: back to the step's own text.
+      const t = tutorialRef.current
+      if (t.reminding) {
+        t.reminding = false
+        if (t.stepText) showCountText(t.stepText)
+        else hideCountText()
+      }
+      updateTutorialPractice(b)
+    }
+    if (sliderLayout === 'diagonal' || modeRef.current === 'tutorial' || diagStageRef.current.startsWith('B3')) updateDiagonalSequence(b)
     updatePacedText(b)
     if (pacedWaitForBottomRef.current && b <= DIAG_EDGE_THRESHOLD && pacedStartFnRef.current) pacedStartFnRef.current()
 
@@ -1238,7 +1475,7 @@ export default function App() {
     }
 
     handleMovement()
-  }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, updatePacedText])
+  }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, updatePacedText, updateTutorialPractice, showCountText, hideCountText])
 
   // Fade the scene and sliders in (see SCENE_REVEAL_MS).
   const revealScene = useCallback(() => {
@@ -1274,6 +1511,14 @@ export default function App() {
     clearTimeout(tutorialTimerRef.current)
     setSceneRevealed(false)
     textFadeOutEndRef.current = 0
+    modeRef.current = m
+    clearTutorialTimers()
+    tutorialRef.current = newTutorialState()
+    setContinueVisible(false)
+    setTutorialArt('morph')
+    setTutorialPaced(false)
+    setTutorialSub(null)
+    setTutorialSubVisible(false)
     diagRoundRef.current = 1
     pendingGatesFnRef.current = null
     awaitingMovementRef.current = false
@@ -1346,7 +1591,13 @@ export default function App() {
     // movement doesn't advance them.
     clearTimeout(introTimerRef.current)
     const intro = MODE_INTRO[m]
-    if (intro) {
+    if (m === 'tutorial') {
+      // Tutorial: Part 1's text waits for Continue (handleTutorialContinue).
+      introActiveRef.current = false
+      stageRef.current = 'done'
+      diagStageRef.current = 'intro'
+      showTutorialScreen('part1', TUTORIAL.part1)
+    } else if (intro) {
       introActiveRef.current = true
       setTutorialAtTop(true)
       stageRef.current = 'intro'
@@ -1372,7 +1623,7 @@ export default function App() {
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, sliderLayout, startBoxArt, startPacedArt, revealScene])
+  }, [resetSlowingState, showGatesText, sliderLayout, startBoxArt, startPacedArt, revealScene, clearTutorialTimers, showTutorialScreen])
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
@@ -1387,6 +1638,9 @@ export default function App() {
   const handleBackFromExperience = useCallback(() => {
     audioRef.current.stop()
     clearTimeout(introTimerRef.current)
+    clearTutorialTimers()
+    tutorialRef.current = newTutorialState()
+    setContinueVisible(false)
     introActiveRef.current = false
     setTutorialAtTop(false)
     gatesEnabledRef.current = false
@@ -1404,7 +1658,7 @@ export default function App() {
     tutorialVisibleRef.current = false
     setMode(null)
     setScreen('selectMode')
-  }, [])
+  }, [clearTutorialTimers])
 
   // Measures the Home/Restart button (group)'s own rendered height so the
   // sliders can be shifted up to sit flush against its top edge -- avoids
@@ -1462,7 +1716,11 @@ export default function App() {
       />
     )
   }
-  const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box'
+  // Tutorial: Part 1 shows the Morph only; the paced gates/art mount for Part 3's end.
+  const tutorialPacedOn = mode === 'tutorial' && tutorialPaced
+  const showBackgroundArt = mode !== 'tutorial' || tutorialArt === 'background'
+  const landscapeMode = tutorialPacedOn ? 'slowing' : mode   // landscape speed follows the gates once they run
+  const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box' || tutorialPacedOn
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : MorphA
   const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
   const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
@@ -1482,14 +1740,14 @@ export default function App() {
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
-        {shapeOption === 'b' && <LandscapeB mode={mode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
-        {shapeOption === 'f' && <SideCloudsF mode={mode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}
-        {backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
-        {backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
+        {showBackgroundArt && shapeOption === 'b' && <LandscapeB mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
+        {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}
+        {showBackgroundArt && backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
+        {showBackgroundArt && backgroundOption === 'rings' && <RingParticlesD textColor={palette.textColor} secondaryColor={palette.secondaryColor} tertiaryColor={palette.tertiaryColor} primaryColor={palette.primaryColor} paceProgressRef={ringPaceProgressRef} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} isBoxBreathing={mode === 'box'} boxPhaseRef={boxPhaseRef} boxProgressRef={boxProgressRef} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
         {mode === 'slowing' && shapeOption !== 'd' && shapeOption !== 'e' && !usesCubeFlow(shapeOption) && <PacedBreathCountStarter gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onStart={handlePacedCountStart} />}
         {mode === 'slowing' && (shapeOption === 'd' || shapeOption === 'e' || usesCubeFlow(shapeOption)) && <PacedPhaseWatcher gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} onPhaseChange={handlePacedPhase} />}
-        {mode === 'slowing' && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
-        {backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
+        {(mode === 'slowing' || tutorialPacedOn) && shapeOption === 'd' && <SlowingDownPaceRingsD gatesEnabledRef={gatesEnabledRef} breathPhaseRef={breathPhaseRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} gateColor={palette.secondaryColor} emissiveColor={palette.primaryColor} livePaletteRef={livePaletteRef} paceArtFadeRef={paceArtFadeRef} />}
+        {showBackgroundArt && backgroundOption === 'b' && <BackgroundB gateColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} />}
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
@@ -1506,7 +1764,7 @@ export default function App() {
             exhaleSecondsRef={exhaleSecondsRef}
             livePaletteRef={livePaletteRef}
             paceProgressRef={ringPaceProgressRef}
-            startOnInhale={mode === 'slowing'}
+            startOnInhale={mode === 'slowing' || mode === 'tutorial'}
           />
         )}
         {mode === 'box' && hasGates && (
@@ -1597,11 +1855,38 @@ export default function App() {
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
-          subText={mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold : null}
+          subText={mode === 'tutorial' ? tutorialSub
+            : mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold : null}
+          subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs}
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : 'box'}
           pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef} />
+        {mode === 'tutorial' && (
+          // Tutorial Part screens: rounded like the mode cards, colored/pressed like Start.
+          <button
+            onClick={continueVisible ? handleTutorialContinue : undefined}
+            onPointerDown={() => setContinuePressed(true)}
+            onPointerUp={() => setContinuePressed(false)}
+            onPointerLeave={() => setContinuePressed(false)}
+            onPointerCancel={() => setContinuePressed(false)}
+            style={{
+              position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+              bottom: sliderLayout === 'diagonal' ? 16 : 16 + sliderShiftUp + 20,
+              padding: '20px 24px', borderRadius: 12,
+              background: `rgba(var(--live-primary-rgb, 141, 177, 161), ${continuePressed ? 0.75 : 0.25})`,
+              border: '2px solid rgb(var(--live-primary-rgb, 141, 177, 161))',
+              color: 'rgb(var(--live-primary-rgb, 141, 177, 161))', fontSize: 20, fontWeight: 700,
+              fontFamily: 'sans-serif', cursor: 'pointer',
+              opacity: continueVisible ? 1 : 0,
+              transition: `opacity ${TUTORIAL_SCREEN_FADE_MS}ms ease`,
+              pointerEvents: continueVisible ? 'auto' : 'none',
+              zIndex: 101,
+            }}
+          >
+            Continue
+          </button>
+        )}
         {mode === 'timed' && (
           <BreathLengthControl
             breathLength={breathLength}

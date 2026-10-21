@@ -59,9 +59,10 @@ function roundAlphaMultiplier(totalElapsed, interval) {
 // explanation) instead of the usual spot over the Morph's lower third.
 // size: font size in px (App: 20 mode explanation, 60 paced captions, 40 the rest);
 // larger text gets a wider column so long lines still fit.
-// subText: Box Breathing's "Hold", shown on the line below the caption
-// (positioned so the caption itself doesn't move).
-export default function TutorialText({ size = 20, topPx = null, text, subText = null, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+// subText: a line below the caption (positioned so the caption itself doesn't
+// move) -- Box Breathing's "Hold" (driven by the caption loop) or the Tutorial
+// countdown (subVisible, fading over subFadeMs).
+export default function TutorialText({ size = 20, topPx = null, text, subText = null, subVisible = false, subFadeMs = 300, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
   const subRef = useRef(null)
 
@@ -154,7 +155,9 @@ export default function TutorialText({ size = 20, topPx = null, text, subText = 
           <p ref={subRef} style={{
             ...lineStyle,
             position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
-            opacity: 0,
+            whiteSpace: 'nowrap',
+            opacity: pulseActive ? undefined : (subVisible ? 1 : 0),
+            transition: pulseActive ? 'none' : `opacity ${subFadeMs}ms ease`,
           }}>
             {subText}
           </p>
