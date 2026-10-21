@@ -116,7 +116,8 @@ export default function TutorialText({ size = 20, topPx = null, text, subText = 
       cancelAnimationFrame(raf)
       if (subRef.current) subRef.current.style.opacity = '0'   // "Hold" never lingers once the captions stop
     }
-  }, [pulseActive, pulseMode, pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef])
+    // text: each new Box caption (Inhale <-> Exhale) restarts the loop, clearing the wrap latch.
+  }, [pulseActive, pulseMode, text, pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`
