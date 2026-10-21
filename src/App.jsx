@@ -42,7 +42,7 @@ import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
-import { createAudioEngine } from './breathAudio'
+import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
 
 const navPillStyle = {
@@ -216,8 +216,18 @@ function PacedPhaseWatcher({ gatesEnabledRef, breathPhaseRef, onPhaseChange }) {
 
 // Feeds the paced audio pair its 0 (exhale) -> 1 (inhale) value every frame,
 // or null (silent) outside the app-paced part of Box Breathing / Slowing Down.
-function PaceAudioDriver({ audioRef, getPaceProgress }) {
-  useFrame(() => { audioRef.current.setPace(getPaceProgress()) })
+// Also rings a bell as each paced phase begins: the 3 s bell for Inhale/Exhale,
+// the 4 s bell for Box Breathing's Holds (cut off as the next phase's bell rings).
+function PaceAudioDriver({ audioRef, getPaceProgress, getBellPhase }) {
+  const prevBellRef = useRef(null)
+  useFrame(() => {
+    audioRef.current.setPace(getPaceProgress())
+    const phase = getBellPhase()
+    if (phase === prevBellRef.current) return
+    prevBellRef.current = phase
+    if (phase === null) audioRef.current.stopBell()
+    else audioRef.current.playBell(phase === 'inhale' || phase === 'exhale' ? BELL_INHALE_EXHALE : BELL_HOLD)
+  })
   return null
 }
 
@@ -738,6 +748,25 @@ export default function App() {
       return p === null ? null : p.index < 2 ? 'inhale' : 'exhale'
     }
     if (mode === 'slowing') return slowingPhaseNow()
+    return null
+  }, [mode, boxPhaseNow, slowingPhaseNow])
+
+  // Which paced phase's bell should be ringing: Box 'inhale'/'hold'/'exhale'/
+  // 'hold-out' from the caption clock; Slowing Down 'inhale'/'exhale', from the
+  // first paced Inhale on (skips the 'exhale' startPacedArt sets, like the
+  // captions do). null = no bells.
+  const bellSawInhaleRef = useRef(false)
+  const getBellPhase = useCallback(() => {
+    if (mode === 'box') {
+      const p = boxPhaseNow()
+      return p === null ? null : ['inhale', 'hold', 'exhale', 'hold-out'][p.index]
+    }
+    if (mode === 'slowing') {
+      const phase = slowingPhaseNow()
+      if (phase === null) { bellSawInhaleRef.current = false; return null }
+      if (phase === 'inhale') bellSawInhaleRef.current = true
+      return bellSawInhaleRef.current ? phase : null
+    }
     return null
   }, [mode, boxPhaseNow, slowingPhaseNow])
 
@@ -1446,7 +1475,7 @@ export default function App() {
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
         <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} />
-        <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} />
+        <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} getBellPhase={getBellPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
         <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />

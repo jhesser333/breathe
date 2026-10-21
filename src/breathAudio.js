@@ -33,6 +33,11 @@ const FILE_GAIN = {
 }
 const fileGain = (f) => FILE_GAIN[f.toLowerCase()] ?? 1
 const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context
+// One-shot bells at the start of each paced phase (Box Breathing, Slowing Down).
+export const BELL_INHALE_EXHALE = 'bell_3s_a.wav'
+export const BELL_HOLD = 'bell_4s_a.wav'
+const BELL_GAIN = 1               // volume as exported
+const BELL_CUT_FADE_S = 0.1       // a bell cut off by the next one fades this fast (no click)
 
 // { slider: [1, 2, ...], pace: [1, ...] } -- only groups with both a and b.
 function findGroups() {
@@ -71,6 +76,20 @@ export function createAudioEngine() {
   const current = { slider: null, pace: null }
   let lastCycleIndex = 0
   let resumeCheck = null
+  let bell = null           // the ringing bell { src, gain }, or null
+  let bellRequest = 0       // newest playBell call; a bell that loads late is skipped if superseded
+
+  function cutBell(fadeS = BELL_CUT_FADE_S) {
+    bellRequest++
+    if (!bell || !ctx) { bell = null; return }
+    const { src, gain } = bell
+    bell = null
+    const t = ctx.currentTime
+    gain.gain.cancelScheduledValues(t)
+    gain.gain.setValueAtTime(gain.gain.value, t)
+    gain.gain.linearRampToValueAtTime(0, t + fadeS)
+    try { src.stop(t + fadeS + 0.02) } catch { /* already stopped */ }
+  }
 
   function load(file) {
     if (!buffers[file]) {
@@ -184,6 +203,7 @@ export function createAudioEngine() {
 
   // Old voices belong to the dead context; just drop them and rebuild.
   function restartVoices() {
+    bell = null
     current.slider = null
     current.pace = null
     paceOn = false
@@ -217,11 +237,14 @@ export function createAudioEngine() {
       paceV = 0
       current.slider = makeVoices('slider', cycleIndex, 0.5, 1)
       current.pace = makeVoices('pace', cycleIndex, 0.5, 0)
+      load(BELL_INHALE_EXHALE)
+      load(BELL_HOLD)
     },
 
     stop(fadeS = STOP_FADE_S) {
       if (!ctx) return
       running = false
+      cutBell(fadeS)
       retire(current.slider, fadeS)
       retire(current.pace, fadeS)
       current.slider = null
@@ -240,6 +263,29 @@ export function createAudioEngine() {
       const on = v !== null && v !== undefined
       if (on) { paceV = Math.min(1, Math.max(0, v)); applyCross('pace') }
       if (on !== paceOn) { paceOn = on; setPaceLevel(on) }
+    },
+
+    // Ring a one-shot bell, cutting off any bell still ringing.
+    playBell(file) {
+      if (!running || !ctx) return
+      cutBell()
+      const request = bellRequest
+      load(file).then((buf) => {
+        if (!buf || !running || request !== bellRequest) return
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        const gain = ctx.createGain()
+        gain.gain.value = BELL_GAIN * fileGain(file)
+        src.connect(gain).connect(master)
+        src.start()
+        const ringing = { src, gain }
+        bell = ringing
+        src.onended = () => { src.disconnect(); gain.disconnect(); if (bell === ringing) bell = null }
+      })
+    },
+
+    stopBell(fadeS = BELL_CUT_FADE_S) {
+      cutBell(fadeS)
     },
 
     // Next 5-breath cycle: move each pair to its group for this cycle.
