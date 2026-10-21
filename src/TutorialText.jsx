@@ -62,7 +62,9 @@ function roundAlphaMultiplier(totalElapsed, interval) {
 // subText: a line below the caption (positioned so the caption itself doesn't
 // move) -- Box Breathing's "Hold" (driven by the caption loop) or the Tutorial
 // countdown (subVisible, fading over subFadeMs).
-export default function TutorialText({ size = 20, topPx = null, text, subText = null, subVisible = false, subFadeMs = 300, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+// region: { top, bottom } px from the screen edges -- center the text
+// vertically in that band instead (Tutorial mode's Part screens).
+export default function TutorialText({ size = 20, topPx = null, region = null, text, subText = null, subVisible = false, subFadeMs = 300, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
   const subRef = useRef(null)
 
@@ -140,8 +142,13 @@ export default function TutorialText({ size = 20, topPx = null, text, subText = 
   return (
     <div style={{
       position: 'absolute',
-      top: topPx !== null ? topPx : 'calc(44% + 24px)', left: 0, right: 0,   // default: in front of the Morph's lower third, nudged down ~1/4 inch
-      transform: topPx !== null ? 'none' : 'translateY(-50%)',
+      ...(region
+        ? { top: region.top, bottom: region.bottom, transform: 'none' }
+        : {
+            top: topPx !== null ? topPx : 'calc(44% + 24px)',   // default: in front of the Morph's lower third, nudged down ~1/4 inch
+            transform: topPx !== null ? 'none' : 'translateY(-50%)',
+          }),
+      left: 0, right: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       pointerEvents: 'none',
       zIndex: 100,   // always above the canvas, sliders and nav buttons

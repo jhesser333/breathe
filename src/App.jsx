@@ -98,10 +98,10 @@ const PRACTICE_FREE_BREATHS = 2        // breaths with no text between "Try it o
 const PRACTICE_AFTER_BREATHS = 2       // breaths after "Notice how..." before Part 2
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
-const TEXT_SIZE_INTRO = 30
+const TEXT_SIZE_INTRO = 24
 const INTRO_EXTRA_LINES = 2   // blank intro-size lines added above the mode explanation (line height 1.2)
 const TEXT_SIZE_CAPTION = 60
-const TEXT_SIZE_TUTORIAL = 40
+const TEXT_SIZE_TUTORIAL = 30
 
 // Per-shape camera placement. Each art option is framed independently -- omitting
 // `rotation` lets R3F apply its default look-at-origin, which gives the ~35deg
@@ -503,6 +503,8 @@ export default function App() {
   const [tutorialSub, setTutorialSub] = useState(null)       // countdown line under the text
   const [tutorialSubVisible, setTutorialSubVisible] = useState(false)
   const [tutorialSubFadeMs, setTutorialSubFadeMs] = useState(COUNTDOWN_FADE_MS)
+  const continueRef = useRef(null)
+  const [continueHeight, setContinueHeight] = useState(67)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -1668,6 +1670,9 @@ export default function App() {
   useLayoutEffect(() => {
     if (navButtonsRef.current) setSliderShiftUp(navButtonsRef.current.offsetHeight)
   }, [sliderLayout])
+  useLayoutEffect(() => {
+    if (continueRef.current) setContinueHeight(continueRef.current.offsetHeight)
+  }, [mode])
 
   // Passcode gate: not saved anywhere, so every load/refresh asks again.
   if (!unlocked) {
@@ -1721,6 +1726,13 @@ export default function App() {
   const showBackgroundArt = mode !== 'tutorial' || tutorialArt === 'background'
   const landscapeMode = tutorialPacedOn ? 'slowing' : mode   // landscape speed follows the gates once they run
   const hasGates = mode === 'timed' || mode === 'slowing' || mode === 'box' || tutorialPacedOn
+  // Continue sits a little above the Home/Restart buttons' tops; the Part
+  // texts center between the mode name and the top of Continue.
+  const modeLabelLines = (MODE_LABELS[mode] || '').includes(': ') ? 2 : 1
+  const continueBottom = 16 + sliderShiftUp + 12
+  const tutorialScreenRegion = mode === 'tutorial' && tutorialAtTop
+    ? { top: MODE_CAPTION_TOP + modeLabelLines * MODE_CAPTION_LINE_PX, bottom: continueBottom + continueHeight }
+    : null
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : MorphA
   const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' ? GatesHeadlessE : GatesA
   const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
@@ -1851,7 +1863,7 @@ export default function App() {
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />
         )}
-        <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
+        <TutorialText region={tutorialScreenRegion} topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
@@ -1865,6 +1877,7 @@ export default function App() {
         {mode === 'tutorial' && (
           // Tutorial Part screens: rounded like the mode cards, colored/pressed like Start.
           <button
+            ref={continueRef}
             onClick={continueVisible ? handleTutorialContinue : undefined}
             onPointerDown={() => setContinuePressed(true)}
             onPointerUp={() => setContinuePressed(false)}
@@ -1872,7 +1885,7 @@ export default function App() {
             onPointerCancel={() => setContinuePressed(false)}
             style={{
               position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-              bottom: sliderLayout === 'diagonal' ? 16 : 16 + sliderShiftUp + 20,
+              bottom: continueBottom,
               padding: '20px 24px', borderRadius: 12,
               background: `rgba(var(--live-primary-rgb, 141, 177, 161), ${continuePressed ? 0.75 : 0.25})`,
               border: '2px solid rgb(var(--live-primary-rgb, 141, 177, 161))',
