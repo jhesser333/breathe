@@ -76,6 +76,7 @@ export function createAudioEngine() {
   const current = { slider: null, pace: null }
   let lastCycleIndex = 0
   let resumeCheck = null
+  let stale = false         // page was hidden since the context was made: rebuild on the next tap
   let muted = false         // setMuted: master faded to silence (Tutorial's text screens)
   let bell = null           // the ringing bell { src, gain }, or null
   let bellRequest = 0       // newest playBell call; a bell that loads late is skipped if superseded
@@ -187,6 +188,18 @@ export function createAudioEngine() {
   // to resume, or 'closed'. Resume it, and if that doesn't take, start over
   // with a fresh context and restart whatever was playing.
   function ensureRunning() {
+    // After the page was hidden (phone locked / app backgrounded), iOS can
+    // leave the context reporting 'running' but silent -- rebuild it outright.
+    if (stale && ctx) {
+      stale = false
+      clearTimeout(resumeCheck)
+      try { ctx.close() } catch { /* ignore */ }
+      if (!createContext()) return
+      ctx.resume().catch(() => {})
+      if (running) restartVoices()
+      return
+    }
+    stale = false
     if (!ctx || ctx.state === 'closed') {
       if (!createContext()) return
       if (running) restartVoices()
@@ -216,11 +229,13 @@ export function createAudioEngine() {
   // Any tap (a user gesture) while playing brings a stalled context back, so
   // touching a slider after returning to the phone restores the sound.
   if (typeof document !== 'undefined') {
-    const onGesture = () => { if (running && (!ctx || ctx.state !== 'running')) ensureRunning() }
+    const onGesture = () => { if (running && (stale || !ctx || ctx.state !== 'running')) ensureRunning() }
     for (const type of ['touchend', 'pointerup', 'keydown']) document.addEventListener(type, onGesture, { passive: true })
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && running && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
+      if (document.visibilityState === 'hidden') stale = true
+      else if (running && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
     })
+    window.addEventListener('pagehide', () => { stale = true })
   }
 
   return {
