@@ -267,6 +267,7 @@ export default function App() {
   const [screen, setScreen] = useState('selectMode')
   const [mode, setMode] = useState(null)
   const [modeKey, setModeKey] = useState(0)
+  const [sliderResetKey, setSliderResetKey] = useState(0)   // bump to remount the sliders at full Exhale
   const [tutorialText, setTutorialText] = useState('')
   const [tutorialVisible, setTutorialVisible] = useState(false)
   const [tutorialOpacity, setTutorialOpacity] = useState(null)
@@ -915,7 +916,14 @@ export default function App() {
     hideCountText()
     setSceneRevealed(false)
     audioRef.current.setMuted(true, SCENE_REVEAL_MS / 1000)   // silent while the Part text shows
-    tutorialLater(() => showTutorialScreen(screenId, text), SCENE_REVEAL_MS)
+    tutorialLater(() => {
+      // Fully covered now: put the sliders back at full Exhale so they fade
+      // back in from the default spot, not where they froze.
+      leftRawRef.current = 0
+      rightRawRef.current = 1
+      setSliderResetKey(k => k + 1)
+      showTutorialScreen(screenId, text)
+    }, SCENE_REVEAL_MS)
   }, [hideCountText, showTutorialScreen, tutorialLater])
 
   // The text the current step shows (null = none); held back while the reminder is up.
@@ -1842,8 +1850,8 @@ export default function App() {
           opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
         }}>
           {sliderLayout === 'diagonal'
-            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />
-            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />}
+            ? <SlidersDiagonal key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />
+            : <Sliders key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />}
         </div>
         <div style={{ position: 'absolute', top: MODE_CAPTION_TOP, left: '50%', transform: 'translateX(-50%)' }}>
           <span style={{
