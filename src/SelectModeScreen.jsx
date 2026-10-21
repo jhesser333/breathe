@@ -7,7 +7,7 @@ const OPTIONS = [
   {
     id: 'tutorial',
     label: MODE_LABELS.tutorial,
-    desc: 'Visualize your breathing at whatever pace you\'d like',
+    desc: 'Try this first to learn how things work',
   },
   {
     id: 'box',
