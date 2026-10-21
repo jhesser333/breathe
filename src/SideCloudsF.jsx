@@ -100,7 +100,7 @@ export default function SideCloudsF({ mode, spawnIntervalRef, leftVal, gatesEnab
       travelRef.current = 0
     }
 
-    const interval = mode === 'basic' || !mode ? OWN_PACE_INTERVAL : spawnIntervalRef.current
+    const interval = mode === 'basic' || mode === 'tutorial' || !mode ? OWN_PACE_INTERVAL : spawnIntervalRef.current
     const speed = (mode === 'box' ? TRAVEL.box : TRAVEL.other) / Math.max(interval, 0.1)
     const step = speed * delta
 

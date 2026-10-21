@@ -1,4 +1,5 @@
 export const MODE_LABELS = {
+  tutorial: 'Guided Breathing: Tutorial',
   basic: 'Breathe at Your Own Pace',
   timed: 'Paced Breathing',
   slowing: 'Guided Breathing: Slowing Down',
@@ -20,6 +21,8 @@ export const MODE_INTRO = {
   box: 'Box Breathing\nhas 4 steps:\ninhale, hold, exhale, hold\nfor 4 counts each.\n\nFollow the steps\nin this tutorial.\nYou will start\nBox Breathing\nat the end.',
   slowing: 'This mode will record\nthe pace of your\nbreathing and then\nhelp you slow down.\n\nThe following tutorial\nwill guide you into the\nSlowing Down Mode.',
   basic: 'In this mode,\nyou can breathe\nat your own pace\nand use the audio\nand visual feedback\nto help focus.\n\nThe following tutorial will\nguide you into the mode.',
+  // Tutorial mode: copy of Own Pace's for now.
+  tutorial: 'In this mode,\nyou can breathe\nat your own pace\nand use the audio\nand visual feedback\nto help focus.\n\nThe following tutorial will\nguide you into the mode.',
 }
 
 export const TEXTS = {

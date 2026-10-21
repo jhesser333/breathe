@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { MODE_LABELS } from './copy'
 
+// Breathe at Your Own Pace ('basic') and Paced Breathing ('timed') are hidden
+// from the picker but still fully implemented.
 const OPTIONS = [
+  {
+    id: 'tutorial',
+    label: MODE_LABELS.tutorial,
+    desc: 'Visualize your breathing at whatever pace you\'d like',
+  },
   {
     id: 'box',
     label: MODE_LABELS.box,
@@ -11,11 +18,6 @@ const OPTIONS = [
     id: 'slowing',
     label: MODE_LABELS.slowing,
     desc: 'The app gently helps you slow the pace of your breathing',
-  },
-  {
-    id: 'basic',
-    label: MODE_LABELS.basic,
-    desc: 'Visualize your breathing at whatever pace you\'d like',
   },
 ]
 

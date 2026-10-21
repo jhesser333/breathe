@@ -81,7 +81,7 @@ export default function LandscapeB({ mode, spawnIntervalRef, landscapeIndexRef, 
       }
     }
 
-    const interval = mode === 'basic' || !mode ? OWN_PACE_INTERVAL : spawnIntervalRef.current
+    const interval = mode === 'basic' || mode === 'tutorial' || !mode ? OWN_PACE_INTERVAL : spawnIntervalRef.current
     const speed = (mode === 'box' ? TARGET_SPAWN_DIST.box : TARGET_SPAWN_DIST.other) / Math.max(interval, 0.1)
     const step = speed * delta
 

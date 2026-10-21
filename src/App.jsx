@@ -280,8 +280,9 @@ export default function App() {
     return Object.keys(TARGET_PACES).includes(saved) ? saved : DEFAULT_TARGET_PACE
   })
   const [selectedMode, setSelectedModeState] = useState(() => {
-    const saved = localStorage.getItem('selectedMode') || 'basic'
-    return ['basic', 'timed', 'slowing', 'box'].includes(saved) ? saved : 'basic'
+    // Own Pace ('basic') is hidden from the picker: move anyone on it to Tutorial.
+    const saved = localStorage.getItem('selectedMode') || 'tutorial'
+    return ['tutorial', 'timed', 'slowing', 'box'].includes(saved) ? saved : 'tutorial'
   })
 
   const setShapeOption = useCallback((v) => {

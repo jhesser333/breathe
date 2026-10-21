@@ -220,7 +220,12 @@ Per-object rest transforms live in `breathBaseRef`. The Morph backlight glow tra
 
 While any mode is playing, the current mode's display name (from `MODE_LABELS` in `copy.js`) appears as a small persistent uppercase caption at top-center of the experience screen (`top:16, left:'50%', transform:'translateX(-50%)'`, plain text, no background) — always on for the whole session, does not fade, distinct from `TutorialText` (`top:calc(44% + 24px)`) and `BreathLengthControl` (`top:16,left:16`).
 
+### Guided Breathing: Tutorial
+- Internal id `'tutorial'`. Currently an exact copy of Basic (Own Pace): App.jsx treats any mode other than `'box'`/`'slowing'`/`'timed'` as Own Pace, so it inherits all of Basic's behavior. Its own entries are `MODE_LABELS.tutorial`, `MODE_INTRO.tutorial` (a copy of Basic's for now), and the Own Pace drift-speed checks in `LandscapeB`/`LandscapeF`/`SideCloudsF`.
+- Top card on Select Mode and the default (`selectedMode` default, `TESTING_DEFAULTS.selectedMode`). A saved `'basic'` is migrated to `'tutorial'` on load.
+
 ### Basic
+- Hidden from the Select Mode picker (replaced by Tutorial); still fully implemented.
 - Morph + environment, no Gates.
 - Display label: **"Breathe at Your Own Pace"** (internal mode id remains `'basic'` everywhere in the code — only the display string changed).
 
