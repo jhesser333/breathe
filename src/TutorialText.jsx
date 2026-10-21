@@ -8,9 +8,8 @@ const OUTLINE_SHADOW = [
   .concat(`0 0 6px ${OUTLINE_COLOR}`)
   .join(', ')
 
-const PULSE_DURATION = 1.0
-const PULSE_MID_FLOOR = 0.5
 const FADE_IN_FRAC = 0.9   // Inhale/Exhale: fraction of the phase spent easing 0 -> 1
+const HOLD_FADE_IN_S = 1   // Box Breathing: "Hold" fades in over this at the start of each Hold
 
 function smoothstep(t) {
   const c = Math.max(0, Math.min(1, t))
@@ -19,15 +18,6 @@ function smoothstep(t) {
 
 function lerp(a, b, t) {
   return a + (b - a) * t
-}
-
-// Per-second pulse used by Box Breathing's "Hold" caption: every second
-// (including the first and last) steps immediately to full and eases back
-// down to PULSE_MID_FLOOR across the whole second -- identical treatment
-// throughout, no special-cased first/last pulse.
-function pulseAlpha(elapsed) {
-  const t = elapsed % PULSE_DURATION
-  return lerp(PULSE_MID_FLOOR, 1, 1 - smoothstep(t / PULSE_DURATION))
 }
 
 // Single fade spanning the whole phase, used by Inhale/Exhale instead of the
@@ -39,17 +29,17 @@ function fadeAlpha(phaseElapsed, interval) {
   return lerp(1, 0, smoothstep((t - FADE_IN_FRAC) / (1 - FADE_IN_FRAC)))
 }
 
-const HOLD_FADE_MAX = 0.5   // caps Hold's mirrored fade-out multiplier so its peak brightness doesn't jar against Inhale/Exhale's fade-in
-
-// Mirror image of Inhale/Exhale's fade-in (rise 0 -> 1 over the first
-// FADE_IN_FRAC of the phase): flat at HOLD_FADE_MAX for the mirrored
-// remainder, then eases HOLD_FADE_MAX -> 0 over the last FADE_IN_FRAC.
-// Multiplied over Hold's per-second pulse as an additional overall fade-out.
-function holdFadeMultiplier(phaseElapsed, interval) {
-  const t = interval > 0 ? phaseElapsed / interval : 0
-  const flatFrac = 1 - FADE_IN_FRAC
-  if (t < flatFrac) return HOLD_FADE_MAX
-  return lerp(HOLD_FADE_MAX, 0, smoothstep((t - flatFrac) / FADE_IN_FRAC))
+// Box Breathing: one caption per half-cycle (Inhale + Hold-in, Exhale +
+// Hold-out). "Inhale"/"Exhale" eases in over the first FADE_IN_FRAC of the
+// movement phase and stays up through the Hold; "Hold" fades in below it
+// over HOLD_FADE_IN_S as the Hold starts. Both ease out together over the
+// Hold's last (1 - FADE_IN_FRAC), the same fade-out Inhale/Exhale had alone.
+function boxAlphas(halfElapsed, interval) {
+  const t = interval > 0 ? halfElapsed / interval : 0   // 0-1 movement, 1-2 Hold
+  const out = t < 1 + FADE_IN_FRAC ? 1 : lerp(1, 0, smoothstep((t - 1 - FADE_IN_FRAC) / (1 - FADE_IN_FRAC)))
+  const main = t < FADE_IN_FRAC ? smoothstep(t / FADE_IN_FRAC) : out
+  const hold = t < 1 ? 0 : smoothstep((halfElapsed - interval) / Math.min(HOLD_FADE_IN_S, interval * FADE_IN_FRAC)) * out
+  return { main, hold }
 }
 
 const ROUND_ALPHA = [1, 1, 0.5, 0.15]   // per round (0-indexed): rounds 1-2 full, round 3 half, round 4 nearly gone
@@ -69,8 +59,11 @@ function roundAlphaMultiplier(totalElapsed, interval) {
 // explanation) instead of the usual spot over the Morph's lower third.
 // size: font size in px (App: 20 mode explanation, 60 paced captions, 40 the rest);
 // larger text gets a wider column so long lines still fit.
-export default function TutorialText({ size = 20, topPx = null, text, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'pulse', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+// subText: Box Breathing's "Hold", shown on the line below the caption
+// (positioned so the caption itself doesn't move).
+export default function TutorialText({ size = 20, topPx = null, text, subText = null, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
+  const subRef = useRef(null)
 
   // Box Breathing's captions drive their own per-second opacity pulse via a
   // rAF loop writing straight to the DOM node, bypassing React state so this
@@ -108,23 +101,40 @@ export default function TutorialText({ size = 20, topPx = null, text, visible, o
       }
       const interval = Math.max(0.05, pulseIntervalRef.current)
       const totalElapsed = Math.max(0, (performance.now() - pulseCycleStartRef.current) / 1000)
-      let phaseElapsed = (totalElapsed % (4 * interval)) % interval
-      if (prevPhaseElapsed !== null && phaseElapsed < prevPhaseElapsed) wrapped = true
-      prevPhaseElapsed = phaseElapsed
-      if (wrapped) phaseElapsed = interval - 1e-4
-      const value = (pulseMode === 'fade'
-        ? fadeAlpha(phaseElapsed, interval)
-        : pulseAlpha(phaseElapsed) * holdFadeMultiplier(phaseElapsed, interval)
-      ) * roundAlphaMultiplier(totalElapsed, interval)
-      if (textRef.current) textRef.current.style.opacity = String(value)
+      let halfElapsed = (totalElapsed % (4 * interval)) % (2 * interval)
+      if (prevPhaseElapsed !== null && halfElapsed < prevPhaseElapsed) wrapped = true
+      prevPhaseElapsed = halfElapsed
+      if (wrapped) halfElapsed = 2 * interval - 1e-4
+      const { main, hold } = boxAlphas(halfElapsed, interval)
+      const round = roundAlphaMultiplier(totalElapsed, interval)
+      if (textRef.current) textRef.current.style.opacity = String(main * round)
+      if (subRef.current) subRef.current.style.opacity = String(hold * round)
       raf = requestAnimationFrame(tick)
     }
     tick()
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      if (subRef.current) subRef.current.style.opacity = '0'   // "Hold" never lingers once the captions stop
+    }
   }, [pulseActive, pulseMode, pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef])
 
   const alpha = typeof opacity === 'number' ? opacity : (visible ? 1 : 0)
   const transition = (typeof opacity === 'number' || pulseActive) ? 'none' : `opacity ${fadeMs}ms ease`
+  const lineStyle = {
+    color: 'var(--live-text-color, rgba(255,255,255,0.9))',
+    fontSize: size,
+    textAlign: 'center',
+    fontFamily: 'sans-serif',
+    fontWeight: 700,
+    lineHeight: size > 20 ? 1.2 : 1.5,
+    maxWidth: size > 20 ? '92vw' : 280,
+    whiteSpace: 'pre-line',
+    // Outline in the live background color so the text reads over both
+    // light and dark art (8-way shadow ring + soft halo; text-shadow is
+    // used instead of -webkit-text-stroke, which eats into the glyphs).
+    textShadow: OUTLINE_SHADOW,
+    margin: 0,
+  }
   return (
     <div style={{
       position: 'absolute',
@@ -135,25 +145,20 @@ export default function TutorialText({ size = 20, topPx = null, text, visible, o
       zIndex: 100,   // always above the canvas, sliders and nav buttons
       padding: size > 20 ? '0 16px' : '0 80px',
     }}>
-      <p ref={textRef} style={{
-        color: 'var(--live-text-color, rgba(255,255,255,0.9))',
-        fontSize: size,
-        textAlign: 'center',
-        fontFamily: 'sans-serif',
-        fontWeight: 700,
-        lineHeight: size > 20 ? 1.2 : 1.5,
-        maxWidth: size > 20 ? '92vw' : 280,
-        whiteSpace: 'pre-line',
-        // Outline in the live background color so the text reads over both
-        // light and dark art (8-way shadow ring + soft halo; text-shadow is
-        // used instead of -webkit-text-stroke, which eats into the glyphs).
-        textShadow: OUTLINE_SHADOW,
-        opacity: pulseActive ? undefined : alpha,
-        transition,
-        margin: 0,
-      }}>
-        {text}
-      </p>
+      <div style={{ position: 'relative' }}>
+        <p ref={textRef} style={{ ...lineStyle, opacity: pulseActive ? undefined : alpha, transition }}>
+          {text}
+        </p>
+        {subText !== null && (
+          <p ref={subRef} style={{
+            ...lineStyle,
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            opacity: 0,
+          }}>
+            {subText}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

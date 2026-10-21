@@ -1152,7 +1152,9 @@ export default function App() {
       const phaseIndex = Math.floor((totalElapsed % (4 * interval)) / interval)
       if (phaseIndex !== boxCaptionIndexRef.current) {
         boxCaptionIndexRef.current = phaseIndex
-        const nextText = [TEXTS.boxInhale, TEXTS.boxHold, TEXTS.boxExhale, TEXTS.boxHold][phaseIndex]
+        // The Inhale/Exhale caption stays up through the Hold after it;
+        // TutorialText fades "Hold" in below it (subText).
+        const nextText = [TEXTS.boxInhale, TEXTS.boxInhale, TEXTS.boxExhale, TEXTS.boxExhale][phaseIndex]
         currentMainTextRef.current = nextText
         setTutorialText(nextText)
         if (!tutorialVisibleRef.current) {
@@ -1592,11 +1594,12 @@ export default function App() {
         )}
         <TutorialText topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           size={tutorialAtTop ? TEXT_SIZE_INTRO
-            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
+            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
-          pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxHold || tutorialText === TEXTS.boxExhale))
+          subText={mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold : null}
+          pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
-          pulseMode={mode === 'slowing' ? 'paced' : tutorialText === TEXTS.boxHold ? 'pulse' : 'fade'}
+          pulseMode={mode === 'slowing' ? 'paced' : 'box'}
           pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef} />
         {mode === 'timed' && (
           <BreathLengthControl
