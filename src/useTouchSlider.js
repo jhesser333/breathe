@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
 import { projectToCurve, CURVE_BOX_W, CURVE_BOX_H } from './diagonalCurveGeometry'
 
-export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'vertical') {
+// disabledRef.current true: ignore touches, including one already in progress
+// (the browser keeps sending a held touch here even after the slider hides).
+export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'vertical', disabledRef = null) {
   const ref = useRef(null)
   const touchId = useRef(null)
   const [value, setValue] = useState(initialValue)
@@ -11,6 +13,7 @@ export function useTouchSlider(initialValue = 0, rawRef = null, orientation = 'v
     if (!el) return
 
     function getValueFromPoint(x, y) {
+      if (disabledRef?.current) return
       const rect = el.getBoundingClientRect()
       let ratio
       if (orientation === 'diagonal-left' || orientation === 'diagonal-right') {

@@ -89,7 +89,8 @@ const COUNT_FADE_MS = 1000   // count-tutorial texts: fade out, swap, fade in (e
 
 // Guided Breathing: Tutorial mode (tutorialRef).
 const TUTORIAL_SCREEN_FADE_MS = 2000   // Part screens + Continue button fade in/out
-const TUTORIAL_REMIND_MS = 5000        // sliders still this long -> "Remember to move the sliders..."
+const TUTORIAL_REVEAL_LAG_MS = 1000    // Part 1: sliders + Morph start fading in this long after "Inhale and..."
+const TUTORIAL_REMIND_MS = 5000       // sliders still this long -> "Remember to move the sliders..."
 const TUTORIAL_PREPARE_MS = 3000       // "Relax and prepare to inhale." shows this long before the countdown
 const COUNTDOWN_STEP_MS = 1000         // each of 3, 2, 1
 const COUNTDOWN_FADE_MS = 300          // each number fades in and out over this
@@ -495,6 +496,9 @@ export default function App() {
   modeRef.current = mode
   const newTutorialState = () => ({ part: 'off', screen: null, step: null, inhales: 0, stepText: null, reminding: false, dir: 0, extreme: null })
   const tutorialRef = useRef(newTutorialState())
+  // Tutorial: sliders ignore touches while the scene is covered (Part screens).
+  const slidersDisabledRef = useRef(false)
+  slidersDisabledRef.current = mode === 'tutorial' && !sceneRevealed
   const tutorialTimersRef = useRef([])
   const [continueVisible, setContinueVisible] = useState(false)
   const [continuePressed, setContinuePressed] = useState(false)
@@ -910,6 +914,7 @@ export default function App() {
     t.stepText = null
     hideCountText()
     setSceneRevealed(false)
+    audioRef.current.setMuted(true, SCENE_REVEAL_MS / 1000)   // silent while the Part text shows
     tutorialLater(() => showTutorialScreen(screenId, text), SCENE_REVEAL_MS)
   }, [hideCountText, showTutorialScreen, tutorialLater])
 
@@ -973,6 +978,7 @@ export default function App() {
     leaveTutorialScreen(() => {
       tutorialRef.current.part = 'paced'
       setSceneRevealed(true)
+      audioRef.current.setMuted(false, SCENE_REVEAL_MS / 1000)
       currentMainTextRef.current = TUTORIAL.prepare
       setTutorialFadeMs(COUNT_FADE_MS)
       setTutorialText(TUTORIAL.prepare)
@@ -1020,10 +1026,9 @@ export default function App() {
         setTutorialVisible(true)
         tutorialVisibleRef.current = true
         diagStageRef.current = 'A1-appear'
-        tutorialLater(() => {
-          diagStageRef.current = 'A1'
-          setSceneRevealed(true)
-        }, A1_FADE_IN_MS)
+        // Sliders and Morph follow the text in, TUTORIAL_REVEAL_LAG_MS behind.
+        tutorialLater(() => setSceneRevealed(true), TUTORIAL_REVEAL_LAG_MS)
+        tutorialLater(() => { diagStageRef.current = 'A1' }, A1_FADE_IN_MS)
       })
     } else if (screenId === 'part2') {
       setTutorialArt('background')   // mounts under the cover, fades in with the scene
@@ -1031,6 +1036,7 @@ export default function App() {
         tutorialRef.current.part = 'count'
         lastMoveTime.current = Date.now()
         setSceneRevealed(true)
+        audioRef.current.setMuted(false, SCENE_REVEAL_MS / 1000)
         breathCountingEnabledRef.current = true
       })
     } else if (screenId === 'part3a') {
@@ -1836,8 +1842,8 @@ export default function App() {
           opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
         }}>
           {sliderLayout === 'diagonal'
-            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />
-            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} />}
+            ? <SlidersDiagonal onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />
+            : <Sliders onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />}
         </div>
         <div style={{ position: 'absolute', top: MODE_CAPTION_TOP, left: '50%', transform: 'translateX(-50%)' }}>
           <span style={{

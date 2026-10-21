@@ -89,9 +89,9 @@ function Slider({ sliderRef, value, topLabel, bottomLabel, side }) {
   )
 }
 
-export default function Sliders({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0 }) {
-  const [leftRef, leftVal] = useTouchSlider(0, leftRawRef)
-  const [rightRef, rightVal] = useTouchSlider(1, rightRawRef)
+export default function Sliders({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null }) {
+  const [leftRef, leftVal] = useTouchSlider(0, leftRawRef, 'vertical', disabledRef)
+  const [rightRef, rightVal] = useTouchSlider(1, rightRawRef, 'vertical', disabledRef)
 
   useEffect(() => { onLeft(leftVal) }, [leftVal])
   useEffect(() => { onRight(rightVal) }, [rightVal])

@@ -76,6 +76,7 @@ export function createAudioEngine() {
   const current = { slider: null, pace: null }
   let lastCycleIndex = 0
   let resumeCheck = null
+  let muted = false         // setMuted: master faded to silence (Tutorial's text screens)
   let bell = null           // the ringing bell { src, gain }, or null
   let bellRequest = 0       // newest playBell call; a bell that loads late is skipped if superseded
 
@@ -176,6 +177,7 @@ export function createAudioEngine() {
     if (!AC) return false
     ctx = new AC()
     master = ctx.createGain()
+    master.gain.value = muted ? 0 : 1
     master.connect(ctx.destination)
     return true
   }
@@ -231,6 +233,7 @@ export function createAudioEngine() {
       ensureRunning()
       if (!ctx) return
       this.stop(0.05)
+      this.setMuted(false, 0.05)
       lastCycleIndex = cycleIndex
       running = true
       paceOn = false
@@ -282,6 +285,16 @@ export function createAudioEngine() {
         bell = ringing
         src.onended = () => { src.disconnect(); gain.disconnect(); if (bell === ringing) bell = null }
       })
+    },
+
+    // Fade all audio out (true) or back in (false) over fadeS; voices keep running.
+    setMuted(on, fadeS = 2) {
+      muted = on
+      if (!ctx || !master) return
+      const t = ctx.currentTime
+      master.gain.cancelScheduledValues(t)
+      master.gain.setValueAtTime(master.gain.value, t)
+      master.gain.linearRampToValueAtTime(on ? 0 : 1, t + fadeS)
     },
 
     stopBell(fadeS = BELL_CUT_FADE_S) {
