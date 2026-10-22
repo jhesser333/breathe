@@ -4,3 +4,8 @@ export const TARGET_PACES = {
 }
 
 export const DEFAULT_TARGET_PACE = '5-5'
+
+// Box Breathing: each step (side of the box) is BOX_STEP_SECONDS long, split
+// into BOX_COUNTS counts (targets, count rings, hold pulses).
+export const BOX_STEP_SECONDS = 6
+export const BOX_COUNTS = 4

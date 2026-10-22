@@ -3,7 +3,7 @@ export const MODE_LABELS = {
   basic: 'Breathe at Your Own Pace',
   timed: 'Paced Breathing',
   slowing: 'Guided Breathing: Slowing Down',
-  box: 'Guided Breathing: Box Breathing',
+  box: 'Box Breathing Instructions\n\nBreathe in 4 steps,\n4 counts each:\ninhale, hold,\nexhale, hold.\n\nWhen it is time to hold\nyou’ll hear a different bell.\n\nKeep the sliders still\nduring each hold.\n\nTutorial text will guide you\nfor the first few breaths.',
 }
 
 export const TEXT_A = 'Move the sliders\nin opposite directions\nwith your thumbs'
@@ -25,9 +25,9 @@ export const MODE_INTRO = {
 // Continue button); slowingRecord is the step text while recording.
 export const MODE_SCREENS = {
   box: 'Box Breathing\n\nBreathe in 4 steps,\n4 seconds each:\ninhale, hold,\nexhale, hold.\n\nDuring each hold,\nkeep the sliders still.\nA different bell rings\nwhen it is time to hold.\n\n‘Inhale’, ‘Hold’ and ‘Exhale’\nwill guide you\nfor the first 2 rounds.',
-  slowing1: 'Slowing Down\nPart 1: Recording your pace\n\nBreathe at your own pace\nfor 5 breaths\nwhile the app records it.',
+  slowing1: 'Slowing Down Instructions\n\nPart 1:\nRecording your pace\n\nBreathe at your own pace\nfor a few breaths\nwhile the app records it.',
   slowingRecord: 'Breathe at your own pace.',
-  slowing2: 'Part 2: Slowing down\n\nThe bells will start\nat the pace you recorded,\nthen slowly guide you\nto a slower pace\nover the next minute.\n\nKeep your breathing\nin sync with the bells.',
+  slowing2: 'Part 2:\nSlowing down\n\nThe bells and visual cues\nwill begin at the\npace you recorded, then\nguide you to a slower pace\nover the next minute.\n\nKeep your breathing\nin sync with the bells\nand visual cues.',
 }
 
 // Guided Breathing: Tutorial mode (App.jsx, tutorialRef). The part* screens

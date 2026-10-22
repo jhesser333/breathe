@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { BOX_COUNTS } from './breathPace'
 
 const POOL_SIZE = 28
 const SPAWN_Z = -6
@@ -39,7 +40,7 @@ export default function GatesBoxBreathingA({ gatesEnabledRef, spawnIntervalRef, 
     const enabled = gatesEnabledRef.current
 
     function spawnSeries(type) {
-      const N = Math.max(1, Math.round(spawnIntervalRef.current))
+      const N = BOX_COUNTS   // counts per step, spread over the step's interval
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
       const spacing = N > 1 ? Math.abs(SPAWN_Z) / (N - 1) : 0
       for (let i = 0; i < N; i++) {

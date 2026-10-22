@@ -86,8 +86,8 @@ function lerp(a, b, t) {
 // Immediate step up to peak at the start of each pulse, then a single eased
 // ramp back down across the whole PULSE_DURATION (smoothstep is flat at both
 // ends, so the descent itself still eases in and out).
-function pulseEnvelope(tInPulse) {
-  return 1 - smoothstep(tInPulse / PULSE_DURATION)
+function pulseEnvelope(tInPulse, duration = PULSE_DURATION) {
+  return 1 - smoothstep(tInPulse / duration)
 }
 
 // Count rings and the Exhale ring need a per-fragment world-space Y fade
@@ -160,7 +160,9 @@ export function usePaceRings({ gateColor, emissiveColor }) {
   // phaseStartPulse (Slowing Down only; no holds): one hold-style pulse on the
   // ring the breath just arrived at, over the first PULSE_DURATION of each
   // side -- the "other" ring, which starts the side at its movement target.
-  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, live, fade = 1, holdExhaleRing = false, phaseStartPulse = false }) {
+  // countStep: seconds between count rings and between hold pulses (Box
+  // Breathing: one step / BOX_COUNTS).
+  function update({ enabled, side, sideElapsed, moveDuration, holdDuration, numCountRings, countStep = PULSE_DURATION, live, fade = 1, holdExhaleRing = false, phaseStartPulse = false }) {
     const inner = ringMatRef.current
     if (live) {
       if (inner) { inner.color.copy(live.secondary); inner.emissive.copy(live.primary) }
@@ -178,7 +180,7 @@ export function usePaceRings({ gateColor, emissiveColor }) {
     const move = Math.max(0.05, moveDuration)
     const inHold = holdDuration > 0 && sideElapsed >= move
     const moveT = smoothstep(sideElapsed / move)
-    const pulse = inHold ? pulseEnvelope((sideElapsed - move) % PULSE_DURATION) : 0
+    const pulse = inHold ? pulseEnvelope((sideElapsed - move) % countStep, countStep) : 0
 
     // "Own" ring = the one whose side this is (inner on Inhale, outer on
     // Exhale): ramps 0 -> target across the movement, then pulses through the
@@ -209,7 +211,7 @@ export function usePaceRings({ gateColor, emissiveColor }) {
     if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
     if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
 
-    // Staggered count rings: instance i starts i seconds into the side and
+    // Staggered count rings: instance i starts i counts (countStep) into the side and
     // travels for one movement's length -- inward (max X -> min X) on the
     // Inhale side, outward (min X -> max X) on the Exhale side -- fading in
     // as it goes, then disappearing as it reaches the destination ring.
@@ -218,7 +220,7 @@ export function usePaceRings({ gateColor, emissiveColor }) {
       const mesh = countMeshesRef.current[i]
       const mat = countMats[i]
       if (!mesh) continue
-      const tLocal = sideElapsed - i
+      const tLocal = sideElapsed - i * countStep
       if (i >= count || tLocal < 0 || tLocal >= move) {
         mesh.visible = false
         mat.opacity = 0

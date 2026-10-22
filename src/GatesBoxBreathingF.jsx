@@ -1,5 +1,6 @@
 import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { BOX_COUNTS } from './breathPace'
 import * as THREE from 'three'
 import { useGateBurstB, isSuccess, missFactor, CUBE_INHALE_MAX_ABS_X } from './gateReactionsB'
 import { makeCloud, applyCloud, sampleCloudSurface, cloudMaxAbsX, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S, CLOUD_BURST_SIZE, randomCloudX } from './cloudShapeF'
@@ -44,7 +45,7 @@ export default function GatesBoxBreathingF({ gatesEnabledRef, spawnIntervalRef, 
     const enabled = gatesEnabledRef.current
 
     function spawnSeries(type) {
-      const N = Math.max(1, Math.round(spawnIntervalRef.current))
+      const N = BOX_COUNTS   // counts per step, spread over the step's interval
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
       const spacing = N > 1 ? Math.abs(SPAWN_Z) / (N - 1) : 0
       seriesRef.current = { type, spawnTime: now, interval: spawnIntervalRef.current, arrived: false }

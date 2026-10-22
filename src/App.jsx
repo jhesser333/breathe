@@ -41,7 +41,7 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL, MODE_SCREENS } from './copy'
-import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
+import { TARGET_PACES, DEFAULT_TARGET_PACE, BOX_STEP_SECONDS } from './breathPace'
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
 
@@ -520,6 +520,10 @@ export default function App() {
   const [tutorialSubFadeMs, setTutorialSubFadeMs] = useState(COUNTDOWN_FADE_MS)
   const continueRef = useRef(null)
   const [continueHeight, setContinueHeight] = useState(67)
+  const [tutorialScreenId, setTutorialScreenId] = useState(null)   // the screen showing (or last shown) with Continue
+  const [skipPressed, setSkipPressed] = useState(false)
+  const skipRef = useRef(null)
+  const [skipHeight, setSkipHeight] = useState(55)
 
   const resetSlowingState = useCallback(() => {
     prevRawRef.current = null
@@ -897,6 +901,7 @@ export default function App() {
     t.screen = screenId
     t.reminding = false
     clearTimeout(tutorialTimerRef.current)
+    setTutorialScreenId(screenId)
     setTutorialAtTop(true)
     setTutorialOpacity(null)
     setTutorialFadeMs(TUTORIAL_SCREEN_FADE_MS)
@@ -1016,8 +1021,9 @@ export default function App() {
 
   // Part 3's last screen: fade in the scene with the paced 5-5 art ready,
   // "Relax and prepare to inhale.", then 3, 2, 1 and "Inhale" exactly as the
-  // first paced Inhale starts (gates enabled, first bell).
-  const startTutorialPaced = useCallback(() => {
+  // first paced Inhale starts (gates enabled, first bell). showDone false
+  // (Skip Tutorial) leaves out the closing "Good job!" text.
+  const startTutorialPaced = useCallback(({ showDone = true } = {}) => {
     const pace = TARGET_PACES['5-5']
     spawnIntervalRef.current = pace.inhale + pace.exhale
     inhaleSecondsRef.current = pace.inhale
@@ -1039,6 +1045,7 @@ export default function App() {
         currentMainTextRef.current = ''
         hideCountText()
       }, inhaleAt + COUNTDOWN_START_MS)
+      if (!showDone) return
       tutorialLater(() => showCountText(TUTORIAL.done), inhaleAt + TUTORIAL_DONE_AFTER_MS)
       tutorialLater(() => {
         currentMainTextRef.current = ''
@@ -1046,6 +1053,16 @@ export default function App() {
       }, inhaleAt + TUTORIAL_DONE_AFTER_MS + TUTORIAL_DONE_SHOW_MS)
     })
   }, [leaveTutorialScreen, tutorialLater, runPreparedStart, showCountText, hideCountText])
+
+  // Skip Tutorial (Part 1 and 2 screens): straight to Part 3's paced start,
+  // with the full art and counting on as after Part 2, and no closing text.
+  const handleTutorialSkip = useCallback(() => {
+    stageRef.current = 'done'
+    diagStageRef.current = 'done'
+    setTutorialArt('background')
+    breathCountingEnabledRef.current = true
+    startTutorialPaced({ showDone: false })
+  }, [startTutorialPaced])
 
   const handleTutorialContinue = useCallback(() => {
     const screenId = tutorialRef.current.screen
@@ -1564,7 +1581,7 @@ export default function App() {
     audioRef.current.setSlider(leftVal.current)
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
-    spawnIntervalRef.current = m === 'timed' ? 12 : m === 'box' ? 4 : 8
+    spawnIntervalRef.current = m === 'timed' ? 12 : m === 'box' ? BOX_STEP_SECONDS : 8
     inhaleSecondsRef.current = null
     exhaleSecondsRef.current = null
     if (m === 'timed' || m === 'slowing' || m === 'box') { clearTimeout(breathControlTimerRef.current); setBreathControlVisible(false) }
@@ -1752,7 +1769,8 @@ export default function App() {
   }, [sliderLayout])
   useLayoutEffect(() => {
     if (continueRef.current) setContinueHeight(continueRef.current.offsetHeight)
-  }, [mode])
+    if (skipRef.current) setSkipHeight(skipRef.current.offsetHeight)
+  }, [mode, tutorialScreenId])
 
   // Passcode gate: not saved anywhere, so every load/refresh asks again.
   if (!unlocked) {
@@ -1809,7 +1827,10 @@ export default function App() {
   // Continue sits a little above the Home/Restart buttons' tops; the Part
   // texts center between the mode name and the top of Continue.
   const modeLabelLines = (MODE_LABELS[mode] || '').includes(': ') ? 2 : 1
-  const continueBottom = 16 + sliderShiftUp + 12
+  // Tutorial Parts 1 and 2 add Skip Tutorial in Continue's spot; Continue moves up.
+  const showSkip = mode === 'tutorial' && (tutorialScreenId === 'part1' || tutorialScreenId === 'part2')
+  const skipBottom = 16 + sliderShiftUp + 12
+  const continueBottom = skipBottom + (showSkip ? skipHeight + 12 : 0)
   const tutorialScreenRegion = usesScreens(mode) && tutorialAtTop
     ? { top: MODE_CAPTION_TOP + modeLabelLines * MODE_CAPTION_LINE_PX, bottom: continueBottom + continueHeight }
     : null
@@ -1947,7 +1968,9 @@ export default function App() {
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
-          liftPx={tutorialAtTop || tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale ? 0 : TUTORIAL_TEXT_LIFT_PX}
+          liftPx={tutorialAtTop ? 0
+            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION * 1.2   // captions: 1 line up
+            : TUTORIAL_TEXT_LIFT_PX}
           subText={mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold
             : usesScreens(mode) ? tutorialSub : null}
           subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs}
@@ -1980,6 +2003,32 @@ export default function App() {
             }}
           >
             Continue
+          </button>
+        )}
+        {showSkip && (
+          // Same shape and colors as Continue, outline only and smaller.
+          <button
+            ref={skipRef}
+            onClick={continueVisible ? handleTutorialSkip : undefined}
+            onPointerDown={() => setSkipPressed(true)}
+            onPointerUp={() => setSkipPressed(false)}
+            onPointerLeave={() => setSkipPressed(false)}
+            onPointerCancel={() => setSkipPressed(false)}
+            style={{
+              position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+              bottom: skipBottom,
+              padding: '16px 20px', borderRadius: 12,
+              background: skipPressed ? 'rgba(var(--live-primary-rgb, 141, 177, 161), 0.75)' : 'transparent',
+              border: '2px solid rgb(var(--live-primary-rgb, 141, 177, 161))',
+              color: 'rgb(var(--live-primary-rgb, 141, 177, 161))', fontSize: 16, fontWeight: 700,
+              fontFamily: 'sans-serif', cursor: 'pointer', whiteSpace: 'nowrap',
+              opacity: continueVisible ? 1 : 0,
+              transition: `opacity ${TUTORIAL_SCREEN_FADE_MS}ms ease`,
+              pointerEvents: continueVisible ? 'auto' : 'none',
+              zIndex: 101,
+            }}
+          >
+            Skip Tutorial
           </button>
         )}
         {mode === 'timed' && (

@@ -1,12 +1,12 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { BOX_COUNTS } from './breathPace'
 import { usePaceRings } from './PaceRingsD'
 
 const POOL_SIZE = 28
 const SPAWN_Z = -6
 const DESPAWN_Z = 6
 
-const PULSE_DURATION = 1.0   // one count ring per second of hold
 const START_FADE_FRAC = 0.9  // art fades in over the first 90% of the first Inhale -- same curve as the "Inhale" caption (TutorialText FADE_IN_FRAC)
 
 function makeSlot() {
@@ -33,7 +33,7 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
     const enabled = gatesEnabledRef.current
 
     function spawnSeries(type) {
-      const N = Math.max(1, Math.round(spawnIntervalRef.current))
+      const N = BOX_COUNTS   // counts per step, spread over the step's interval
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
       const spacing = N > 1 ? Math.abs(SPAWN_Z) / (N - 1) : 0
       for (let i = 0; i < N; i++) {
@@ -101,7 +101,8 @@ export default function GatesBoxBreathingD({ gatesEnabledRef, spawnIntervalRef, 
         sideElapsed: phaseIndex < 2 ? cycleT : cycleT - 2 * interval,
         moveDuration: interval,
         holdDuration: interval,
-        numCountRings: Math.floor((interval - 1e-4) / PULSE_DURATION) + 1,
+        numCountRings: BOX_COUNTS,
+        countStep: interval / BOX_COUNTS,   // one count ring / hold pulse per count
         live,
         fade,
       })
