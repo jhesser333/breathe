@@ -1125,7 +1125,14 @@ export default function App() {
         tutorialRef.current.part = 'paced'
         revealAfterScreen()
         runPreparedStart(false, () => {
-          setTutorialSub(null)
+          // "Inhale" on the countdown line with the first bell, then fades.
+          setTutorialSub('Inhale')
+          setTutorialSubVisible(true)
+          tutorialLater(() => {
+            setTutorialSubFadeMs(COUNT_FADE_MS)
+            setTutorialSubVisible(false)
+          }, COUNTDOWN_START_MS)
+          tutorialLater(() => setTutorialSub(null), COUNTDOWN_START_MS + COUNT_FADE_MS)
           startPacedArt()
           pacedCueStageRef.current = 'done'
         })

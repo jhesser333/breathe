@@ -24,9 +24,9 @@ export const MODE_INTRO = {
 // Box Breathing and Slowing Down open with Tutorial-style screens (App.jsx,
 // Continue button); slowingRecord is the step text while recording.
 export const MODE_SCREENS = {
-  box: 'Box Breathing Instructions\n\nBreathe in 4 steps,\n4 counts each:\ninhale, hold,\nexhale, hold.\n\nWhen it is time to hold\nyou’ll hear a different bell.\n\nKeep the sliders still\nduring each hold.\n\nTutorial text will guide you\nfor the first few breaths.',
-  slowing1: 'Slowing Down Instructions\n\nPart 1:\nRecording your pace\n\nBreathe at your own pace\nfor a few breaths\nwhile the app records it.',
-  slowingRecord: 'Breathe at your own pace.',
+  box: 'Box Breathing Instructions\n\nBreathe in 4 steps,\n4 counts each:\ninhale, hold,\nexhale, hold.\n\nWhen it’s time to hold\nyou’ll hear a different bell.\n\nKeep the sliders still\nduring each hold.\n\nTutorial text will guide you\nfor the first few breaths.',
+  slowing1: 'Slowing Down Instructions\n\nPart 1:\nBreathe at your own pace\nfor a few breaths\nwhile the app records it.',
+  slowingRecord: 'Breathe at your\nown pace.',
   slowing2: 'Part 2:\nSlowing down\n\nThe bells and visual cues\nwill begin at the\npace you recorded, then\nguide you to a slower pace\nover the next minute.\n\nKeep your breathing\nin sync with the bells\nand visual cues.',
 }
 
