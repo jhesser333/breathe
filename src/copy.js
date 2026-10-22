@@ -42,7 +42,7 @@ export const TUTORIAL = {
   part2: 'Part 2:\nWith each breath,\nthe art will evolve.\n\nAfter 5 breaths,\nthe color and sound will change.\n\nBreathe 10 times and\nlook for these changes.',
   part3: 'Part 3:\nPacing your breath\n\nA bell will ring\nwhen it is time to inhale\nor exhale.\n\nAbove and below the sliders,\n‘inhale’ and ‘exhale’\nwill glow.\n\nEach art option\nhas additional cues.',
   prepare: 'Relax and prepare to inhale.',
-  countdown: ['3', '2', '1', 'Start'],
+  countdown: ['3', '2', '1', 'Inhale'],   // the last word shows with the first paced Inhale (not in Box Breathing)
   done: 'Good job! The tutorial is done.\nKeep breathing, or\npress Home\nto try another mode, or\npress Restart\nto redo the tutorial.',
 }
 

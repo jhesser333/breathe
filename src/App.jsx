@@ -986,11 +986,12 @@ export default function App() {
     }
   }, [setTutorialStepText, tutorialGoBlank])
 
-  // "Relax and prepare to inhale." with a countdown on the sub line: 3, 2, 1,
-  // plus "Start" in the Tutorial. Without "Start" (Box Breathing, Slowing
-  // Down) the text fades out during "1". onStart runs as "1" ends (the first
-  // paced Inhale); returns that time (ms from now).
-  const runPreparedStart = useCallback((withStartWord, onStart) => {
+  // "Relax and prepare to inhale." with a countdown on the sub line: 3, 2, 1;
+  // the text fades out during "1". onStart runs as "1" ends (the first paced
+  // Inhale and bell); returns that time (ms from now). withInhaleWord (Tutorial,
+  // Slowing Down) then shows "Inhale" on the countdown line for
+  // COUNTDOWN_START_MS; Box Breathing has its own Inhale caption instead.
+  const runPreparedStart = useCallback((withInhaleWord, onStart) => {
     setTutorialSub('')
     setTutorialSubVisible(false)
     setTutorialSubFadeMs(COUNTDOWN_FADE_MS)
@@ -1000,14 +1001,19 @@ export default function App() {
     setTutorialVisible(true)
     tutorialVisibleRef.current = true
     const startAt = TUTORIAL_PREPARE_MS + (TUTORIAL.countdown.length - 1) * COUNTDOWN_STEP_MS
-    const words = withStartWord ? TUTORIAL.countdown : TUTORIAL.countdown.slice(0, -1)
+    const words = withInhaleWord ? TUTORIAL.countdown : TUTORIAL.countdown.slice(0, -1)
     words.forEach((word, i) => {
       const at = TUTORIAL_PREPARE_MS + i * COUNTDOWN_STEP_MS
       tutorialLater(() => { setTutorialSub(word); setTutorialSubVisible(true) }, at)
       if (at < startAt) tutorialLater(() => setTutorialSubVisible(false), at + COUNTDOWN_STEP_MS - COUNTDOWN_FADE_MS)
     })
-    if (!withStartWord) {
-      tutorialLater(() => { currentMainTextRef.current = ''; hideCountText() }, startAt - COUNT_FADE_MS)
+    tutorialLater(() => { currentMainTextRef.current = ''; hideCountText() }, startAt - COUNT_FADE_MS)
+    if (withInhaleWord) {
+      tutorialLater(() => {
+        setTutorialSubFadeMs(COUNT_FADE_MS)
+        setTutorialSubVisible(false)
+      }, startAt + COUNTDOWN_START_MS)
+      tutorialLater(() => setTutorialSub(null), startAt + COUNTDOWN_START_MS + COUNT_FADE_MS)
     }
     tutorialLater(onStart, startAt)
     return startAt
@@ -1039,12 +1045,6 @@ export default function App() {
         pacedCueStageRef.current = 'done'
         gatesEnabledRef.current = true
       })
-      tutorialLater(() => {
-        setTutorialSubFadeMs(COUNT_FADE_MS)
-        setTutorialSubVisible(false)
-        currentMainTextRef.current = ''
-        hideCountText()
-      }, inhaleAt + COUNTDOWN_START_MS)
       if (!showDone) return
       tutorialLater(() => showCountText(TUTORIAL.done), inhaleAt + TUTORIAL_DONE_AFTER_MS)
       tutorialLater(() => {
@@ -1124,15 +1124,7 @@ export default function App() {
       leaveTutorialScreen(() => {
         tutorialRef.current.part = 'paced'
         revealAfterScreen()
-        runPreparedStart(false, () => {
-          // "Inhale" on the countdown line with the first bell, then fades.
-          setTutorialSub('Inhale')
-          setTutorialSubVisible(true)
-          tutorialLater(() => {
-            setTutorialSubFadeMs(COUNT_FADE_MS)
-            setTutorialSubVisible(false)
-          }, COUNTDOWN_START_MS)
-          tutorialLater(() => setTutorialSub(null), COUNTDOWN_START_MS + COUNT_FADE_MS)
+        runPreparedStart(true, () => {
           startPacedArt()
           pacedCueStageRef.current = 'done'
         })
