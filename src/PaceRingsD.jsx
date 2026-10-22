@@ -32,9 +32,11 @@ const PULSE_EMISSIVE_MAX = 1.25
 const PULSE_MOVE_ALPHA_TARGET = 0.5    // Inhale/Exhale: pulse rings' own alpha ramp target
 const PULSE_MOVE_EMISSIVE_TARGET = 1   // Inhale/Exhale: pulse rings' own emissive-intensity ramp target
 const EXHALE_RING_EMISSIVE_MULT = 3    // the Pulse/Hold Exhale ring's emissive x this (inner ring x1)
+const EXHALE_RING_PULSE_MULT = 2       // ...and its glow pulses (hold + phase start) rise this much more than the inner ring's
 
 const COUNT_RING_ALPHA_TARGET = 0.5      // count rings fade 0 -> this across their travel
-const COUNT_RING_EMISSIVE_TARGET = 2
+const COUNT_RING_EMISSIVE_START = 1      // count rings' emissive ramps start -> target across their travel
+const COUNT_RING_EMISSIVE_TARGET = 4
 const COUNT_RING_POOL_SIZE = 16      // generous cap; only the first numCountRings are ever shown
 const COUNT_RING_X_SCALE_MULT = 1.5    // max X scale is 1.5x the count ring's own resting (min) X scale
 
@@ -188,6 +190,11 @@ export function usePaceRings({ gateColor, emissiveColor }) {
     const otherAlpha = fade * (inHold ? 0 : lerp(PULSE_MOVE_ALPHA_TARGET, 0, moveT) + (PULSE_ALPHA_MAX - PULSE_ALPHA_MIN) * startPulse)
     const otherEmissive = fade * (inHold ? 0 : lerp(PULSE_MOVE_EMISSIVE_TARGET, 0, moveT) + (PULSE_EMISSIVE_MAX - PULSE_EMISSIVE_MIN) * startPulse)
 
+    // Exhale ring: same curves, but its glow pulses rise EXHALE_RING_PULSE_MULT x as far.
+    const pulseRise = (PULSE_EMISSIVE_MAX - PULSE_EMISSIVE_MIN) * EXHALE_RING_PULSE_MULT
+    const exhaleOwnEmissive = fade * (inHold ? PULSE_EMISSIVE_MIN + pulseRise * pulse : lerp(0, PULSE_MOVE_EMISSIVE_TARGET, moveT))
+    const exhaleOtherEmissive = fade * (inHold ? 0 : lerp(PULSE_MOVE_EMISSIVE_TARGET, 0, moveT) + pulseRise * startPulse)
+
     const innerIsOwn = side === 'inhale'
     if (ringMeshRef.current) ringMeshRef.current.visible = true
     if (exhaleMeshRef.current) exhaleMeshRef.current.visible = true
@@ -197,7 +204,7 @@ export function usePaceRings({ gateColor, emissiveColor }) {
       if (live && innerIsOwn && inHold) inner.color.copy(live.primary)
     }
     exhaleMat.opacity = holdExhaleRing ? fade * PULSE_MOVE_ALPHA_TARGET : innerIsOwn ? otherAlpha : ownAlpha
-    exhaleMat.emissiveIntensity = EXHALE_RING_EMISSIVE_MULT * (holdExhaleRing ? fade * PULSE_MOVE_EMISSIVE_TARGET : innerIsOwn ? otherEmissive : ownEmissive)
+    exhaleMat.emissiveIntensity = EXHALE_RING_EMISSIVE_MULT * (holdExhaleRing ? fade * PULSE_MOVE_EMISSIVE_TARGET : innerIsOwn ? exhaleOtherEmissive : exhaleOwnEmissive)
     // Hold-out pulses as bright as Hold-in: same primary base color swap.
     if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
     if (live && !innerIsOwn && inHold) exhaleMat.color.copy(live.primary)
@@ -230,7 +237,7 @@ export function usePaceRings({ gateColor, emissiveColor }) {
       mat.userData.uFadeStartY.value = COUNT_RING_FADE_START_Y * fadeScale
       mat.userData.uFadeEndY.value = COUNT_RING_FADE_END_Y * fadeScale
       mat.opacity = fade * lerp(0, COUNT_RING_ALPHA_TARGET, progress)
-      mat.emissiveIntensity = fade * lerp(0, COUNT_RING_EMISSIVE_TARGET, progress)
+      mat.emissiveIntensity = fade * lerp(COUNT_RING_EMISSIVE_START, COUNT_RING_EMISSIVE_TARGET, progress)
       mesh.visible = true
     }
   }

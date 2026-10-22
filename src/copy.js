@@ -36,7 +36,7 @@ export const TUTORIAL = {
   part3: 'Part 3:\nPacing your breath\n\nA bell will ring\nwhen it is time to inhale\nor exhale.\n\nAbove and below the sliders,\n‘inhale’ and ‘exhale’\nwill glow.\n\nEach art option\nhas additional cues.',
   prepare: 'Relax and prepare to inhale.',
   countdown: ['3', '2', '1', 'Start'],
-  done: 'Good job! The tutorial is done.\nKeep breathing, or\nreturn to the main menu with Home, or\nredo the tutorial with Restart.',
+  done: 'Good job! The tutorial is done.\nKeep breathing, or\npress Home\nto try another mode, or\npress Restart\nto redo the tutorial.',
 }
 
 export const TEXTS = {
