@@ -94,7 +94,10 @@ const TUTORIAL_REMIND_MS = 5000       // sliders still this long -> "Remember to
 const TUTORIAL_PREPARE_MS = 3000       // "Relax and prepare to inhale." shows this long before the countdown
 const COUNTDOWN_STEP_MS = 1000         // each of 3, 2, 1
 const COUNTDOWN_FADE_MS = 300          // each number fades in and out over this
-const COUNTDOWN_INHALE_MS = 2000       // "Inhale" (with the first paced Inhale) shows this long, then fades
+const COUNTDOWN_START_MS = 2000        // "Start" (with the first paced Inhale) shows this long, then fades
+const TUTORIAL_DONE_AFTER_MS = 20000   // closing text: 2 paced 5-5 breaths after "Start" = the 3rd Inhale
+const TUTORIAL_DONE_SHOW_MS = 10000    // closing text shows this long, then fades
+const TUTORIAL_SUB_GAP_PX = 15         // extra space above the countdown line
 const PRACTICE_FREE_BREATHS = 2        // breaths with no text between "Try it on your own" and "Notice how..."
 const PRACTICE_AFTER_BREATHS = 2       // breaths after "Notice how..." before Part 2
 
@@ -277,10 +280,10 @@ export default function App() {
   const textFadeOutEndRef = useRef(0)   // performance.now() when the current fade-out finishes
   const [tutorialAtTop, setTutorialAtTop] = useState(false)   // mode explanation: shown up under the mode name
   const [shapeOption, setShapeOptionState] = useState(() => {
-    let saved = localStorage.getItem('shapeOption') || 'b'
+    let saved = localStorage.getItem('shapeOption') || 'd'
     // Rotating Rings (e) is hidden from Art Options; move anyone who last
     // picked it to the default so they aren't stuck on a shape with no card.
-    if (saved === 'e') saved = 'b'
+    if (saved === 'e') saved = 'd'
     return ['a', 'b', 'c', 'd', 'e', 'f'].includes(saved) ? saved : 'a'
   })
   const [sliderLayout, setSliderLayoutState] = useState(() => {
@@ -957,10 +960,8 @@ export default function App() {
     else if (t.dir === -1 && b < t.extreme) t.extreme = b
     if (!event) return
     if (t.step === 'gotIt' && event === 'inhale') {
-      // One inhale + exhale on "You got it!", then "Try it on your own" for the next.
-      if (++t.inhales === 2) { t.step = 'try'; setTutorialStepText(TUTORIAL.tryOwn) }
-    } else if (t.step === 'try' && event === 'inhale') {
-      t.step = 'free'; t.inhales = 0; setTutorialStepText(null)
+      // One inhale + exhale on "You got it!", then free breaths.
+      if (++t.inhales === 2) { t.step = 'free'; t.inhales = 0; setTutorialStepText(null) }
     } else if (t.step === 'free' && event === 'inhale') {
       if (++t.inhales === PRACTICE_FREE_BREATHS) { t.step = 'notice'; setTutorialStepText(TUTORIAL.notice) }
     } else if (t.step === 'notice' && event === 'exhale') {
@@ -1010,9 +1011,14 @@ export default function App() {
         setTutorialSubVisible(false)
         currentMainTextRef.current = ''
         hideCountText()
-      }, inhaleAt + COUNTDOWN_INHALE_MS)
+      }, inhaleAt + COUNTDOWN_START_MS)
+      tutorialLater(() => showCountText(TUTORIAL.done), inhaleAt + TUTORIAL_DONE_AFTER_MS)
+      tutorialLater(() => {
+        currentMainTextRef.current = ''
+        hideCountText()
+      }, inhaleAt + TUTORIAL_DONE_AFTER_MS + TUTORIAL_DONE_SHOW_MS)
     })
-  }, [leaveTutorialScreen, tutorialLater, hideCountText])
+  }, [leaveTutorialScreen, tutorialLater, showCountText, hideCountText])
 
   const handleTutorialContinue = useCallback(() => {
     const screenId = tutorialRef.current.screen
@@ -1883,7 +1889,7 @@ export default function App() {
             : TEXT_SIZE_TUTORIAL}
           subText={mode === 'tutorial' ? tutorialSub
             : mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold : null}
-          subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs}
+          subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs} subGapPx={mode === 'tutorial' ? TUTORIAL_SUB_GAP_PX : 0}
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : 'box'}

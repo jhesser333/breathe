@@ -61,10 +61,10 @@ function roundAlphaMultiplier(totalElapsed, interval) {
 // larger text gets a wider column so long lines still fit.
 // subText: a line below the caption (positioned so the caption itself doesn't
 // move) -- Box Breathing's "Hold" (driven by the caption loop) or the Tutorial
-// countdown (subVisible, fading over subFadeMs).
+// countdown (subVisible, fading over subFadeMs), subGapPx lower.
 // region: { top, bottom } px from the screen edges -- center the text
 // vertically in that band instead (Tutorial mode's Part screens).
-export default function TutorialText({ size = 20, topPx = null, region = null, text, subText = null, subVisible = false, subFadeMs = 300, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+export default function TutorialText({ size = 20, topPx = null, region = null, text, subText = null, subVisible = false, subFadeMs = 300, subGapPx = 0, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
   const subRef = useRef(null)
 
@@ -163,6 +163,7 @@ export default function TutorialText({ size = 20, topPx = null, region = null, t
             ...lineStyle,
             position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
             whiteSpace: 'nowrap',
+            marginTop: subGapPx,
             opacity: pulseActive ? undefined : (subVisible ? 1 : 0),
             transition: pulseActive ? 'none' : `opacity ${subFadeMs}ms ease`,
           }}>
