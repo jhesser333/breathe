@@ -37,6 +37,7 @@ const RESUME_CHECK_MS = 300       // still not running this long after resume() 
 export const BELL_INHALE_EXHALE = 'bell_3s_a.wav'
 export const BELL_HOLD = 'bell_4s_a.wav'
 const BELL_GAIN = 1               // volume as exported
+export const BELL_INHALE_GAIN = 0.5   // Inhale-start bell is half as loud as the Exhale one
 const BELL_CUT_FADE_S = 0.1       // a bell cut off by the next one fades this fast (no click)
 
 // { slider: [1, 2, ...], pace: [1, ...] } -- only groups with both a and b.
@@ -284,7 +285,7 @@ export function createAudioEngine() {
     },
 
     // Ring a one-shot bell, cutting off any bell still ringing.
-    playBell(file) {
+    playBell(file, gainMult = 1) {
       if (!running || !ctx) return
       cutBell()
       const request = bellRequest
@@ -293,7 +294,7 @@ export function createAudioEngine() {
         const src = ctx.createBufferSource()
         src.buffer = buf
         const gain = ctx.createGain()
-        gain.gain.value = BELL_GAIN * fileGain(file)
+        gain.gain.value = BELL_GAIN * fileGain(file) * gainMult
         src.connect(gain).connect(master)
         src.start()
         const ringing = { src, gain }

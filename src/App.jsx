@@ -42,7 +42,7 @@ import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL, MODE_SCREENS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
-import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD } from './breathAudio'
+import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
 
 const navPillStyle = {
@@ -244,7 +244,8 @@ function PaceAudioDriver({ audioRef, getPaceProgress, getBellPhase }) {
     if (phase === prevBellRef.current) return
     prevBellRef.current = phase
     if (phase === null) audioRef.current.stopBell()
-    else audioRef.current.playBell(phase === 'inhale' || phase === 'exhale' ? BELL_INHALE_EXHALE : BELL_HOLD)
+    else audioRef.current.playBell(phase === 'inhale' || phase === 'exhale' ? BELL_INHALE_EXHALE : BELL_HOLD,
+      phase === 'inhale' ? BELL_INHALE_GAIN : 1)
   })
   return null
 }
