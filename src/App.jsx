@@ -98,7 +98,8 @@ const COUNTDOWN_START_MS = 2000        // "Start" (with the first paced Inhale) 
 const TUTORIAL_DONE_AFTER_MS = 20000   // closing text: 2 paced 5-5 breaths after "Start" = the 3rd Inhale
 const TUTORIAL_DONE_SHOW_MS = 10000    // closing text shows this long, then fades
 const TUTORIAL_SUB_GAP_PX = 15         // extra space above the countdown line
-const PRACTICE_FREE_BREATHS = 2        // breaths with no text between "Try it on your own" and "Notice how..."
+const PRACTICE_FREE_BREATHS = 1        // breaths with no text between "You got it!" and "Notice how..."
+const TUTORIAL_TEXT_LIFT_PX = 72       // 30 px tutorial text sits 2 lines (2 x 30 x 1.2) above the default spot
 const PRACTICE_AFTER_BREATHS = 2       // breaths after "Notice how..." before Part 2
 
 // Tutorial font sizes: mode explanation, paced captions (Inhale/Hold/Exhale), everything else.
@@ -277,6 +278,7 @@ export default function App() {
   const [tutorialFadeMs, setTutorialFadeMs] = useState(2000)
   // Blank-background start: false = scene covered, sliders hidden (SCENE_REVEAL_MS fade when it turns true).
   const [sceneRevealed, setSceneRevealed] = useState(false)
+  const [coverFading, setCoverFading] = useState(false)   // Tutorial: sliders stay live while the cover fades in
   const textFadeOutEndRef = useRef(0)   // performance.now() when the current fade-out finishes
   const [tutorialAtTop, setTutorialAtTop] = useState(false)   // mode explanation: shown up under the mode name
   const [shapeOption, setShapeOptionState] = useState(() => {
@@ -502,7 +504,8 @@ export default function App() {
   const tutorialRef = useRef(newTutorialState())
   // Tutorial: sliders ignore touches while the scene is covered (Part screens).
   const slidersDisabledRef = useRef(false)
-  slidersDisabledRef.current = mode === 'tutorial' && !sceneRevealed
+  const slidersLive = sceneRevealed || coverFading
+  slidersDisabledRef.current = mode === 'tutorial' && !slidersLive
   const tutorialTimersRef = useRef([])
   const [continueVisible, setContinueVisible] = useState(false)
   const [continuePressed, setContinuePressed] = useState(false)
@@ -918,10 +921,12 @@ export default function App() {
     t.stepText = null
     hideCountText()
     setSceneRevealed(false)
+    setCoverFading(true)   // sliders keep working until the cover is fully up
     audioRef.current.setMuted(true, SCENE_REVEAL_MS / 1000)   // silent while the Part text shows
     tutorialLater(() => {
       // Fully covered now: put the sliders back at full Exhale so they fade
       // back in from the default spot, not where they froze.
+      setCoverFading(false)
       leftRawRef.current = 0
       rightRawRef.current = 1
       setSliderResetKey(k => k + 1)
@@ -1053,9 +1058,7 @@ export default function App() {
         audioRef.current.setMuted(false, SCENE_REVEAL_MS / 1000)
         breathCountingEnabledRef.current = true
       })
-    } else if (screenId === 'part3a') {
-      leaveTutorialScreen(() => showTutorialScreen('part3b', TUTORIAL.part3b))
-    } else if (screenId === 'part3b') {
+    } else if (screenId === 'part3') {
       startTutorialPaced()
     }
   }, [leaveTutorialScreen, showTutorialScreen, startTutorialPaced, tutorialLater])
@@ -1080,7 +1083,7 @@ export default function App() {
   const handleBreathCountEvent = useCallback((type, cycle, n) => {
     // Tutorial Part 2: after 10 breaths (2 count cycles), on to Part 3.
     if (tutorialRef.current.part === 'count') {
-      if (type === 'cycleDone' && cycle === 1) tutorialGoBlank('part3a', TUTORIAL.part3a)
+      if (type === 'cycleDone' && cycle === 1) tutorialGoBlank('part3', TUTORIAL.part3)
       return
     }
     const ct = countTutorialRef.current
@@ -1532,6 +1535,7 @@ export default function App() {
 
     clearTimeout(tutorialTimerRef.current)
     setSceneRevealed(false)
+    setCoverFading(false)
     textFadeOutEndRef.current = 0
     modeRef.current = m
     clearTutorialTimers()
@@ -1852,7 +1856,7 @@ export default function App() {
           opacity: sceneRevealed ? 0 : 1, transition: `opacity ${SCENE_REVEAL_MS}ms ease`, pointerEvents: 'none',
         }} />
         <div style={{
-          position: 'absolute', inset: 0, pointerEvents: sceneRevealed ? 'auto' : 'none',
+          position: 'absolute', inset: 0, pointerEvents: slidersLive ? 'auto' : 'none',
           opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
         }}>
           {sliderLayout === 'diagonal'
@@ -1887,6 +1891,7 @@ export default function App() {
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
+          liftPx={tutorialAtTop || tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale ? 0 : TUTORIAL_TEXT_LIFT_PX}
           subText={mode === 'tutorial' ? tutorialSub
             : mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold : null}
           subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs} subGapPx={mode === 'tutorial' ? TUTORIAL_SUB_GAP_PX : 0}

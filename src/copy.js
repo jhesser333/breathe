@@ -27,17 +27,16 @@ export const MODE_INTRO = {
 // show at the top with a Continue button.
 export const TUTORIAL = {
   part1: 'Part 1:\nMove your thumbs\nas you breathe\nto transform the\nart and sound.',
-  inhaleUp: 'Inhale\nand\nmove the sliders\nup.',
-  exhaleDown: 'Exhale\nand\nmove the sliders\ndown.',
+  inhaleUp: 'Inhale,\nmove the sliders\nup.',
+  exhaleDown: 'Exhale,\nmove the sliders\ndown.',
   gotIt: 'You got it!\nJust keep\nmoving the sliders\nas you breathe.',
   remember: 'Remember to\nmove the sliders\nwith your breath.',
   notice: 'Notice how your breathing controls the art and sound.',
-  part2: 'Part 2:\nWith each breath,\nthe art will evolve.\nAfter 5 breaths,\nthe color and sound will change.\n\nWatch for these changes\nand breathe 10 times.',
-  part3a: 'Part 3:\nPacing your breath\n\nA bell will ring\nwhen it is time to inhale\nor exhale.',
-  part3b: 'Above and below the sliders,\n‘inhale’ and ‘exhale’\nwill glow.\n\nEach art option\nhas additional cues.',
+  part2: 'Part 2:\nWith each breath,\nthe art will evolve.\n\nAfter 5 breaths,\nthe color and sound will change.\n\nBreathe 10 times and\nlook for these changes.',
+  part3: 'Part 3:\nPacing your breath\n\nA bell will ring\nwhen it is time to inhale\nor exhale.\n\nAbove and below the sliders,\n‘inhale’ and ‘exhale’\nwill glow.\n\nEach art option\nhas additional cues.',
   prepare: 'Relax and prepare to inhale.',
   countdown: ['3', '2', '1', 'Start'],
-  done: 'Good job! The tutorial is done.\nKeep breathing,\nreturn to the main menu with Home,\nor replay the tutorial with Restart.',
+  done: 'Good job! The tutorial is done.\nKeep breathing, or\nreturn to the main menu with Home, or\nredo the tutorial with Restart.',
 }
 
 export const TEXTS = {
