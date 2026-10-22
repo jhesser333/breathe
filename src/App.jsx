@@ -40,7 +40,7 @@ import { RESET_ON_UNLOCK, TESTING_DEFAULTS } from './passcode'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
-import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL } from './copy'
+import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL, MODE_SCREENS } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE } from './breathPace'
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
@@ -107,6 +107,9 @@ const TEXT_SIZE_INTRO = 24
 const INTRO_EXTRA_LINES = 2   // blank intro-size lines added above the mode explanation (line height 1.2)
 const TEXT_SIZE_CAPTION = 60
 const TEXT_SIZE_TUTORIAL = 30
+
+// Modes that open with Tutorial-style screens (text at the top + Continue).
+const usesScreens = (m) => m === 'tutorial' || m === 'box' || m === 'slowing'
 
 // Per-shape camera placement. Each art option is framed independently -- omitting
 // `rotation` lets R3F apply its default look-at-origin, which gives the ~35deg
@@ -505,7 +508,7 @@ export default function App() {
   // Tutorial: sliders ignore touches while the scene is covered (Part screens).
   const slidersDisabledRef = useRef(false)
   const slidersLive = sceneRevealed || coverFading
-  slidersDisabledRef.current = mode === 'tutorial' && !slidersLive
+  slidersDisabledRef.current = usesScreens(mode) && !slidersLive
   const tutorialTimersRef = useRef([])
   const [continueVisible, setContinueVisible] = useState(false)
   const [continuePressed, setContinuePressed] = useState(false)
@@ -977,6 +980,39 @@ export default function App() {
     }
   }, [setTutorialStepText, tutorialGoBlank])
 
+  // "Relax and prepare to inhale." with a countdown on the sub line: 3, 2, 1,
+  // plus "Start" in the Tutorial. Without "Start" (Box Breathing, Slowing
+  // Down) the text fades out during "1". onStart runs as "1" ends (the first
+  // paced Inhale); returns that time (ms from now).
+  const runPreparedStart = useCallback((withStartWord, onStart) => {
+    setTutorialSub('')
+    setTutorialSubVisible(false)
+    setTutorialSubFadeMs(COUNTDOWN_FADE_MS)
+    currentMainTextRef.current = TUTORIAL.prepare
+    setTutorialFadeMs(COUNT_FADE_MS)
+    setTutorialText(TUTORIAL.prepare)
+    setTutorialVisible(true)
+    tutorialVisibleRef.current = true
+    const startAt = TUTORIAL_PREPARE_MS + (TUTORIAL.countdown.length - 1) * COUNTDOWN_STEP_MS
+    const words = withStartWord ? TUTORIAL.countdown : TUTORIAL.countdown.slice(0, -1)
+    words.forEach((word, i) => {
+      const at = TUTORIAL_PREPARE_MS + i * COUNTDOWN_STEP_MS
+      tutorialLater(() => { setTutorialSub(word); setTutorialSubVisible(true) }, at)
+      if (at < startAt) tutorialLater(() => setTutorialSubVisible(false), at + COUNTDOWN_STEP_MS - COUNTDOWN_FADE_MS)
+    })
+    if (!withStartWord) {
+      tutorialLater(() => { currentMainTextRef.current = ''; hideCountText() }, startAt - COUNT_FADE_MS)
+    }
+    tutorialLater(onStart, startAt)
+    return startAt
+  }, [tutorialLater, hideCountText])
+
+  // Fade the scene back in (and the audio) after a screen.
+  const revealAfterScreen = useCallback(() => {
+    setSceneRevealed(true)
+    audioRef.current.setMuted(false, SCENE_REVEAL_MS / 1000)
+  }, [])
+
   // Part 3's last screen: fade in the scene with the paced 5-5 art ready,
   // "Relax and prepare to inhale.", then 3, 2, 1 and "Inhale" exactly as the
   // first paced Inhale starts (gates enabled, first bell).
@@ -986,31 +1022,16 @@ export default function App() {
     inhaleSecondsRef.current = pace.inhale
     exhaleSecondsRef.current = pace.exhale
     setTutorialPaced(true)
-    setTutorialSub('')
-    setTutorialSubVisible(false)
-    setTutorialSubFadeMs(COUNTDOWN_FADE_MS)
     leaveTutorialScreen(() => {
       tutorialRef.current.part = 'paced'
       setSceneRevealed(true)
       audioRef.current.setMuted(false, SCENE_REVEAL_MS / 1000)
-      currentMainTextRef.current = TUTORIAL.prepare
-      setTutorialFadeMs(COUNT_FADE_MS)
-      setTutorialText(TUTORIAL.prepare)
-      setTutorialVisible(true)
-      tutorialVisibleRef.current = true
-      const t0 = TUTORIAL_PREPARE_MS
-      TUTORIAL.countdown.forEach((word, i) => {
-        const at = t0 + i * COUNTDOWN_STEP_MS
-        tutorialLater(() => { setTutorialSub(word); setTutorialSubVisible(true) }, at)
-        if (i < TUTORIAL.countdown.length - 1) tutorialLater(() => setTutorialSubVisible(false), at + COUNTDOWN_STEP_MS - COUNTDOWN_FADE_MS)
-      })
-      const inhaleAt = t0 + (TUTORIAL.countdown.length - 1) * COUNTDOWN_STEP_MS
-      tutorialLater(() => {
+      const inhaleAt = runPreparedStart(true, () => {
         // Same start as Slowing Down's paced art, without its captions.
         breathPhaseRef.current = 'exhale'
         pacedCueStageRef.current = 'done'
         gatesEnabledRef.current = true
-      }, inhaleAt)
+      })
       tutorialLater(() => {
         setTutorialSubFadeMs(COUNT_FADE_MS)
         setTutorialSubVisible(false)
@@ -1023,7 +1044,7 @@ export default function App() {
         hideCountText()
       }, inhaleAt + TUTORIAL_DONE_AFTER_MS + TUTORIAL_DONE_SHOW_MS)
     })
-  }, [leaveTutorialScreen, tutorialLater, showCountText, hideCountText])
+  }, [leaveTutorialScreen, tutorialLater, runPreparedStart, showCountText, hideCountText])
 
   const handleTutorialContinue = useCallback(() => {
     const screenId = tutorialRef.current.screen
@@ -1060,15 +1081,55 @@ export default function App() {
       })
     } else if (screenId === 'part3') {
       startTutorialPaced()
+    } else if (screenId === 'box') {
+      // Box Breathing: countdown, then the paced art and captions.
+      leaveTutorialScreen(() => {
+        tutorialRef.current.part = 'paced'
+        revealAfterScreen()
+        breathCountingEnabledRef.current = true
+        runPreparedStart(false, () => { setTutorialSub(null); startBoxArt() })
+      })
+    } else if (screenId === 'slowing1') {
+      // Slowing Down Part 1: breathe freely while SlowingDownController records
+      // the pace (handleRecordingReady goes blank to Part 2).
+      leaveTutorialScreen(() => {
+        tutorialRef.current.part = 'record'
+        lastMoveTime.current = Date.now()
+        revealAfterScreen()
+        breathCountingEnabledRef.current = true
+        recordingEnabledRef.current = true
+        setTutorialStepText(MODE_SCREENS.slowingRecord)
+      })
+    } else if (screenId === 'slowing2') {
+      // Slowing Down Part 2: countdown, then the paced art at the recorded
+      // pace and the ramp, without captions (bells and labels only).
+      leaveTutorialScreen(() => {
+        tutorialRef.current.part = 'paced'
+        revealAfterScreen()
+        runPreparedStart(false, () => {
+          setTutorialSub(null)
+          startPacedArt()
+          pacedCueStageRef.current = 'done'
+        })
+      })
     }
-  }, [leaveTutorialScreen, showTutorialScreen, startTutorialPaced, tutorialLater])
+  }, [leaveTutorialScreen, showTutorialScreen, startTutorialPaced, tutorialLater, revealAfterScreen, runPreparedStart, startBoxArt, startPacedArt, setTutorialStepText])
 
-  // "Remember to move the sliders..." after TUTORIAL_REMIND_MS still (Parts 1 and 2).
+  // Slowing Down: recording done. From Part 1, hold the ramp at the recorded
+  // pace and go blank to Part 2.
+  const handleRecordingReady = useCallback(() => {
+    if (tutorialRef.current.part !== 'record') { handleSlowingRecordingDone(); return }
+    phase2StartRef.current = Infinity
+    tutorialGoBlank('slowing2', MODE_SCREENS.slowing2)
+  }, [handleSlowingRecordingDone, tutorialGoBlank])
+
+  // "Remember to move the sliders..." after TUTORIAL_REMIND_MS still (Tutorial
+  // Parts 1 and 2, Slowing Down's recording).
   useEffect(() => {
-    if (mode !== 'tutorial') return
+    if (!usesScreens(mode)) return
     const id = setInterval(() => {
       const t = tutorialRef.current
-      if ((t.part !== 'practice' && t.part !== 'count') || t.reminding) return
+      if ((t.part !== 'practice' && t.part !== 'count' && t.part !== 'record') || t.reminding) return
       if (Date.now() - lastMoveTime.current < TUTORIAL_REMIND_MS) return
       t.reminding = true
       showCountText(TUTORIAL.remember)
@@ -1086,17 +1147,9 @@ export default function App() {
       if (type === 'cycleDone' && cycle === 1) tutorialGoBlank('part3', TUTORIAL.part3)
       return
     }
+    // Count tutorial (Own Pace; Box/Slowing open with screens instead).
     const ct = countTutorialRef.current
-    if (!ct.active) return
-    const m = ct.mode
-    const paced = m === 'box' || m === 'slowing'
-    if (type === 'cycleDone') {
-      if (cycle === 1 && paced) {
-        ct.active = false
-        pacedWaitForBottomRef.current = true
-      }
-      return
-    }
+    if (!ct.active || type === 'cycleDone') return
     if (cycle === 0) {
       if (n === 1) showCountText(TEXTS.countEachBreath)
       else if (n === 2) hideCountText()
@@ -1104,17 +1157,12 @@ export default function App() {
       else if (n === 4) hideCountText()
       else if (n === 5) showCountText(TEXTS.countResets)
     } else if (cycle === 1) {
-      if (m === 'slowing' && n === 1) recordingEnabledRef.current = true
       if (n === 1) showCountText(TEXTS.countNewCycle)
-      else if (!paced) {
-        // Own Pace: the tutorial ends with the new-cycle text.
+      else {
+        // The tutorial ends with the new-cycle text.
         hideCountText()
         ct.active = false
       }
-      else if (n === 2) showCountText(m === 'box' ? TEXTS.boxCountSoon : TEXTS.gatesSlowing)
-      else if (n === 3) showCountText(m === 'box' ? TEXTS.boxCountPace : TEXTS.slowingCuesSoon)
-      else if (n === 4) showCountText(m === 'box' ? TEXTS.boxCountTwoMore : TEXTS.slowingCuesSync)
-      else if (n === 5) hideCountText()
     }
   }, [showCountText, hideCountText, tutorialGoBlank])
 
@@ -1133,7 +1181,7 @@ export default function App() {
         clearTimeout(tutorialTimerRef.current)
         setTutorialVisible(false)
         tutorialVisibleRef.current = false
-        currentMainTextRef.current = TEXTS.slowingCuesSync
+        currentMainTextRef.current = ''
         return
       }
       pacedCaptionRef.current = {
@@ -1365,7 +1413,7 @@ export default function App() {
       // Box Breathing's captions are driven by their own clock-based poll
       // below, not by user interaction -- "stillness" is meaningless here.
       if (mode === 'box') return
-      if (mode === 'tutorial') return   // has its own reminder (TUTORIAL_REMIND_MS)
+      if (usesScreens(mode)) return   // Tutorial-style modes: own reminder (TUTORIAL_REMIND_MS)
       if (introActiveRef.current) return
       if (mode === 'slowing' && pacedCueStageRef.current === 'captions') return
       if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
@@ -1452,7 +1500,7 @@ export default function App() {
     lastMoveTime.current = Date.now()
     // Breath position in the old left-slider convention (0 exhale -> 1 inhale).
     const b = 1 - v
-    if (modeRef.current === 'tutorial') {
+    if (usesScreens(modeRef.current)) {
       // Moving again after the reminder: back to the step's own text.
       const t = tutorialRef.current
       if (t.reminding) {
@@ -1553,7 +1601,7 @@ export default function App() {
     // paced source at the count tutorial's third cycle).
     introStartsCountingRef.current = true
     countTutorialRef.current = { active: false, mode: m }
-    pacedStartFnRef.current = m === 'box' ? startBoxArt : m === 'slowing' ? startPacedArt : null
+    pacedStartFnRef.current = null   // Box/Slowing start from their countdown (handleTutorialContinue)
     breathCountSourceRef.current = null
     breathPhaseRef.current = 'exhale'
     paceArtFadeRef.current = 1
@@ -1623,6 +1671,13 @@ export default function App() {
       stageRef.current = 'done'
       diagStageRef.current = 'intro'
       showTutorialScreen('part1', TUTORIAL.part1)
+    } else if (m === 'box' || m === 'slowing') {
+      // Tutorial-style opening screen; Continue runs the rest (handleTutorialContinue).
+      introActiveRef.current = false
+      stageRef.current = 'done'
+      diagStageRef.current = 'done'
+      const id = m === 'box' ? 'box' : 'slowing1'
+      showTutorialScreen(id, MODE_SCREENS[id])
     } else if (intro) {
       introActiveRef.current = true
       setTutorialAtTop(true)
@@ -1649,7 +1704,7 @@ export default function App() {
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, sliderLayout, startBoxArt, startPacedArt, revealScene, clearTutorialTimers, showTutorialScreen])
+  }, [resetSlowingState, showGatesText, sliderLayout, revealScene, clearTutorialTimers, showTutorialScreen])
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
@@ -1754,7 +1809,7 @@ export default function App() {
   // texts center between the mode name and the top of Continue.
   const modeLabelLines = (MODE_LABELS[mode] || '').includes(': ') ? 2 : 1
   const continueBottom = 16 + sliderShiftUp + 12
-  const tutorialScreenRegion = mode === 'tutorial' && tutorialAtTop
+  const tutorialScreenRegion = usesScreens(mode) && tutorialAtTop
     ? { top: MODE_CAPTION_TOP + modeLabelLines * MODE_CAPTION_LINE_PX, bottom: continueBottom + continueHeight }
     : null
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : MorphA
@@ -1829,7 +1884,7 @@ export default function App() {
             spawnIntervalRef={spawnIntervalRef}
             recordingEnabledRef={recordingEnabledRef}
             lastMaxTimeRef={lastMaxTimeRef}
-            onGatesReady={handleSlowingRecordingDone}
+            onGatesReady={handleRecordingReady}
             onTextDone={shapeOption === 'd' || shapeOption === 'e' || usesCubeFlow(shapeOption) ? () => {} : handleSlowingTextDDone}
             onTextEDone={shapeOption === 'd' || shapeOption === 'e' || usesCubeFlow(shapeOption) ? () => {} : handleSlowingTextEDone}
             inhaleSecondsRef={inhaleSecondsRef}
@@ -1892,15 +1947,16 @@ export default function App() {
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
           liftPx={tutorialAtTop || tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale ? 0 : TUTORIAL_TEXT_LIFT_PX}
-          subText={mode === 'tutorial' ? tutorialSub
-            : mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold : null}
-          subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs} subGapPx={mode === 'tutorial' ? TUTORIAL_SUB_GAP_PX : 0}
+          subText={mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold
+            : usesScreens(mode) ? tutorialSub : null}
+          subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs}
+          subGapPx={usesScreens(mode) && tutorialText !== TEXTS.boxInhale && tutorialText !== TEXTS.boxExhale ? TUTORIAL_SUB_GAP_PX : 0}
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : 'box'}
           pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef} />
-        {mode === 'tutorial' && (
-          // Tutorial Part screens: rounded like the mode cards, colored/pressed like Start.
+        {usesScreens(mode) && (
+          // Tutorial-style screens: rounded like the mode cards, colored/pressed like Start.
           <button
             ref={continueRef}
             onClick={continueVisible ? handleTutorialContinue : undefined}

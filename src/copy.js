@@ -18,9 +18,16 @@ export const TEXT_B3 = 'Now the art will change with each breath.'
 
 // Shown for MODE_INTRO_MS at the start of each mode, before its tutorial.
 export const MODE_INTRO = {
-  box: 'Box Breathing\nhas 4 steps:\ninhale, hold, exhale, hold\nfor 4 counts each.\n\nFollow the steps\nin this tutorial.\nYou will start\nBox Breathing\nat the end.',
-  slowing: 'This mode will record\nthe pace of your\nbreathing and then\nhelp you slow down.\n\nThe following tutorial\nwill guide you into the\nSlowing Down Mode.',
   basic: 'In this mode,\nyou can breathe\nat your own pace\nand use the audio\nand visual feedback\nto help focus.\n\nThe following tutorial will\nguide you into the mode.',
+}
+
+// Box Breathing and Slowing Down open with Tutorial-style screens (App.jsx,
+// Continue button); slowingRecord is the step text while recording.
+export const MODE_SCREENS = {
+  box: 'Box Breathing\n\nBreathe in 4 steps,\n4 seconds each:\ninhale, hold,\nexhale, hold.\n\nDuring each hold,\nkeep the sliders still.\nA different bell rings\nwhen it is time to hold.\n\n‘Inhale’, ‘Hold’ and ‘Exhale’\nwill guide you\nfor the first 2 rounds.',
+  slowing1: 'Slowing Down\nPart 1: Recording your pace\n\nBreathe at your own pace\nfor 5 breaths\nwhile the app records it.',
+  slowingRecord: 'Breathe at your own pace.',
+  slowing2: 'Part 2: Slowing down\n\nThe bells will start\nat the pace you recorded,\nthen slowly guide you\nto a slower pace\nover the next minute.\n\nKeep your breathing\nin sync with the bells.',
 }
 
 // Guided Breathing: Tutorial mode (App.jsx, tutorialRef). The part* screens
@@ -44,7 +51,6 @@ export const TEXTS = {
   gatesTimedD:  'Adjust the pace of the targets with the slider on the left.',
   gatesTimedAmbient:  'Let the background\'s rhythm guide your pace as you breathe.',
   gatesTimedDAmbient: 'Adjust the pace of the rhythm with the slider on the left.',
-  gatesSlowing: 'Breathe at your own pace for a few breaths.',
   slowingTextD: 'Good Job! The oncoming targets will begin at your pace and slow down over the next minute.',
   slowingTextE: 'Keep Morph aligned with the targets to slow down your breathing.',
   slowingTextDAmbient: 'You will soon see art animate at the rate you recorded.',
@@ -57,12 +63,6 @@ export const TEXTS = {
   countColors:     'These changes help count breaths.',
   countResets:     'After 5 breaths, the counting resets. The colors and sounds will change.',
   countNewCycle:   'This is a new 5-breath cycle.',
-  boxCountSoon:    'Box Breathing cues will appear after this cycle.',
-  boxCountPace:    'Follow these cues to inhale, hold, exhale and hold.',
-  boxCountTwoMore: 'The cues are about to start.',
-  // Slowing Down's count-tutorial texts 2-3 (all art options).
-  slowingCuesSoon: 'You will soon see cues at the rate you recorded.',
-  slowingCuesSync: 'Keep your breathing in sync with the cues as they slow down.',
   boxInhale:    'Inhale',
   boxHold:      'Hold',
   boxExhale:    'Exhale',
