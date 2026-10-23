@@ -14,5 +14,5 @@ export const TESTING_DEFAULTS = {
   selectedMode: 'tutorial', // Guided Breathing: Tutorial
   shapeOption: 'd',        // Morphing Sphere that Disappears
   sliderLayout: 'diagonal',
-  targetPace: '5-5',       // Slowing Down: 5 in, 5 out
+  targetPace: '6-6',       // Slowing Down: 6 in, 6 out
 }

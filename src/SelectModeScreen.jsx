@@ -49,10 +49,10 @@ function modeBtnStyle(selected, palette) {
   }
 }
 
-export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange }) {
+export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange, onAnyTap }) {
   const [startPressed, setStartPressed] = useState(false)
   return (
-    <div style={{
+    <div onPointerDown={onAnyTap} style={{
       position: 'fixed', inset: 0,
       background: palette.background,
       display: 'flex', flexDirection: 'column',

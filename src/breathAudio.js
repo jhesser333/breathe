@@ -32,7 +32,11 @@ const FILE_GAIN = {
   'slider_3b.wav': 0.24,   // was 0.75; ~half as loud again (-10 dB)
 }
 const fileGain = (f) => FILE_GAIN[f.toLowerCase()] ?? 1
-const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context
+// Home screen: this slider group loops with both sides at full level (the
+// app's full-Inhale sound), so people can set their volume before starting.
+const HOME_GROUP = 3
+const HOME_FADE_S = 1
+const RESUME_CHECK_MS = 300      // still not running this long after resume() -> rebuild the context
 // One-shot bells at the start of each paced phase (Box Breathing, Slowing Down).
 export const BELL_INHALE_EXHALE = 'bellkick_3s_a.wav'
 export const BELL_HOLD = 'bell_4s_a.wav'
@@ -75,6 +79,8 @@ export function createAudioEngine() {
   let paceOn = false
   // Per pair: the currently audible voice set { group, level GainNode, a/b { src, gain } }.
   const current = { slider: null, pace: null }
+  let home = null           // the home-screen loop's voices, or null
+  let homeOn = false
   let lastCycleIndex = 0
   let resumeCheck = null
   let stale = false         // page was hidden since the context was made: rebuild on the next tap
@@ -131,6 +137,32 @@ export function createAudioEngine() {
         src.connect(gain).connect(level)
         src.start()
         voices[side] = { src, gain, trim }
+      })
+    }
+    return voices
+  }
+
+  // The home loop: HOME_GROUP's a and b, both at full level (x their trims).
+  function makeHomeVoices(fadeS) {
+    const entry = groups.slider.find((e) => e.group === HOME_GROUP) || groups.slider[groups.slider.length - 1]
+    if (!entry) return null
+    const level = ctx.createGain()
+    level.connect(master)
+    const voices = { group: entry.group, level, a: null, b: null, dead: false }
+    const t = ctx.currentTime
+    level.gain.setValueAtTime(0, t)
+    level.gain.linearRampToValueAtTime(1, t + fadeS)
+    for (const side of ['a', 'b']) {
+      load(entry[side]).then((buf) => {
+        if (!buf || voices.dead) return
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        src.loop = true
+        const gain = ctx.createGain()
+        gain.gain.value = fileGain(entry[side])
+        src.connect(gain).connect(level)
+        src.start()
+        voices[side] = { src, gain }
       })
     }
     return voices
@@ -197,13 +229,13 @@ export function createAudioEngine() {
       try { ctx.close() } catch { /* ignore */ }
       if (!createContext()) return
       ctx.resume().catch(() => {})
-      if (running) restartVoices()
+      restartVoices()
       return
     }
     stale = false
     if (!ctx || ctx.state === 'closed') {
       if (!createContext()) return
-      if (running) restartVoices()
+      restartVoices()
       return
     }
     if (ctx.state === 'running') return
@@ -213,12 +245,15 @@ export function createAudioEngine() {
       if (!ctx || ctx.state === 'running') return
       try { ctx.close() } catch { /* ignore */ }
       if (!createContext()) return
-      if (running) restartVoices()
+      restartVoices()
     }, RESUME_CHECK_MS)
   }
 
-  // Old voices belong to the dead context; just drop them and rebuild.
+  // Old voices belong to the dead context; just drop them and rebuild
+  // whatever was playing (a mode's pairs and/or the home loop).
   function restartVoices() {
+    home = homeOn ? makeHomeVoices(0.5) : null
+    if (!running) return
     bell = null
     current.slider = null
     current.pace = null
@@ -230,11 +265,11 @@ export function createAudioEngine() {
   // Any tap (a user gesture) while playing brings a stalled context back, so
   // touching a slider after returning to the phone restores the sound.
   if (typeof document !== 'undefined') {
-    const onGesture = () => { if (running && (stale || !ctx || ctx.state !== 'running')) ensureRunning() }
+    const onGesture = () => { if ((running || homeOn) && (stale || !ctx || ctx.state !== 'running')) ensureRunning() }
     for (const type of ['touchend', 'pointerup', 'keydown']) document.addEventListener(type, onGesture, { passive: true })
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') stale = true
-      else if (running && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
+      else if ((running || homeOn) && ctx && ctx.state !== 'running') ctx.resume().catch(() => {})
     })
     window.addEventListener('pagehide', () => { stale = true })
   }
@@ -245,7 +280,23 @@ export function createAudioEngine() {
       ensureRunning()
     },
 
+    // Home screen loop on (idempotent; must first run inside a tap) / off.
+    startHome(fadeS = HOME_FADE_S) {
+      homeOn = true
+      ensureRunning()
+      if (!ctx || home) return
+      home = makeHomeVoices(fadeS)
+    },
+
+    stopHome(fadeS = HOME_FADE_S) {
+      homeOn = false
+      if (!ctx || !home) return
+      retire(home, fadeS)
+      home = null
+    },
+
     start(cycleIndex = 0) {
+      this.stopHome(0.5)
       ensureRunning()
       if (!ctx) return
       this.stop(0.05)

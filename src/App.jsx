@@ -95,7 +95,7 @@ const TUTORIAL_PREPARE_MS = 3000       // "Relax and prepare to inhale." shows t
 const COUNTDOWN_STEP_MS = 1000         // each of 3, 2, 1
 const COUNTDOWN_FADE_MS = 300          // each number fades in and out over this
 const COUNTDOWN_START_MS = 2000        // "Start" (with the first paced Inhale) shows this long, then fades
-const TUTORIAL_DONE_AFTER_MS = 20000   // closing text: 2 paced 5-5 breaths after "Start" = the 3rd Inhale
+const TUTORIAL_DONE_AFTER_MS = 24000   // closing text: 2 paced 6-6 breaths after "Inhale" = the 3rd Inhale
 const TUTORIAL_DONE_SHOW_MS = 10000    // closing text shows this long, then fades
 const TUTORIAL_SUB_GAP_PX = 15         // extra space above the countdown line
 const PRACTICE_FREE_BREATHS = 1        // breaths with no text between "You got it!" and "Notice how..."
@@ -336,6 +336,9 @@ export default function App() {
       setSliderLayout(TESTING_DEFAULTS.sliderLayout)
       setTargetPace(TESTING_DEFAULTS.targetPace)
     }
+    // Typing the code is a user gesture: unlock audio and start the home loop.
+    audioRef.current.unlock()
+    audioRef.current.startHome()
     setUnlocked(true)
   }, [setSelectedMode, setShapeOption, setSliderLayout, setTargetPace])
 
@@ -1025,12 +1028,12 @@ export default function App() {
     audioRef.current.setMuted(false, SCENE_REVEAL_MS / 1000)
   }, [])
 
-  // Part 3's last screen: fade in the scene with the paced 5-5 art ready,
+  // Part 3's last screen: fade in the scene with the paced 6-6 art ready,
   // "Relax and prepare to inhale.", then 3, 2, 1 and "Inhale" exactly as the
   // first paced Inhale starts (gates enabled, first bell). showDone false
   // (Skip Tutorial) leaves out the closing "Good job!" text.
   const startTutorialPaced = useCallback(({ showDone = true } = {}) => {
-    const pace = TARGET_PACES['5-5']
+    const pace = TARGET_PACES['6-6']
     spawnIntervalRef.current = pace.inhale + pace.exhale
     inhaleSecondsRef.current = pace.inhale
     exhaleSecondsRef.current = pace.exhale
@@ -1771,6 +1774,13 @@ export default function App() {
     if (skipRef.current) setSkipHeight(skipRef.current.offsetHeight)
   }, [mode, tutorialScreenId])
 
+  // Home screen loop: on while Home shows, off on every other screen.
+  useEffect(() => {
+    if (!unlocked) return
+    if (screen === 'selectMode') audioRef.current.startHome()
+    else audioRef.current.stopHome()
+  }, [screen, unlocked])
+
   // Passcode gate: not saved anywhere, so every load/refresh asks again.
   if (!unlocked) {
     return <PasscodeScreen palette={palette} onUnlock={handleUnlock} />
@@ -1785,6 +1795,7 @@ export default function App() {
         palette={palette}
         selectedMode={selectedMode}
         onSelectModeChange={setSelectedMode}
+        onAnyTap={() => audioRef.current.startHome()}
       />
     )
   }
