@@ -64,6 +64,12 @@ export default function PasscodeScreen({ palette, onUnlock }) {
       }}>
         Incorrect code
       </p>
+      <p style={{
+        color: palette.headerColor, fontSize: 16, lineHeight: 1.4,
+        textAlign: 'center', whiteSpace: 'pre-line', margin: '12px 0 0',
+      }}>
+        {'This app is designed\nto be used on your phone\nin the usual vertical position.'}
+      </p>
     </div>
   )
 }
