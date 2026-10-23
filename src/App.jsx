@@ -2019,8 +2019,8 @@ export default function App() {
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : 'box'}
           pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef}
-          insert={mode === 'tutorial' && tutorialAtTop && tutorialScreenId === 'part3' && (
-            <button onClick={continueVisible ? () => audioRef.current.testBell() : undefined} style={navPillStyle}>
+          insert={tutorialAtTop && (tutorialScreenId === 'part3' || tutorialScreenId === 'box') && (
+            <button onClick={continueVisible ? () => audioRef.current.testBell(tutorialScreenId === 'box' ? BELL_HOLD : BELL_INHALE_EXHALE) : undefined} style={navPillStyle}>
               {TEST_BELL_LABEL}
             </button>
           )} />
