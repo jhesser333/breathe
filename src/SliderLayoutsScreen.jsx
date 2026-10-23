@@ -10,12 +10,16 @@ function optionBtn(selected, palette) {
   }
 }
 
+// Control Options. The Vertical sliders ('vertical': sliders on the left and
+// right edges of the screen) are hidden but still implemented.
 const OPTIONS = [
-  { id: 'vertical', label: 'Vertical', desc: 'Sliders on the left and right edges of the screen' },
-  { id: 'diagonal', label: 'Diagonal', desc: 'Sliders angled inward near the bottom of the screen' },
+  { id: 'diagonal', label: 'Double Sliders', desc: 'Simultaneously move two sliders up when you inhale and down when you exhale.' },
+  { id: 'single', label: 'Single Slider', desc: 'When you inhale, slide a finger up anywhere on the screen. Slide it down when you exhale.' },
+  { id: 'touch', label: 'Touch the Screen', desc: 'Touch the screen when you inhale, and lift your finger when you exhale.' },
+  { id: 'tilt', label: 'Tilt Your Phone', desc: 'When you inhale, tilt your phone up toward vertical. When you exhale, tilt it back toward flat.' },
 ]
 
-export default function SliderLayoutsScreen({ selected, onSelect, onHome, palette }) {
+export default function SliderLayoutsScreen({ selected, onSelect, onHome, palette, tiltFailed = false }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -26,12 +30,15 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, palett
       fontFamily: 'sans-serif',
     }}>
       <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
-        Slider Layouts
+        CONTROL OPTIONS
       </h1>
       {OPTIONS.map(opt => (
         <button key={opt.id} style={optionBtn(selected === opt.id, palette)} onClick={() => onSelect(opt.id)}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selected === opt.id && '✓'}</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
+          {opt.id === 'tilt' && tiltFailed && (
+            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 5 }}>Motion access is off, so Double Sliders will be used.</div>
+          )}
         </button>
       ))}
 

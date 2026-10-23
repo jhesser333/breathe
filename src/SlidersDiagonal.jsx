@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTouchSlider } from './useTouchSlider'
 import { UI_EDGE, UI_INTERIOR, UI_FILL, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
 import {
@@ -98,12 +98,21 @@ function DiagonalTrack({ sliderRef, value, side }) {
   )
 }
 
-export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null }) {
-  const [leftRef, leftVal] = useTouchSlider(0, leftRawRef, 'diagonal-left', disabledRef)
-  const [rightRef, rightVal] = useTouchSlider(1, rightRawRef, 'diagonal-right', disabledRef)
+// drivenValue (0 exhale -> 1 inhale, or null): another Control Option is
+// driving the breath, so the thumbs show it and the tracks ignore touches.
+export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null, drivenValue = null }) {
+  const driven = drivenValue !== null
+  const drivenRef = useRef(driven)
+  drivenRef.current = driven
+  const touchDisabledRef = useMemo(() => ({ get current() { return drivenRef.current || !!disabledRef?.current } }), [disabledRef])
+  const [leftRef, touchLeft] = useTouchSlider(0, leftRawRef, 'diagonal-left', touchDisabledRef)
+  const [rightRef, touchRight] = useTouchSlider(1, rightRawRef, 'diagonal-right', touchDisabledRef)
 
-  useEffect(() => { onLeft(leftVal) }, [leftVal])
-  useEffect(() => { onRight(rightVal) }, [rightVal])
+  useEffect(() => { if (!drivenRef.current) onLeft(touchLeft) }, [touchLeft])
+  useEffect(() => { if (!drivenRef.current) onRight(touchRight) }, [touchRight])
+
+  const leftVal = driven ? drivenValue : touchLeft
+  const rightVal = driven ? 1 - drivenValue : touchRight
 
   const exhaleLabelBottom = BOTTOM_INSET + (1 - P0_FRAC.y) * CURVE_BOX_H
     - TRACK_THICKNESS / 2 - EXHALE_LABEL_GAP

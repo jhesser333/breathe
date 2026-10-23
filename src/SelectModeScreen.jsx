@@ -60,17 +60,6 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
       gap: 16, padding: 32,
       fontFamily: 'sans-serif',
     }}>
-      <button
-        onClick={onSliderLayouts}
-        style={{
-          position: 'absolute', top: 16, left: 16,
-          width: 28, height: 28, padding: 0,
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 6,
-          cursor: 'pointer',
-        }}
-      />
       <div style={{
         position: 'absolute', bottom: 16, left: '50%',
         transform: 'translateX(-50%)',
@@ -93,9 +82,14 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
         >
           Start
         </button>
-        <button onClick={onPersonalize} style={pillStyle}>
-          Change the Art
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={onPersonalize} style={pillStyle}>
+            Art Options
+          </button>
+          <button onClick={onSliderLayouts} style={pillStyle}>
+            Control Options
+          </button>
+        </div>
       </div>
       <h1 style={{
         color: palette.tertiaryColor, fontSize: 32, fontWeight: 700,

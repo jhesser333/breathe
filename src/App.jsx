@@ -44,6 +44,7 @@ import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, 
 import { TARGET_PACES, DEFAULT_TARGET_PACE, BOX_STEP_SECONDS } from './breathPace'
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
+import { useBreathControl, requestTiltPermission } from './useBreathControl'
 
 const navPillStyle = {
   background: UI_INTERIOR,
@@ -292,10 +293,18 @@ export default function App() {
     if (saved === 'e') saved = 'd'
     return ['a', 'b', 'c', 'd', 'e', 'f'].includes(saved) ? saved : 'a'
   })
+  // Control Options (sliderLayout key kept): 'diagonal' = Double Sliders,
+  // 'single' / 'touch' / 'tilt' drive the Diagonal sliders' thumbs
+  // (useBreathControl). 'vertical' is hidden: move anyone on it to 'diagonal'.
   const [sliderLayout, setSliderLayoutState] = useState(() => {
-    const saved = localStorage.getItem('sliderLayout') || 'vertical'
-    return ['vertical', 'diagonal'].includes(saved) ? saved : 'vertical'
+    let saved = localStorage.getItem('sliderLayout') || 'diagonal'
+    if (saved === 'vertical') saved = 'diagonal'
+    return ['vertical', 'diagonal', 'single', 'touch', 'tilt'].includes(saved) ? saved : 'diagonal'
   })
+  const isDiagonal = sliderLayout !== 'vertical'
+  // Tilt denied or no sensor: fall back to Double Sliders.
+  const [tiltFailed, setTiltFailed] = useState(false)
+  const breathControl = ['single', 'touch', 'tilt'].includes(sliderLayout) && !(sliderLayout === 'tilt' && tiltFailed) ? sliderLayout : null
   const [targetPace, setTargetPaceState] = useState(() => {
     const saved = localStorage.getItem('targetPace') || DEFAULT_TARGET_PACE
     return Object.keys(TARGET_PACES).includes(saved) ? saved : DEFAULT_TARGET_PACE
@@ -1436,7 +1445,7 @@ export default function App() {
       if (usesScreens(mode)) return   // Tutorial-style modes: own reminder (TUTORIAL_REMIND_MS)
       if (introActiveRef.current) return
       if (mode === 'slowing' && pacedCueStageRef.current === 'captions') return
-      if (sliderLayout === 'diagonal' && diagStageRef.current !== 'done') return
+      if (isDiagonal && diagStageRef.current !== 'done') return
       if (!tutorialVisibleRef.current && performance.now() >= textFadeOutEndRef.current && Date.now() - lastMoveTime.current >= STILLNESS_MS) {
         awaitingMovementRef.current = true
         setTutorialText(currentMainTextRef.current)
@@ -1445,7 +1454,7 @@ export default function App() {
       }
     }, 500)
     return () => clearInterval(id)
-  }, [screen, sliderLayout, mode])
+  }, [screen, isDiagonal, mode])
 
   // Box Breathing's captions: which of Inhale/Hold/Exhale/Hold shows, and
   // when, is derived purely from boxClockStartRef + spawnIntervalRef -- the
@@ -1530,7 +1539,7 @@ export default function App() {
       }
       updateTutorialPractice(b)
     }
-    if (sliderLayout === 'diagonal' || modeRef.current === 'tutorial' || diagStageRef.current.startsWith('B3')) updateDiagonalSequence(b)
+    if (isDiagonal || modeRef.current === 'tutorial' || diagStageRef.current.startsWith('B3')) updateDiagonalSequence(b)
     updatePacedText(b)
     if (pacedWaitForBottomRef.current && b <= DIAG_EDGE_THRESHOLD && pacedStartFnRef.current) pacedStartFnRef.current()
 
@@ -1568,7 +1577,22 @@ export default function App() {
     }
 
     handleMovement()
-  }, [handleMovement, triggerTextAFade, triggerTextBFade, sliderLayout, updateDiagonalSequence, updatePacedText, updateTutorialPractice, showCountText, hideCountText])
+  }, [handleMovement, triggerTextAFade, triggerTextBFade, isDiagonal, updateDiagonalSequence, updatePacedText, updateTutorialPractice, showCountText, hideCountText])
+
+  // Single Slider / Touch the Screen / Tilt Your Phone drive the breath here,
+  // exactly as if both sliders had moved (raw refs too, for recording).
+  const drivenBreath = useBreathControl({
+    control: mode ? breathControl : null,
+    disabledRef: slidersDisabledRef,
+    resetKey: sliderResetKey,
+    onValue: (v) => {
+      leftRawRef.current = v
+      rightRawRef.current = 1 - v
+      setLeft(v)
+      setRight(1 - v)
+    },
+    onTiltFail: () => setTiltFailed(true),
+  })
 
   // Fade the scene and sliders in (see SCENE_REVEAL_MS).
   const revealScene = useCallback(() => {
@@ -1578,6 +1602,8 @@ export default function App() {
   const handleSelectMode = useCallback((m) => {
     // Start/Restart taps: unlock and (re)start the breath audio.
     audioGroupIndexRef.current = 0
+    // Tilt Your Phone: ask for motion access inside this tap (iOS).
+    if (sliderLayout === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
     audioRef.current.unlock()
     audioRef.current.start(0)
     audioRef.current.setSlider(leftVal.current)
@@ -1639,7 +1665,7 @@ export default function App() {
     introActiveRef.current = false
     revealScene()   // scene + sliders fade in together with the first text
     setTutorialAtTop(false)
-    if (sliderLayout === 'diagonal') {
+    if (isDiagonal) {
       stageRef.current = 'done'
       diagStageRef.current = 'A1'
       diagDirectionRef.current = 0
@@ -1724,7 +1750,7 @@ export default function App() {
     setMode(m)
     setModeKey(k => k + 1)
     setScreen('experience')
-  }, [resetSlowingState, showGatesText, sliderLayout, revealScene, clearTutorialTimers, showTutorialScreen])
+  }, [resetSlowingState, showGatesText, isDiagonal, sliderLayout, revealScene, clearTutorialTimers, showTutorialScreen])
 
   // Slowing Down: first paced Inhale after recording (see PacedBreathCountStarter).
   const handlePacedCountStart = useCallback(() => {
@@ -1768,7 +1794,7 @@ export default function App() {
   const [sliderShiftUp, setSliderShiftUp] = useState(50)
   useLayoutEffect(() => {
     if (navButtonsRef.current) setSliderShiftUp(navButtonsRef.current.offsetHeight)
-  }, [sliderLayout])
+  }, [isDiagonal])
   useLayoutEffect(() => {
     if (continueRef.current) setContinueHeight(continueRef.current.offsetHeight)
     if (skipRef.current) setSkipHeight(skipRef.current.offsetHeight)
@@ -1803,7 +1829,11 @@ export default function App() {
     return (
       <SliderLayoutsScreen
         selected={sliderLayout}
-        onSelect={setSliderLayout}
+        onSelect={(v) => {
+          setSliderLayout(v)
+          if (v === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
+        }}
+        tiltFailed={tiltFailed}
         onHome={() => setScreen('selectMode')}
         palette={palette}
       />
@@ -1946,8 +1976,8 @@ export default function App() {
           position: 'absolute', inset: 0, pointerEvents: slidersLive ? 'auto' : 'none',
           opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
         }}>
-          {sliderLayout === 'diagonal'
-            ? <SlidersDiagonal key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />
+          {isDiagonal
+            ? <SlidersDiagonal key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} drivenValue={drivenBreath} />
             : <Sliders key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />}
         </div>
         <div style={{ position: 'absolute', top: MODE_CAPTION_TOP, left: '50%', transform: 'translateX(-50%)' }}>
@@ -2048,7 +2078,7 @@ export default function App() {
             visible={breathControlVisible}
           />
         )}
-        {sliderLayout === 'diagonal' ? (
+        {isDiagonal ? (
           <>
             <button ref={navButtonsRef} onClick={handleBackFromExperience} style={{ ...navPillStyle, position: 'absolute', bottom: 16, left: 16 }}>
               Home
