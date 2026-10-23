@@ -34,10 +34,10 @@ const FILE_GAIN = {
 const fileGain = (f) => FILE_GAIN[f.toLowerCase()] ?? 1
 const RESUME_CHECK_MS = 300       // still not running this long after resume() -> rebuild the context
 // One-shot bells at the start of each paced phase (Box Breathing, Slowing Down).
-export const BELL_INHALE_EXHALE = 'bell_3s_a.wav'
+export const BELL_INHALE_EXHALE = 'bellkick_3s_a.wav'
 export const BELL_HOLD = 'bell_4s_a.wav'
 const BELL_GAIN = 1               // volume as exported
-export const BELL_INHALE_GAIN = 0.5   // Inhale-start bell is half as loud as the Exhale one
+export const BELL_INHALE_GAIN = 0.25  // Inhale-start bell is a quarter as loud as the Exhale one
 const BELL_CUT_FADE_S = 0.1       // a bell cut off by the next one fades this fast (no click)
 
 // { slider: [1, 2, ...], pace: [1, ...] } -- only groups with both a and b.
