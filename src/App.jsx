@@ -141,9 +141,11 @@ const LABEL_DIM_OPACITY = 0.5   // label opacity in its tertiary state (1 when l
 const LABEL_GLOW_MULT = 10      // lit label's primary-color glow strength (text-shadow blur px per layer)
 const _labelColor = new THREE.Color()
 
-function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef, getLabelPhase }) {
+function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRef, wrapperRef, getLabelPhase, getHoldPhase }) {
   // Slider inhale/exhale labels: 0 = tertiary, 1 = text color (the phase to breathe now).
   const labelPRef = useRef({ inhale: 0, exhale: 0 })
+  // Box Breathing's "hold" labels: 0 hidden -> 1 shown (lit), same timing as the labels.
+  const holdPRef = useRef({ in: 0, out: 0 })
   useFrame((state, delta) => {
     if (paletteLerpRef.current) {
       const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime } = paletteLerpRef.current
@@ -194,6 +196,18 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
           : `0 0 ${g}px rgba(${rgb}, ${k.toFixed(3)}), 0 0 ${2 * g}px rgba(${rgb}, ${k.toFixed(3)}), 0 0 ${4 * g}px rgba(${rgb}, ${(0.75 * k).toFixed(3)})`)
       }
       wrapperRef.current.style.setProperty('--live-tertiary-color', '#' + live.tertiary.getHexString())
+      // "hold" labels: fade in as their Hold starts, out with the partner label
+      // as the next phase begins; shown in the lit label's look.
+      const hold = getHoldPhase ? getHoldPhase() : null
+      const hp = holdPRef.current
+      for (const key of ['in', 'out']) {
+        const target = hold === key ? 1 : 0
+        hp[key] = target > hp[key] ? Math.min(target, hp[key] + step) : Math.max(target, hp[key] - step)
+        wrapperRef.current.style.setProperty(`--hold-${key}-label-opacity`, String(THREE.MathUtils.smoothstep(hp[key], 0, 1)))
+      }
+      const g = LABEL_GLOW_MULT
+      const rgb = `${Math.round(live.primary.r * 255)}, ${Math.round(live.primary.g * 255)}, ${Math.round(live.primary.b * 255)}`
+      wrapperRef.current.style.setProperty('--hold-label-glow', `0 0 ${g}px rgba(${rgb}, 1), 0 0 ${2 * g}px rgba(${rgb}, 1), 0 0 ${4 * g}px rgba(${rgb}, 0.75)`)
     }
   })
   return null
@@ -812,6 +826,13 @@ export default function App() {
     if (mode === 'slowing' || mode === 'tutorial') return slowingPhaseNow()
     return null
   }, [mode, boxPhaseNow, slowingPhaseNow])
+
+  // Box Breathing's "hold" slider labels: 'in' during Hold-in, 'out' during Hold-out.
+  const getHoldPhase = useCallback(() => {
+    if (mode !== 'box') return null
+    const p = boxPhaseNow()
+    return p === null ? null : p.index === 1 ? 'in' : p.index === 3 ? 'out' : null
+  }, [mode, boxPhaseNow])
 
   // Which paced phase's bell should be ringing: Box 'inhale'/'hold'/'exhale'/
   // 'hold-out' from the caption clock; Slowing Down 'inhale'/'exhale', from the
@@ -1888,7 +1909,7 @@ export default function App() {
         <color attach="background" args={[palette.background]} />
         <ambientLight intensity={0.4} />
         <directionalLight position={[5, 5, 5]} intensity={1} />
-        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} />
+        <PaletteLerpDriver livePaletteRef={livePaletteRef} paletteLerpRef={paletteLerpRef} paletteCycleIndexRef={paletteCycleIndexRef} wrapperRef={wrapperRef} getLabelPhase={getLabelPhase} getHoldPhase={getHoldPhase} />
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} getBellPhase={getBellPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}

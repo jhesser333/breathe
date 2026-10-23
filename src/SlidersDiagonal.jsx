@@ -10,11 +10,13 @@ const INNER_GAP = 20
 const BOTTOM_INSET = 16
 const INHALE_LABEL_GAP = 14 // label bottom to top of the thumb at the inhale end
 const EXHALE_LABEL_GAP = 6  // bottom of the track caps to label top
+const LABEL_SIZE = 22
+const HOLD_LABEL_GAP = 4    // Box Breathing's "hold" labels: gap to their inhale/exhale partner
 
 const labelStyle = {
   position: 'absolute',
   color: 'var(--live-tertiary-color, #276d8c)',
-  fontSize: 22,
+  fontSize: LABEL_SIZE,
   lineHeight: 1,
   whiteSpace: 'nowrap',
   fontFamily: 'sans-serif',
@@ -23,6 +25,14 @@ const labelStyle = {
   userSelect: 'none',
   pointerEvents: 'none',
 }
+
+// Box Breathing's "hold" labels: the lit label look, opacity from App's PaletteLerpDriver.
+const holdStyle = (key) => ({
+  ...labelStyle,
+  color: 'var(--live-text-color, #c2dafb)',
+  opacity: `var(--hold-${key}-label-opacity, 0)`,
+  textShadow: 'var(--hold-label-glow, none)',
+})
 
 function DiagonalTrack({ sliderRef, value, side }) {
   const isLeft = side === 'left'
@@ -57,6 +67,14 @@ function DiagonalTrack({ sliderRef, value, side }) {
         transform: 'translate(-50%, -100%)',
       }}>
         inhale
+      </span>
+      <span style={{
+        ...holdStyle('in'),
+        left: (isLeft ? P2_FRAC.x : 1 - P2_FRAC.x) * w,
+        top: P2_FRAC.y * h - THUMB_SIZE / 2 - INHALE_LABEL_GAP - LABEL_SIZE - HOLD_LABEL_GAP,
+        transform: 'translate(-50%, -100%)',
+      }}>
+        hold
       </span>
       <div
         ref={sliderRef}
@@ -123,6 +141,9 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawR
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
       <span style={{ ...labelStyle, color: 'var(--exhale-label-color, var(--live-tertiary-color, #276d8c))', opacity: 'var(--exhale-label-opacity, 0.5)', textShadow: 'var(--exhale-label-glow, none)', bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
         exhale
+      </span>
+      <span style={{ ...holdStyle('out'), bottom: exhaleLabelBottom - LABEL_SIZE - HOLD_LABEL_GAP, left: '50%', transform: 'translate(-50%, 100%)' }}>
+        hold
       </span>
     </div>
   )
