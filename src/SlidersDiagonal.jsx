@@ -11,7 +11,11 @@ const BOTTOM_INSET = 16
 const INHALE_LABEL_GAP = 14 // label bottom to top of the thumb at the inhale end
 const EXHALE_LABEL_GAP = 6  // bottom of the track caps to label top
 const LABEL_SIZE = 22
-const HOLD_LABEL_GAP = 4    // Box Breathing's "hold" labels: gap to their inhale/exhale partner
+const HOLD_LABEL_GAP = 4    // Box Breathing's "hold" labels: gap to their inhale partner
+// The Hold-out "hold" sits between the tracks, above the exhale thumbs: its top
+// at this y in the track box, where the gap between the tracks clears the
+// label (~52 px wide) by about 8 px on each side.
+const HOLD_OUT_TOP_Y = 94
 
 const labelStyle = {
   position: 'absolute',
@@ -142,7 +146,7 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawR
       <span style={{ ...labelStyle, color: 'var(--exhale-label-color, var(--live-tertiary-color, #276d8c))', opacity: 'var(--exhale-label-opacity, 0.5)', textShadow: 'var(--exhale-label-glow, none)', bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
         exhale
       </span>
-      <span style={{ ...holdStyle('out'), bottom: exhaleLabelBottom - LABEL_SIZE - HOLD_LABEL_GAP, left: '50%', transform: 'translate(-50%, 100%)' }}>
+      <span style={{ ...holdStyle('out'), bottom: BOTTOM_INSET + CURVE_BOX_H - HOLD_OUT_TOP_Y - LABEL_SIZE, left: '50%', transform: 'translateX(-50%)' }}>
         hold
       </span>
     </div>
