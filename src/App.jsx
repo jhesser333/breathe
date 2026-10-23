@@ -40,7 +40,7 @@ import { RESET_ON_UNLOCK, TESTING_DEFAULTS } from './passcode'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { PALETTES } from './palettes'
 import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
-import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL, MODE_SCREENS } from './copy'
+import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, TEXT_B1_DIAGONAL, TEXT_B2_DIAGONAL, TEXT_B3, MODE_LABELS, TUTORIAL, MODE_SCREENS, TEST_BELL_LABEL } from './copy'
 import { TARGET_PACES, DEFAULT_TARGET_PACE, BOX_STEP_SECONDS } from './breathPace'
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
@@ -2018,7 +2018,12 @@ export default function App() {
           pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : 'box'}
-          pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef} />
+          pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef}
+          insert={mode === 'tutorial' && tutorialAtTop && tutorialScreenId === 'part3' && (
+            <button onClick={continueVisible ? () => audioRef.current.testBell() : undefined} style={navPillStyle}>
+              {TEST_BELL_LABEL}
+            </button>
+          )} />
         {usesScreens(mode) && (
           // Tutorial-style screens: rounded like the mode cards, colored/pressed like Start.
           <button

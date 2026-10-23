@@ -354,6 +354,28 @@ export function createAudioEngine() {
       })
     },
 
+    // Tutorial Part 3's Test Bell (inside the tap): the Inhale/Exhale bell at
+    // full level, restarting if it's still ringing. Skips the master gain, so
+    // it plays while the Part screen has the rest of the audio muted.
+    testBell() {
+      ensureRunning()
+      if (!ctx) return
+      cutBell()
+      const request = bellRequest
+      load(BELL_INHALE_EXHALE).then((buf) => {
+        if (!buf || request !== bellRequest) return
+        const src = ctx.createBufferSource()
+        src.buffer = buf
+        const gain = ctx.createGain()
+        gain.gain.value = BELL_GAIN * fileGain(BELL_INHALE_EXHALE)
+        src.connect(gain).connect(ctx.destination)
+        src.start()
+        const ringing = { src, gain }
+        bell = ringing
+        src.onended = () => { src.disconnect(); gain.disconnect(); if (bell === ringing) bell = null }
+      })
+    },
+
     // Fade all audio out (true) or back in (false) over fadeS; voices keep running.
     setMuted(on, fadeS = 2) {
       muted = on

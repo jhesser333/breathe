@@ -32,6 +32,10 @@ export const MODE_SCREENS = {
 
 // Guided Breathing: Tutorial mode (App.jsx, tutorialRef). The part* screens
 // show at the top with a Continue button.
+// A line holding only TEST_BELL_MARK is replaced by the Test Bell button (TutorialText insert).
+export const TEST_BELL_MARK = '[[testBell]]'
+export const TEST_BELL_LABEL = 'Test Bell'
+
 export const TUTORIAL = {
   part1: 'Part 1:\nMove your thumbs\nas you breathe\nto transform the\nart and sound.',
   inhaleUp: 'Inhale,\nmove the sliders\nup.',
@@ -40,7 +44,7 @@ export const TUTORIAL = {
   remember: 'Remember to\nmove the sliders\nwith your breath.',
   notice: 'Notice how your breathing controls the art and sound.',
   part2: 'Part 2:\nWith each breath,\nthe art will evolve.\n\nAfter 5 breaths,\nthe color and sound will change.\n\nBreathe 10 times and\nlook for these changes.',
-  part3: 'Part 3:\nPacing your breath\n\nA bell will ring\nwhen it is time to inhale\nor exhale.\n\nAbove and below the sliders,\n‘inhale’ and ‘exhale’\nwill glow.\n\nEach art option\nhas additional cues.',
+  part3: 'Part 3:\nPacing your breath\n\nA bell will ring\nwhen it is time to inhale\nor exhale.\n[[testBell]]\nAbove and below the sliders,\n‘inhale’ and ‘exhale’\nwill glow.\n\nEach art option\nhas additional cues.',
   prepare: 'Relax and prepare to inhale.',
   countdown: ['3', '2', '1', 'Inhale'],   // the last word shows with the first paced Inhale (not in Box Breathing)
   done: 'Good job! The tutorial is done.\nKeep breathing, or\npress Home\nto try another mode, or\npress Restart\nto redo the tutorial.',

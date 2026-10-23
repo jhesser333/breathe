@@ -1,4 +1,5 @@
 import { useRef, useLayoutEffect } from 'react'
+import { TEST_BELL_MARK } from './copy'
 
 const OUTLINE_COLOR = 'var(--live-bg-color, #1a1a3a)'
 const OUTLINE_PX = 2
@@ -65,7 +66,9 @@ function roundAlphaMultiplier(totalElapsed, interval) {
 // liftPx: raise the default spot by this much (App: 30 px text, 2 lines).
 // region: { top, bottom } px from the screen edges -- center the text
 // vertically in that band instead (Tutorial mode's Part screens).
-export default function TutorialText({ size = 20, liftPx = 0, topPx = null, region = null, text, subText = null, subVisible = false, subFadeMs = 300, subGapPx = 0, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
+// insert: a node (Tutorial Part 3's Test Bell) shown in place of a
+// TEST_BELL_MARK line in text, fading with the text.
+export default function TutorialText({ size = 20, liftPx = 0, topPx = null, region = null, text, subText = null, subVisible = false, subFadeMs = 300, subGapPx = 0, insert = null, visible, opacity, fadeMs = 2000, pulseActive, pulseMode = 'box', pulseCycleStartRef, pulseIntervalRef, pacedCaptionRef }) {
   const textRef = useRef(null)
   const subRef = useRef(null)
 
@@ -140,6 +143,12 @@ export default function TutorialText({ size = 20, liftPx = 0, topPx = null, regi
     textShadow: OUTLINE_SHADOW,
     margin: 0,
   }
+  const markAt = typeof text === 'string' ? text.indexOf(`
+${TEST_BELL_MARK}
+`) : -1
+  const parts = markAt >= 0
+    ? [text.slice(0, markAt), text.slice(markAt + TEST_BELL_MARK.length + 2)]
+    : null
   return (
     <div style={{
       position: 'absolute',
@@ -156,9 +165,23 @@ export default function TutorialText({ size = 20, liftPx = 0, topPx = null, regi
       padding: size > 20 ? '0 16px' : '0 80px',
     }}>
       <div style={{ position: 'relative' }}>
-        <p ref={textRef} style={{ ...lineStyle, opacity: pulseActive ? undefined : alpha, transition }}>
-          {text}
-        </p>
+        {parts
+          ? (
+            <div ref={textRef} style={{ opacity: pulseActive ? undefined : alpha, transition }}>
+              <p style={lineStyle}>{parts[0]}</p>
+              {insert && (
+                <div style={{ display: 'flex', justifyContent: 'center', margin: `${size * 0.6}px 0`, pointerEvents: 'auto' }}>
+                  {insert}
+                </div>
+              )}
+              <p style={lineStyle}>{parts[1]}</p>
+            </div>
+          )
+          : (
+            <p ref={textRef} style={{ ...lineStyle, opacity: pulseActive ? undefined : alpha, transition }}>
+              {text}
+            </p>
+          )}
         {subText !== null && (
           <p ref={subRef} style={{
             ...lineStyle,
