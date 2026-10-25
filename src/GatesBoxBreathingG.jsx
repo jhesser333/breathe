@@ -10,9 +10,9 @@ import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, 
 // Shape G (Paper Airplane), Box Breathing: rounded-cube gates with
 // GatesBoxBreathingF's series timing -- BOX_COUNTS gates per phase, spawned
 // together from SPAWN_Z back, evenly spaced; the last one spawns the next
-// series as it reaches z = 0. A gate is a bar on the plane's wrong height
-// (bottom for Exhale, top for Inhale) plus a side cube (makePlaneCubeGate);
-// every gate in a series blocks the same side.
+// series as it reaches z = 0. A gate is a side cube plus (Exhale gates only)
+// a bar at the bottom (makePlaneCubeGate); every gate in a series blocks the
+// same side.
 // Judged at z = 0 by collision with the plane (planePosRef): clear = particle
 // burst, hit = emissive ramps to 0. Then it fades out over FADE_OUT_S.
 const POOL_SIZE = 28
@@ -60,7 +60,7 @@ export default function GatesBoxBreathingG({ gatesEnabledRef, spawnIntervalRef, 
         const gate = makePlaneCubeGate(type, side, limits)
         Object.assign(s, makeSlot(), { active: true, type, z: SPAWN_Z - n * spacing, speed, isFirst: n === 0, isLast: n === N - 1, gate })
         const parts = partRefs.current[i]
-        if (parts.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0)
+        if (parts.bar) { parts.bar.visible = !!gate.bar; if (gate.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0) }
         if (parts.side) parts.side.position.set(gate.side.x, gate.side.y, 0)
       }
     }

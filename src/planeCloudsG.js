@@ -97,24 +97,24 @@ export function applyPlaneGate(mainGroup, sideGroup, gate) {
 
 // ---------------------------------------------------------------------------
 // Rounded-cube gates (in use; the cloud gates above are parked for later).
-// A bar (a rounded cube stretched BAR_SCALE_X in X, spanning the screen) sits
-// on the plane's wrong height: bottomY (full Inhale) for an Exhale gate, topY
-// (full Exhale) for an Inhale gate. A side cube sits on the plane's right
-// height, out on one side, so the free lane is the other side.
-export const CUBE_SIZE = 1
+// Exhale gates have a bar (a rounded cube stretched BAR_SCALE_X in X, spanning
+// the screen) on the plane's wrong height, bottomY (full Inhale), so it flies
+// over it; Inhale gates have no bar. Every gate has a side cube on the plane's
+// right height, out on one side, so the free lane is the other side.
+export const CUBE_SIZE = 2
 export const BAR_SCALE_X = 5
-export const CUBE_RADIUS = 0.1
+export const CUBE_RADIUS = 0.2
 const SIDE_CENTER_FRAC = 0.58   // side cube's center, as a fraction of the plane's side reach (spanX)
 const CUBE_HIT_FORGIVE = 0.9 // boxes count at this fraction of their half-size
 
 // type: 'exhale' | 'inhale'; side: -1 (side cube on the left) | 1 (right).
-// Returns { bar, side }, each { x, y, w, h } (center and size).
+// Returns { bar, side }, each { x, y, w, h } (center and size); bar is null
+// for an Inhale gate.
 export function makePlaneCubeGate(type, side, limits) {
   const { topY, bottomY, spanX } = limits
-  const wrongY = type === 'exhale' ? bottomY : topY
   const rightY = type === 'exhale' ? topY : bottomY
   return {
-    bar: { x: 0, y: wrongY, w: CUBE_SIZE * BAR_SCALE_X, h: CUBE_SIZE },
+    bar: type === 'exhale' ? { x: 0, y: bottomY, w: CUBE_SIZE * BAR_SCALE_X, h: CUBE_SIZE } : null,
     side: { x: side * spanX * SIDE_CENTER_FRAC, y: rightY, w: CUBE_SIZE, h: CUBE_SIZE },
   }
 }
@@ -123,14 +123,14 @@ export function makePlaneCubeGate(type, side, limits) {
 export function hitsPlaneCubes(gate, px, py) {
   const padX = PLANE_HALF_W * PLANE_HIT_PAD
   const padY = PLANE_HALF_H * PLANE_HIT_PAD
-  return [gate.bar, gate.side].some((b) =>
+  return [gate.bar, gate.side].some((b) => b &&
     Math.abs(px - b.x) < (b.w / 2) * CUBE_HIT_FORGIVE + padX
     && Math.abs(py - b.y) < (b.h / 2) * CUBE_HIT_FORGIVE + padY)
 }
 
 // Random point on either box's surface, in world space (gate at depth z).
 export function sampleCubeGateSurface(gate, z) {
-  const b = Math.random() < 0.6 ? gate.bar : gate.side
+  const b = gate.bar && Math.random() < 0.6 ? gate.bar : gate.side
   const half = [b.w / 2, b.h / 2, CUBE_SIZE / 2]
   const p = half.map((h) => (Math.random() * 2 - 1) * h)
   const axis = Math.floor(Math.random() * 3)   // push one axis out to a face

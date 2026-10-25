@@ -9,9 +9,8 @@ import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, 
 // Shape G (Paper Airplane), Slowing Down / Paced: rounded-cube gates with
 // GatesF's timing. Exhale gates spawn at SPAWN_Z every interval; each one
 // spawns an Inhale gate farther back (computeGateBZ), hidden until
-// GATE_B_FADE_Z. A gate is a bar on the plane's wrong height (bottom for
-// Exhale, top for Inhale) plus a side cube on a random side
-// (makePlaneCubeGate). Judged at z = 0 by collision with the plane
+// GATE_B_FADE_Z. A gate is a side cube on a random side, plus (Exhale gates
+// only) a bar at the bottom (makePlaneCubeGate). Judged at z = 0 by collision with the plane
 // (planePosRef): clear = particle burst, hit = emissive ramps to 0. Then it
 // fades out over FADE_OUT_S.
 const POOL_SIZE = 8
@@ -75,7 +74,7 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
       const gate = makePlaneCubeGate(type, Math.random() < 0.5 ? -1 : 1, limits)
       Object.assign(s, makeSlot(), { active: true, type, z, speed, gate })
       const parts = partRefs.current[i]
-      if (parts.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0)
+      if (parts.bar) { parts.bar.visible = !!gate.bar; if (gate.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0) }
       if (parts.side) parts.side.position.set(gate.side.x, gate.side.y, 0)
     }
     const spawnA = () => {
