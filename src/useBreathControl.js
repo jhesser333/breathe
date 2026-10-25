@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 //   'single' -- slide one finger up/down anywhere on the screen
 //   'touch'  -- any finger down = inhale, none = exhale
 //   'tilt'   -- tip the phone's top edge toward you (inhale) / away (exhale)
-//   'blow'   -- blow on the microphone = exhale, quiet = inhale
+//   'blow'   -- blow on the microphone = exhale, quiet = inhale (or hold:
+//               once a pace runs, quiet rises only in its Inhale phase)
 
 // Single Slider
 const SINGLE_TRAVEL_FRAC = 1 / 3  // finger travel (of screen height) for full Exhale -> Inhale
@@ -107,8 +108,10 @@ export function requestMicAccess(keep = true) {
 const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('button'))
 
 // control: 'single' | 'touch' | 'tilt' | 'blow' | null (off). onValue(v) is
-// called whenever v changes. Returns v for the thumbs (null when off).
-export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail }) {
+// called whenever v changes. getQuietRate() (blow only) gives the rise while
+// quiet: null = no pace (BLOW_INHALE_RATE_PER_S), 0 = hold, else v/s.
+// Returns v for the thumbs (null when off).
+export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate }) {
   const [shown, setShown] = useState(null)
   const onValueRef = useRef(onValue)
   onValueRef.current = onValue
@@ -116,6 +119,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
   onTiltFailRef.current = onTiltFail
   const onMicFailRef = useRef(onMicFail)
   onMicFailRef.current = onMicFail
+  const getQuietRateRef = useRef(getQuietRate)
+  getQuietRateRef.current = getQuietRate
   const vRef = useRef(0)
 
   useEffect(() => { vRef.current = 0 }, [resetKey])
@@ -274,7 +279,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           const rate = BLOW_MIN_RATE_PER_S + (BLOW_MAX_RATE_PER_S - BLOW_MIN_RATE_PER_S) * blow.strength
           v = Math.max(0, v - rate * dt)
         } else if (now - blow.lastOnT > BLOW_RELEASE_MS) {
-          v = Math.min(1, v + BLOW_INHALE_RATE_PER_S * dt)
+          const rate = getQuietRateRef.current?.() ?? BLOW_INHALE_RATE_PER_S
+          v = Math.min(1, v + rate * dt)
         }
       }
       vRef.current = v
