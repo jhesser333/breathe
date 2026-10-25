@@ -38,6 +38,9 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         <button style={optionBtn(shapeOption === 'f', palette)} onClick={() => onSelectShape('f')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Hot Air Balloon (in-progress) {shapeOption === 'f' && '✓'}</div>
         </button>
+        <button style={optionBtn(shapeOption === 'g', palette)} onClick={() => onSelectShape('g')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Paper Airplane (in-progress) {shapeOption === 'g' && '✓'}</div>
+        </button>
       </div>
 
       <div style={{
