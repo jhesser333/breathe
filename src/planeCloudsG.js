@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import { makeCloud, sampleCloudSurface } from './cloudShapeF'
 
-// Shape G (Paper Airplane): where the plane can fly, and the cloud gates it
+// Shape G (Paper Airplane): where the plane can fly, and the gates it
 // dodges. Shared by MorphG (the plane) and GatesG / GatesBoxBreathingG.
+// The gates use the rounded cubes (bottom of this file) for now; the cloud
+// gates below are kept for when clouds come back.
 
 // The plane's half-size on screen, so the limits keep it just inside the edges.
 export const PLANE_HALF_W = 0.7
@@ -91,4 +93,47 @@ export function applyPlaneGate(mainGroup, sideGroup, gate) {
   mainGroup.scale.setScalar(gate.main.s)
   sideGroup.position.set(gate.side.x, gate.side.y, 0)
   sideGroup.scale.setScalar(gate.side.s)
+}
+
+// ---------------------------------------------------------------------------
+// Rounded-cube gates (in use; the cloud gates above are parked for later).
+// A bar (a rounded cube stretched BAR_SCALE_X in X, spanning the screen) sits
+// on the plane's wrong height: bottomY (full Inhale) for an Exhale gate, topY
+// (full Exhale) for an Inhale gate. A side cube sits on the plane's right
+// height, out on one side, so the free lane is the other side.
+export const CUBE_SIZE = 1
+export const BAR_SCALE_X = 5
+export const CUBE_RADIUS = 0.1
+const SIDE_CENTER_FRAC = 0.58   // side cube's center, as a fraction of the plane's side reach (spanX)
+const CUBE_HIT_FORGIVE = 0.9 // boxes count at this fraction of their half-size
+
+// type: 'exhale' | 'inhale'; side: -1 (side cube on the left) | 1 (right).
+// Returns { bar, side }, each { x, y, w, h } (center and size).
+export function makePlaneCubeGate(type, side, limits) {
+  const { topY, bottomY, spanX } = limits
+  const wrongY = type === 'exhale' ? bottomY : topY
+  const rightY = type === 'exhale' ? topY : bottomY
+  return {
+    bar: { x: 0, y: wrongY, w: CUBE_SIZE * BAR_SCALE_X, h: CUBE_SIZE },
+    side: { x: side * spanX * SIDE_CENTER_FRAC, y: rightY, w: CUBE_SIZE, h: CUBE_SIZE },
+  }
+}
+
+// Does the plane at (px, py) touch either box? x/y only, at the crossing.
+export function hitsPlaneCubes(gate, px, py) {
+  const padX = PLANE_HALF_W * PLANE_HIT_PAD
+  const padY = PLANE_HALF_H * PLANE_HIT_PAD
+  return [gate.bar, gate.side].some((b) =>
+    Math.abs(px - b.x) < (b.w / 2) * CUBE_HIT_FORGIVE + padX
+    && Math.abs(py - b.y) < (b.h / 2) * CUBE_HIT_FORGIVE + padY)
+}
+
+// Random point on either box's surface, in world space (gate at depth z).
+export function sampleCubeGateSurface(gate, z) {
+  const b = Math.random() < 0.6 ? gate.bar : gate.side
+  const half = [b.w / 2, b.h / 2, CUBE_SIZE / 2]
+  const p = half.map((h) => (Math.random() * 2 - 1) * h)
+  const axis = Math.floor(Math.random() * 3)   // push one axis out to a face
+  p[axis] = (Math.random() < 0.5 ? -1 : 1) * half[axis]
+  return [b.x + p[0], b.y + p[1], z + p[2]]
 }

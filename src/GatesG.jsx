@@ -2,14 +2,16 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGateBurstB, missFactor } from './gateReactionsB'
-import { applyCloud, createCloudMaterial, applyCloudLook, CLOUD_MESH_COUNT, FADE_OUT_S, CLOUD_BURST_SIZE } from './cloudShapeF'
-import { planeLimits, makePlaneGate, hitsPlane, sampleGateSurface, applyPlaneGate } from './planeCloudsG'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { createCloudMaterial, applyCloudLook, FADE_OUT_S, CLOUD_BURST_SIZE } from './cloudShapeF'
+import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, CUBE_SIZE, BAR_SCALE_X, CUBE_RADIUS } from './planeCloudsG'
 
-// Shape G (Paper Airplane), Slowing Down / Paced: cloud gates with GatesF's
-// timing. Exhale gates spawn at SPAWN_Z every interval; each one spawns an
-// Inhale gate farther back (computeGateBZ), hidden until GATE_B_FADE_Z. A gate
-// is a big cloud (bottom for Exhale, top for Inhale) plus a side cloud on a
-// random side (makePlaneGate). Judged at z = 0 by collision with the plane
+// Shape G (Paper Airplane), Slowing Down / Paced: rounded-cube gates with
+// GatesF's timing. Exhale gates spawn at SPAWN_Z every interval; each one
+// spawns an Inhale gate farther back (computeGateBZ), hidden until
+// GATE_B_FADE_Z. A gate is a bar on the plane's wrong height (bottom for
+// Exhale, top for Inhale) plus a side cube on a random side
+// (makePlaneCubeGate). Judged at z = 0 by collision with the plane
 // (planePosRef): clear = particle burst, hit = emissive ramps to 0. Then it
 // fades out over FADE_OUT_S.
 const POOL_SIZE = 8
@@ -34,12 +36,12 @@ function makeSlot() {
 export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, planePosRef, livePaletteRef, paceProgressRef, startOnInhale = false }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const groupRefs = useRef([])
-  const partRefs = useRef(Array.from({ length: POOL_SIZE }, () => ({ main: null, side: null })))
-  const meshRefs = useRef(Array.from({ length: POOL_SIZE }, () => ({ main: [], side: [] })))
+  const partRefs = useRef(Array.from({ length: POOL_SIZE }, () => ({ bar: null, side: null })))
 
-  const geometry = useMemo(() => new THREE.SphereGeometry(1, 32, 16), [])
+  const barGeometry = useMemo(() => new RoundedBoxGeometry(CUBE_SIZE * BAR_SCALE_X, CUBE_SIZE, CUBE_SIZE, 4, CUBE_RADIUS), [])
+  const cubeGeometry = useMemo(() => new RoundedBoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE, 4, CUBE_RADIUS), [])
   const materials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createCloudMaterial(palette)), [palette])
-  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => { barGeometry.dispose(); cubeGeometry.dispose() }, [barGeometry, cubeGeometry])
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials])
 
   const gateBurst = useGateBurstB(palette.primaryColor, CLOUD_BURST_SIZE)
@@ -70,12 +72,11 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
       const i = slots.current.findIndex((s) => !s.active)
       if (i === -1) return
       const s = slots.current[i]
-      const gate = makePlaneGate(type, Math.random() < 0.5 ? -1 : 1, limits)
+      const gate = makePlaneCubeGate(type, Math.random() < 0.5 ? -1 : 1, limits)
       Object.assign(s, makeSlot(), { active: true, type, z, speed, gate })
       const parts = partRefs.current[i]
-      if (parts.main && parts.side) applyPlaneGate(parts.main, parts.side, gate)
-      applyCloud(meshRefs.current[i].main, gate.main.cloud)
-      applyCloud(meshRefs.current[i].side, gate.side.cloud)
+      if (parts.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0)
+      if (parts.side) parts.side.position.set(gate.side.x, gate.side.y, 0)
     }
     const spawnA = () => {
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
@@ -109,9 +110,9 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
         s.judgedElapsed = 0
         if (breathPhaseRef) breathPhaseRef.current = s.type === 'exhale' ? 'inhale' : 'exhale'   // the phase to breathe next
         const pos = planePosRef?.current
-        if (pos && !hitsPlane(s.gate, pos.x, pos.y)) {
+        if (pos && !hitsPlaneCubes(s.gate, pos.x, pos.y)) {
           const z = s.z
-          gateBurst.burstFrom(() => sampleGateSurface(s.gate, z), limits.halfW, now)
+          gateBurst.burstFrom(() => sampleCubeGateSurface(s.gate, z), limits.halfW, now)
         } else {
           s.missElapsed = 0
         }
@@ -146,13 +147,8 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
       {gateBurst.points}
       {Array.from({ length: POOL_SIZE }, (_, i) => (
         <group key={i} ref={(el) => { groupRefs.current[i] = el }} visible={false}>
-          {['main', 'side'].map((part) => (
-            <group key={part} ref={(el) => { partRefs.current[i][part] = el }}>
-              {Array.from({ length: CLOUD_MESH_COUNT }, (_, k) => (
-                <mesh key={k} ref={(el) => { meshRefs.current[i][part][k] = el }} geometry={geometry} material={materials[i]} />
-              ))}
-            </group>
-          ))}
+          <mesh ref={(el) => { partRefs.current[i].bar = el }} geometry={barGeometry} material={materials[i]} />
+          <mesh ref={(el) => { partRefs.current[i].side = el }} geometry={cubeGeometry} material={materials[i]} />
         </group>
       ))}
     </>
