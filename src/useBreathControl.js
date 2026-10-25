@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 //   'single' -- slide one finger up/down anywhere on the screen
 //   'touch'  -- any finger down = inhale, none = exhale
 //   'tilt'   -- tip the phone's top edge toward you (inhale) / away (exhale)
-//   'blow'   -- blow on the microphone = exhale, quiet = inhale (or hold:
-//               once a pace runs, quiet rises only in its Inhale phase)
+//   'blow'   -- blow on the microphone = exhale, quiet = inhale,
+//               quiet with a finger on the screen = hold
 
 // Single Slider
 const SINGLE_TRAVEL_FRAC = 1 / 3  // finger travel (of screen height) for full Exhale -> Inhale
@@ -109,7 +109,7 @@ const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('but
 
 // control: 'single' | 'touch' | 'tilt' | 'blow' | null (off). onValue(v) is
 // called whenever v changes. getQuietRate() (blow only) gives the rise while
-// quiet: null = no pace (BLOW_INHALE_RATE_PER_S), 0 = hold, else v/s.
+// quiet: null = no pace (BLOW_INHALE_RATE_PER_S), else v/s.
 // Returns v for the thumbs (null when off).
 export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate }) {
   const [shown, setShown] = useState(null)
@@ -278,7 +278,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           blow.lastOnT = now
           const rate = BLOW_MIN_RATE_PER_S + (BLOW_MAX_RATE_PER_S - BLOW_MIN_RATE_PER_S) * blow.strength
           v = Math.max(0, v - rate * dt)
-        } else if (now - blow.lastOnT > BLOW_RELEASE_MS) {
+        } else if (down.size === 0 && now - blow.lastOnT > BLOW_RELEASE_MS) {
+          // A finger on the screen (not on a button) holds; blowing still exhales.
           const rate = getQuietRateRef.current?.() ?? BLOW_INHALE_RATE_PER_S
           v = Math.min(1, v + rate * dt)
         }

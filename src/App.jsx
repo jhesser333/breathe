@@ -845,18 +845,15 @@ export default function App() {
   }, [mode, boxPhaseNow])
 
   // Blow on the Mic: how fast quiet rises (v/s). Once a pace runs, quiet
-  // rises only in its Inhale phase, at that phase's speed, and holds
-  // otherwise (holds, an early-finished Exhale). null = no pace yet.
+  // rises at the pace's inhale speed (holding is the user's touch, not
+  // automatic). null = no pace yet.
   const getQuietRate = useCallback(() => {
     if (mode === 'box') {
-      const p = boxPhaseNow()
-      if (p === null) return null
-      return p.index === 0 ? 1 / Math.max(0.05, spawnIntervalRef.current) : 0
+      if (boxPhaseNow() === null) return null
+      return 1 / Math.max(0.05, spawnIntervalRef.current)
     }
     if (mode === 'slowing' || mode === 'tutorial') {
-      const phase = slowingPhaseNow()
-      if (phase === null) return null
-      if (phase !== 'inhale') return 0
+      if (slowingPhaseNow() === null) return null
       const { inhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
       return 1 / Math.max(0.05, inhaleDuration)
     }

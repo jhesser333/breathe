@@ -17,7 +17,7 @@ const OPTIONS = [
   { id: 'single', label: 'Single Slider', desc: 'When you inhale, slide a finger up anywhere on the screen. Slide it down when you exhale.' },
   { id: 'touch', label: 'Touch the Screen', desc: 'Touch the screen when you inhale, and lift your finger when you exhale.' },
   { id: 'tilt', label: 'Tilt Your Phone', desc: 'When you inhale, tilt your phone up toward vertical. When you exhale, tilt it back toward flat.' },
-  { id: 'blow', label: 'Blow on the Mic', desc: 'When you exhale, blow gently through pursed lips toward your phone. When you inhale, stay quiet.' },
+  { id: 'blow', label: 'Blow on the Mic', desc: 'When you exhale, blow gently through pursed lips toward your phone. When you inhale, stay quiet. To hold your breath, touch the screen.' },
 ]
 
 export default function SliderLayoutsScreen({ selected, onSelect, onHome, palette, tiltFailed = false, micFailed = false }) {
