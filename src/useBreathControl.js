@@ -31,7 +31,10 @@ const BLOW_RANGE_DB = 20          // OFF + this = full strength
 const BLOW_MIN_FLATNESS = 0.2     // spectral flatness needed to start (0 tone -> 1 noise)
 const BLOW_LEVEL_SMOOTH_S = 0.05
 const FLOOR_FALL_S = 0.5          // noise floor follows a quieter room quickly...
-const FLOOR_RISE_S = 20           // ...and a louder one slowly (only while not blowing)
+const FLOOR_RISE_S = 20           // ...and a louder one slowly while not blowing...
+const FLOOR_RISE_BLOWING_S = 15   // ...and very slowly while blowing, so it can't stick on
+const BLOW_CALIBRATE_S = 0.5      // first stretch of real audio sets the floor
+const BLOW_NO_DATA_DB = -110      // below this the analyser has no audio yet
 const BLOW_MIN_RATE_PER_S = 1 / 6 // exhale speed, gentle -> hard blow
 const BLOW_MAX_RATE_PER_S = 1 / 2
 const BLOW_RELEASE_MS = 300       // pause this long before the inhale starts
@@ -131,7 +134,17 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     let tiltTarget = null
     let gotTilt = false
     // Blow on the Mic: smoothed level and noise floor (dB), blowing state.
-    const blow = { level: null, floor: null, on: false, strength: 0, lastOnT: -Infinity }
+    const blow = { level: null, floor: null, on: false, strength: 0, lastOnT: -Infinity, calS: 0, calSum: 0, calN: 0, flatness: 0 }
+    // ?micdebug in the URL shows the detector's numbers, for tuning on a phone.
+    let debugEl = null
+    if (control === 'blow' && /[?&]micdebug/.test(window.location.search)) {
+      debugEl = document.createElement('div')
+      Object.assign(debugEl.style, {
+        position: 'fixed', top: '40px', left: '8px', zIndex: 1000, pointerEvents: 'none',
+        font: '12px monospace', color: '#fff', background: 'rgba(0,0,0,0.6)', padding: '4px 6px', whiteSpace: 'pre',
+      })
+      document.body.appendChild(debugEl)
+    }
 
     const onDown = (e) => {
       if (onButton(e)) return
@@ -205,10 +218,20 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       const mean = sum / n
       const flatness = Math.exp(logSum / n) / mean
       const level = 10 * Math.log10(mean)
-      if (blow.level === null) { blow.level = level; blow.floor = level }
+      blow.flatness = flatness
+      if (level < BLOW_NO_DATA_DB) { blow.on = false; return }   // mic not delivering audio yet
+      // Calibrate: the first stretch of real audio is the room's noise floor.
+      if (blow.calS < BLOW_CALIBRATE_S) {
+        blow.calS += dt
+        blow.calSum += level
+        blow.calN++
+        blow.level = blow.floor = blow.calSum / blow.calN
+        blow.on = false
+        return
+      }
       blow.level += (level - blow.level) * (1 - Math.exp(-dt / BLOW_LEVEL_SMOOTH_S))
       if (blow.level < blow.floor) blow.floor += (blow.level - blow.floor) * (1 - Math.exp(-dt / FLOOR_FALL_S))
-      else if (!blow.on) blow.floor += (blow.level - blow.floor) * (1 - Math.exp(-dt / FLOOR_RISE_S))
+      else blow.floor += (blow.level - blow.floor) * (1 - Math.exp(-dt / (blow.on ? FLOOR_RISE_BLOWING_S : FLOOR_RISE_S)))
       const above = blow.level - blow.floor
       if (!blow.on && above > BLOW_ON_DB && flatness > BLOW_MIN_FLATNESS) blow.on = true
       else if (blow.on && above < BLOW_OFF_DB) blow.on = false
@@ -222,6 +245,12 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       prev = now
       let v = vRef.current
       if (control === 'blow') readBlow(dt)   // keeps the noise floor current even while disabled
+      if (debugEl) {
+        const f = (x) => (x === null ? '--' : x.toFixed(1))
+        debugEl.textContent = `mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}\n`
+          + `level ${f(blow.level)}  floor ${f(blow.floor)}  above ${blow.level === null ? '--' : f(blow.level - blow.floor)}\n`
+          + `flat ${blow.flatness.toFixed(2)}  ${blow.calS < BLOW_CALIBRATE_S ? 'calibrating' : blow.on ? 'BLOWING' : 'quiet'}  v ${v.toFixed(2)}`
+      }
       if (disabled()) {
         glideDir = 0
       } else if (control === 'single') {
@@ -267,6 +296,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('pointercancel', onUp)
       window.removeEventListener('deviceorientation', onTilt)
       if (control === 'blow') releaseMic()
+      debugEl?.remove()
     }
   }, [control, disabledRef])
 
