@@ -14,14 +14,33 @@ const EDGE_MARGIN = 0.15
 // bottom edge, clearing the sliders and their "inhale" labels.
 const SLIDER_CLEAR_PX = 250
 
+// Where the camera ray through a screen point (NDC nx, ny) meets the plane's
+// flight plane, z = 0. Works for any camera angle (level or tilted down).
+const _ray = new THREE.Vector3()
+function hitFlightPlane(camera, nx, ny) {
+  _ray.set(nx, ny, 0.5).unproject(camera)
+  const o = camera.position
+  const dz = _ray.z - o.z
+  const t = Math.abs(dz) < 1e-6 ? -1 : -o.z / dz
+  if (t <= 0) return null   // the ray never reaches z = 0 in front of the camera
+  return { x: o.x + (_ray.x - o.x) * t, y: o.y + (_ray.y - o.y) * t }
+}
+
 // The plane's range at z = 0 in world units: topY (full Exhale), bottomY
-// (full Inhale), spanX (side reach), halfW (half the view's width).
+// (full Inhale), spanX (side reach), halfW (half the view's widest width).
 export function planeLimits(camera, size) {
-  const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z
-  const halfW = halfH * camera.aspect
-  const topY = halfH - PLANE_HALF_H - EDGE_MARGIN
-  const bottomY = Math.min(topY, -halfH + (SLIDER_CLEAR_PX / size.height) * 2 * halfH + PLANE_HALF_H)
-  return { topY, bottomY, spanX: Math.max(0, halfW - PLANE_HALF_W - EDGE_MARGIN), halfW }
+  const sliderNY = -1 + (2 * SLIDER_CLEAR_PX) / size.height
+  const top = hitFlightPlane(camera, 0, 1) || { y: 100 }
+  const bottom = hitFlightPlane(camera, 0, sliderNY) || { y: -100 }
+  const topY = top.y - PLANE_HALF_H - EDGE_MARGIN
+  const bottomY = Math.min(topY, bottom.y + PLANE_HALF_H)
+  // Side reach: the narrower of the view's widths at the top and bottom rows.
+  const wTop = hitFlightPlane(camera, 1, 1)
+  const wBottom = hitFlightPlane(camera, 1, sliderNY)
+  const widths = [wTop, wBottom].filter(Boolean).map((p) => p.x)
+  const minHalfW = widths.length ? Math.min(...widths) : 0
+  const halfW = widths.length ? Math.max(...widths) : 0
+  return { topY, bottomY, spanX: Math.max(0, minHalfW - PLANE_HALF_W - EDGE_MARGIN), halfW }
 }
 
 // Gates. Each is a big cloud filling one half of the plane's range (bottom

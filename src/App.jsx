@@ -127,7 +127,7 @@ const CAMERA_BY_SHAPE = {
   d: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 50 },
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
   f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 135 },  // Sphere Morph's (d) placement, wider fov
-  g: { position: [0, 0, 10], rotation: [0, 0, 0], fov: 50 },    // the PaperPlane project's camera
+  g: { position: [0, 7, 10], fov: 50 },   // the cube's (b) look-at-origin angle, twice as far back
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
