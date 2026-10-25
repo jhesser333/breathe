@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { planeLimits } from './planeCloudsG'
 
 // Shape G: Paper Airplane (in-progress), ported from the PaperPlane project's
 // PlaneMorph. Breath flies it up and down: full Inhale sits it just above the
 // sliders, Exhale lifts it to the top of the screen, and Inhale lets it drift
 // back down. Tilting the phone left/right sets its sideways position.
-// App passes breathRef as leftVal (0 exhale -> 1 inhale).
+// App passes breathRef as leftVal (0 exhale -> 1 inhale). The plane's range
+// comes from planeLimits (planeCloudsG.js), shared with the cloud gates; its
+// rendered position is written to planePosRef for their collision checks.
 
 // Gray-box paper airplane: a 4-sided pyramid, tip pointing away from the
 // camera (-Z), flattened and widened. Sizes in world units.
@@ -27,13 +30,6 @@ const TILT_FULL_SPEED = 3       // world units per second
 const REST_PITCH = -0.12        // slight nose-down glide, so the camera sees the top
 const TILT_SMOOTH_S = 0.15
 
-// The plane's half-size on screen, so the limits keep it just inside the edges.
-const HALF_W = WINGSPAN / 2
-const HALF_H = 0.35
-const EDGE_MARGIN = 0.15
-// Full Inhale: the plane's bottom sits this many pixels above the screen's
-// bottom edge, clearing the sliders and their "inhale" labels.
-const SLIDER_CLEAR_PX = 250
 // Phone roll (deviceorientation gamma) that puts the plane at a side edge.
 const SIDE_TILT_FULL_DEG = 25
 
@@ -76,7 +72,7 @@ function smoothDamp(current, target, vel, smoothTime, dt) {
   return target + (change + temp) * exp
 }
 
-export default function MorphG({ leftVal, palette }) {
+export default function MorphG({ leftVal, palette, planePosRef }) {
   const groupRef = useRef()
   const state = useRef({ x: 0, y: null, vx: { v: 0 }, vy: { v: 0 }, bank: 0, pitch: 0 })
   const gammaRef = useRef(0)
@@ -104,12 +100,7 @@ export default function MorphG({ leftVal, palette }) {
     const s = state.current
     const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
 
-    // View half-size in world units at the plane's depth (z = 0).
-    const halfH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z
-    const halfW = halfH * camera.aspect
-    const spanX = Math.max(0, halfW - HALF_W - EDGE_MARGIN)
-    const topY = halfH - HALF_H - EDGE_MARGIN
-    const bottomY = Math.min(topY, -halfH + (SLIDER_CLEAR_PX / size.height) * 2 * halfH + HALF_H)
+    const { topY, bottomY, spanX } = planeLimits(camera, size)
 
     const tx = THREE.MathUtils.clamp(gammaRef.current / SIDE_TILT_FULL_DEG, -1, 1) * spanX
     const ty = THREE.MathUtils.lerp(topY, bottomY, lv)
@@ -124,8 +115,10 @@ export default function MorphG({ leftVal, palette }) {
     s.pitch += (pitchTarget - s.pitch) * k
 
     const g = groupRef.current
-    g.position.set(s.x, s.y + floatBob(dt), 0)
+    const y = s.y + floatBob(dt)
+    g.position.set(s.x, y, 0)
     g.rotation.set(s.pitch, 0, s.bank + floatRoll(dt))
+    if (planePosRef) { planePosRef.current.x = s.x; planePosRef.current.y = y }
   })
 
   return (

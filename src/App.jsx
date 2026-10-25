@@ -11,6 +11,8 @@ import MorphF from './MorphF'
 import MorphG from './MorphG'
 import GatesF from './GatesF'
 import GatesBoxBreathingF from './GatesBoxBreathingF'
+import GatesG from './GatesG'
+import GatesBoxBreathingG from './GatesBoxBreathingG'
 import GatesA from './GatesA'
 import GatesB from './GatesB'
 import GatesC from './GatesC'
@@ -132,9 +134,9 @@ const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 // Shapes that use the Morphing Cube's count/tutorial flow (the Hot Air
 // Balloon reuses the cube's 5-breath count and target timing).
 const usesCubeFlow = (shape) => shape === 'b' || shape === 'f'
-// Shapes with no visible targets (pace carried by background/art, or none
-// yet): ambient copy and the D/E paced hand-off. The Paper Airplane (g) has
-// no obstacles yet, so it goes here for now.
+// Shapes on the D/E paced hand-off (gates with startOnInhale, no count
+// counted from the pace) and their ambient copy. The Paper Airplane (g) has
+// cloud obstacles but no count, so it follows this flow.
 const isAmbientArt = (shape) => shape === 'd' || shape === 'e' || shape === 'g'
 
 // Breath-count palette cycle (see MorphC.jsx / breathCyclePalettes.js):
@@ -382,6 +384,9 @@ export default function App() {
 
   const palette = PALETTES.teal
   const shapeRef = useRef(shapeOption)
+  // Paper Airplane: the plane's rendered position (world x/y at z = 0),
+  // written by MorphG, read by its cloud gates for collision.
+  const planePosRef = useRef({ x: 0, y: 0 })
   shapeRef.current = shapeOption
 
   const lastMoveTime = useRef(0)
@@ -1936,8 +1941,8 @@ export default function App() {
     ? { top: MODE_CAPTION_TOP + modeLabelLines * MODE_CAPTION_LINE_PX, bottom: continueBottom + continueHeight }
     : null
   const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : shapeOption === 'g' ? MorphG : MorphA
-  const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'e' || shapeOption === 'g' ? GatesHeadlessE : GatesA
-  const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'e' || shapeOption === 'g' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
+  const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'g' ? GatesG : shapeOption === 'e' ? GatesHeadlessE : GatesA
+  const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'g' ? GatesBoxBreathingG : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
 
   return (
@@ -1953,7 +1958,7 @@ export default function App() {
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} getBellPhase={getBellPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
-        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} />
+        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} />
         {showBackgroundArt && shapeOption === 'b' && <LandscapeB mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
@@ -1978,6 +1983,7 @@ export default function App() {
             exhaleSecondsRef={exhaleSecondsRef}
             livePaletteRef={livePaletteRef}
             paceProgressRef={ringPaceProgressRef}
+            planePosRef={planePosRef}
             startOnInhale={mode === 'slowing' || mode === 'tutorial'}
           />
         )}
@@ -1995,6 +2001,7 @@ export default function App() {
             livePaletteRef={livePaletteRef}
             boxPhaseRef={boxPhaseRef}
             boxProgressRef={boxProgressRef}
+            planePosRef={planePosRef}
             paceArtFadeRef={paceArtFadeRef}
           />
         )}
