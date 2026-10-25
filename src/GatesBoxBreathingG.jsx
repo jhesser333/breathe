@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { useGateBurstB, missFactor } from './gateReactionsB'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { createCloudMaterial, applyCloudLook, FADE_OUT_S, CLOUD_BURST_SIZE } from './cloudShapeF'
-import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, CUBE_SIZE, BAR_SCALE_X, CUBE_RADIUS } from './planeCloudsG'
+import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, CUBE_SIZE, CUBE_RADIUS, BAR_W, SIDE_W, SIDE_H } from './planeCloudsG'
 
 // Shape G (Paper Airplane), Box Breathing: rounded-cube gates with
 // GatesBoxBreathingF's series timing -- BOX_COUNTS gates per phase, spawned
@@ -29,8 +29,8 @@ export default function GatesBoxBreathingG({ gatesEnabledRef, spawnIntervalRef, 
   const partRefs = useRef(Array.from({ length: POOL_SIZE }, () => ({ bar: null, side: null })))
   const wasEnabled = useRef(false)
 
-  const barGeometry = useMemo(() => new RoundedBoxGeometry(CUBE_SIZE * BAR_SCALE_X, CUBE_SIZE, CUBE_SIZE, 4, CUBE_RADIUS), [])
-  const cubeGeometry = useMemo(() => new RoundedBoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE, 4, CUBE_RADIUS), [])
+  const barGeometry = useMemo(() => new RoundedBoxGeometry(BAR_W, CUBE_SIZE, CUBE_SIZE, 4, CUBE_RADIUS), [])
+  const cubeGeometry = useMemo(() => new RoundedBoxGeometry(SIDE_W, SIDE_H, CUBE_SIZE, 4, CUBE_RADIUS), [])
   const materials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createCloudMaterial(palette)), [palette])
   useEffect(() => () => { barGeometry.dispose(); cubeGeometry.dispose() }, [barGeometry, cubeGeometry])
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials])
