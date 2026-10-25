@@ -1,7 +1,7 @@
 function optionBtn(selected, palette) {
   return {
     width: '100%', maxWidth: 320,
-    padding: '20px 24px',
+    padding: '12px 20px',
     background: selected ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)',
     border: selected ? '1px solid rgba(255,255,255,0.55)' : '1px solid rgba(255,255,255,0.15)',
     borderRadius: 12,
@@ -27,7 +27,7 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, palett
       background: palette.background,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      gap: 16, padding: 32,
+      gap: 12, padding: 32, paddingBottom: 72,
       fontFamily: 'sans-serif',
     }}>
       <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
@@ -36,12 +36,12 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, palett
       {OPTIONS.map(opt => (
         <button key={opt.id} style={optionBtn(selected === opt.id, palette)} onClick={() => onSelect(opt.id)}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selected === opt.id && '✓'}</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{opt.desc}</div>
           {opt.id === 'tilt' && tiltFailed && (
-            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 5 }}>Motion access is off, so Double Sliders will be used.</div>
+            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>Motion access is off, so Double Sliders will be used.</div>
           )}
           {opt.id === 'blow' && micFailed && (
-            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 5 }}>Microphone access is off, so Double Sliders will be used.</div>
+            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>Microphone access is off, so Double Sliders will be used.</div>
           )}
         </button>
       ))}
