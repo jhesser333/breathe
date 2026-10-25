@@ -44,7 +44,7 @@ import { MODE_INTRO, TEXT_A, TEXT_B, TEXTS, TEXT_A1_DIAGONAL, TEXT_A2_DIAGONAL, 
 import { TARGET_PACES, DEFAULT_TARGET_PACE, BOX_STEP_SECONDS } from './breathPace'
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
-import { useBreathControl, requestTiltPermission } from './useBreathControl'
+import { useBreathControl, requestTiltPermission, requestMicAccess } from './useBreathControl'
 
 const navPillStyle = {
   background: UI_INTERIOR,
@@ -308,17 +308,20 @@ export default function App() {
     return ['a', 'b', 'c', 'd', 'e', 'f'].includes(saved) ? saved : 'a'
   })
   // Control Options (sliderLayout key kept): 'diagonal' = Double Sliders,
-  // 'single' / 'touch' / 'tilt' drive the Diagonal sliders' thumbs
+  // 'single' / 'touch' / 'tilt' / 'blow' drive the Diagonal sliders' thumbs
   // (useBreathControl). 'vertical' is hidden: move anyone on it to 'diagonal'.
   const [sliderLayout, setSliderLayoutState] = useState(() => {
     let saved = localStorage.getItem('sliderLayout') || 'diagonal'
     if (saved === 'vertical') saved = 'diagonal'
-    return ['vertical', 'diagonal', 'single', 'touch', 'tilt'].includes(saved) ? saved : 'diagonal'
+    return ['vertical', 'diagonal', 'single', 'touch', 'tilt', 'blow'].includes(saved) ? saved : 'diagonal'
   })
   const isDiagonal = sliderLayout !== 'vertical'
   // Tilt denied or no sensor: fall back to Double Sliders.
   const [tiltFailed, setTiltFailed] = useState(false)
-  const breathControl = ['single', 'touch', 'tilt'].includes(sliderLayout) && !(sliderLayout === 'tilt' && tiltFailed) ? sliderLayout : null
+  // Mic denied or missing (Blow on the Mic): same fallback.
+  const [micFailed, setMicFailed] = useState(false)
+  const breathControl = ['single', 'touch', 'tilt', 'blow'].includes(sliderLayout)
+    && !(sliderLayout === 'tilt' && tiltFailed) && !(sliderLayout === 'blow' && micFailed) ? sliderLayout : null
   const [targetPace, setTargetPaceState] = useState(() => {
     const saved = localStorage.getItem('targetPace') || DEFAULT_TARGET_PACE
     return Object.keys(TARGET_PACES).includes(saved) ? saved : DEFAULT_TARGET_PACE
@@ -1600,7 +1603,7 @@ export default function App() {
     handleMovement()
   }, [handleMovement, triggerTextAFade, triggerTextBFade, isDiagonal, updateDiagonalSequence, updatePacedText, updateTutorialPractice, showCountText, hideCountText])
 
-  // Single Slider / Touch the Screen / Tilt Your Phone drive the breath here,
+  // Single Slider / Touch the Screen / Tilt Your Phone / Blow on the Mic drive the breath here,
   // exactly as if both sliders had moved (raw refs too, for recording).
   const drivenBreath = useBreathControl({
     control: mode ? breathControl : null,
@@ -1613,6 +1616,7 @@ export default function App() {
       setRight(1 - v)
     },
     onTiltFail: () => setTiltFailed(true),
+    onMicFail: () => setMicFailed(true),
   })
 
   // Fade the scene and sliders in (see SCENE_REVEAL_MS).
@@ -1625,6 +1629,8 @@ export default function App() {
     audioGroupIndexRef.current = 0
     // Tilt Your Phone: ask for motion access inside this tap (iOS).
     if (sliderLayout === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
+    // Blow on the Mic: open the mic inside this tap.
+    if (sliderLayout === 'blow') requestMicAccess().then((ok) => setMicFailed(!ok))
     audioRef.current.unlock()
     audioRef.current.start(0)
     audioRef.current.setSlider(leftVal.current)
@@ -1853,8 +1859,10 @@ export default function App() {
         onSelect={(v) => {
           setSliderLayout(v)
           if (v === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
+          if (v === 'blow') requestMicAccess(false).then((ok) => setMicFailed(!ok))
         }}
         tiltFailed={tiltFailed}
+        micFailed={micFailed}
         onHome={() => setScreen('selectMode')}
         palette={palette}
       />
