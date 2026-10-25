@@ -388,6 +388,9 @@ export default function App() {
   // Paper Airplane: the plane's rendered position (world x/y at z = 0),
   // written by MorphG, read by its cloud gates for collision.
   const planePosRef = useRef({ x: 0, y: 0 })
+  // Blow on the Mic: 1 while the mic hears a blow (useBreathControl), read by
+  // the Paper Airplane to glow brighter.
+  const blowRef = useRef(0)
   shapeRef.current = shapeOption
 
   const lastMoveTime = useRef(0)
@@ -1647,6 +1650,7 @@ export default function App() {
     onTiltFail: () => setTiltFailed(true),
     onMicFail: () => setMicFailed(true),
     getQuietRate,
+    blowRef,
   })
 
   // Keep the screen awake for the whole session (every control).
@@ -1959,7 +1963,7 @@ export default function App() {
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} getBellPhase={getBellPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
-        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} />
+        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} blowRef={blowRef} />
         {showBackgroundArt && shapeOption === 'b' && <LandscapeB mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'g' && <GroundTiesG mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}

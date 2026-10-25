@@ -108,10 +108,11 @@ export function requestMicAccess(keep = true) {
 const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('button'))
 
 // control: 'single' | 'touch' | 'tilt' | 'blow' | null (off). onValue(v) is
-// called whenever v changes. getQuietRate() (blow only) gives the rise while
+// called whenever v changes. blowRef (blow only) is set to 1 while the mic
+// hears a blow, else 0. getQuietRate() (blow only) gives the rise while
 // quiet: null = no pace (BLOW_INHALE_RATE_PER_S), else v/s.
 // Returns v for the thumbs (null when off).
-export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate }) {
+export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef }) {
   const [shown, setShown] = useState(null)
   const onValueRef = useRef(onValue)
   onValueRef.current = onValue
@@ -249,7 +250,10 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       const dt = Math.min(0.1, (now - prev) / 1000)
       prev = now
       let v = vRef.current
-      if (control === 'blow') readBlow(dt)   // keeps the noise floor current even while disabled
+      if (control === 'blow') {
+        readBlow(dt)   // keeps the noise floor current even while disabled
+        if (blowRef) blowRef.current = blow.on ? 1 : 0
+      }
       if (debugEl) {
         const f = (x) => (x === null ? '--' : x.toFixed(1))
         debugEl.textContent = `mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}\n`
@@ -303,6 +307,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('pointercancel', onUp)
       window.removeEventListener('deviceorientation', onTilt)
       if (control === 'blow') releaseMic()
+      if (blowRef) blowRef.current = 0
       debugEl?.remove()
     }
   }, [control, disabledRef])

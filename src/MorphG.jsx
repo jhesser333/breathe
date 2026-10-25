@@ -17,6 +17,9 @@ const WINGSPAN = 1.4
 const THICKNESS = 0.25
 const LENGTH = 2
 const EMISSIVE_INTENSITY = 0.3
+// Blow on the Mic feedback: the emissive doubles while the mic hears a blow
+// (blowRef), easing up and down over BLOW_GLOW_SMOOTH_S.
+const BLOW_GLOW_SMOOTH_S = 0.15
 
 // Seconds to (mostly) reach a new target -- a smooth ease in and out.
 const RISE_TIME = 1.5
@@ -72,8 +75,10 @@ function smoothDamp(current, target, vel, smoothTime, dt) {
   return target + (change + temp) * exp
 }
 
-export default function MorphG({ leftVal, palette, planePosRef }) {
+export default function MorphG({ leftVal, palette, planePosRef, blowRef }) {
   const groupRef = useRef()
+  const materialRef = useRef()
+  const glowRef = useRef(0)
   const state = useRef({ x: 0, y: null, vx: { v: 0 }, vy: { v: 0 }, bank: 0, pitch: 0 })
   const gammaRef = useRef(0)
   const floatRoll = useMemo(() => makeDrifter(FLOAT_ROLL_MIN, FLOAT_ROLL_MAX, FLOAT_ROLL_TIME_MIN, FLOAT_ROLL_TIME_MAX), [])
@@ -118,6 +123,10 @@ export default function MorphG({ leftVal, palette, planePosRef }) {
     const y = s.y + floatBob(dt)
     g.position.set(s.x, y, 0)
     g.rotation.set(s.pitch, 0, s.bank + floatRoll(dt))
+
+    const blowing = blowRef ? blowRef.current : 0
+    glowRef.current += (blowing - glowRef.current) * (1 - Math.exp(-dt / BLOW_GLOW_SMOOTH_S))
+    if (materialRef.current) materialRef.current.emissiveIntensity = EMISSIVE_INTENSITY * (1 + glowRef.current)
     if (planePosRef) { planePosRef.current.x = s.x; planePosRef.current.y = y }
   })
 
@@ -125,6 +134,7 @@ export default function MorphG({ leftVal, palette, planePosRef }) {
     <group ref={groupRef}>
       <mesh geometry={geometry}>
         <meshStandardMaterial
+          ref={materialRef}
           color={palette.tertiaryColor}
           emissive={palette.primaryColor}
           emissiveIntensity={EMISSIVE_INTENSITY}
