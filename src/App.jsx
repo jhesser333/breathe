@@ -45,6 +45,7 @@ import { TARGET_PACES, DEFAULT_TARGET_PACE, BOX_STEP_SECONDS } from './breathPac
 import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } from './breathAudio'
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
 import { useBreathControl, requestTiltPermission, requestMicAccess } from './useBreathControl'
+import { useWakeLock } from './useWakeLock'
 
 const navPillStyle = {
   background: UI_INTERIOR,
@@ -1618,6 +1619,9 @@ export default function App() {
     onTiltFail: () => setTiltFailed(true),
     onMicFail: () => setMicFailed(true),
   })
+
+  // Keep the screen awake for the whole session (every control).
+  useWakeLock(!!mode)
 
   // Fade the scene and sliders in (see SCENE_REVEAL_MS).
   const revealScene = useCallback(() => {
