@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import { makeCloud, sampleCloudSurface } from './cloudShapeF'
 
-// Shape G (Paper Airplane): where the plane can fly, and the gates it
-// dodges. Shared by MorphG (the plane) and GatesG / GatesBoxBreathingG.
-// The gates use the rounded cubes (bottom of this file) for now; the cloud
-// gates below are kept for when clouds come back.
+// Shape G (Paper Airplane): where the plane can fly, and its gates. Shared
+// by MorphG (the plane) and GatesG / GatesBoxBreathingG. The gates use the
+// bar + ring targets (bottom of this file) for now; the cloud gates below
+// are kept for when clouds come back.
 
 // The plane's half-size on screen, so the limits keep it just inside the edges.
 export const PLANE_HALF_W = 0.7
@@ -26,14 +26,18 @@ function hitFlightPlane(camera, nx, ny) {
   return { x: o.x + (_ray.x - o.x) * t, y: o.y + (_ray.y - o.y) * t }
 }
 
-// The plane's range at z = 0 in world units: topY (full Exhale), bottomY
-// (full Inhale), spanX (side reach), halfW (half the view's widest width).
+// The plane's range at z = 0 in world units: topY (full Exhale, the high
+// ring's center), bottomY (full Inhale, the low ring's center), spanX (side
+// reach), halfW (half the view's widest width).
 export function planeLimits(camera, size) {
   const sliderNY = -1 + (2 * SLIDER_CLEAR_PX) / size.height
   const top = hitFlightPlane(camera, 0, 1) || { y: 100 }
   const bottom = hitFlightPlane(camera, 0, sliderNY) || { y: -100 }
-  const topY = top.y - PLANE_HALF_H - EDGE_MARGIN
-  const bottomY = Math.min(topY, bottom.y + PLANE_HALF_H)
+  const screenTopY = top.y - PLANE_HALF_H - EDGE_MARGIN
+  const bottomY = Math.min(screenTopY, bottom.y + PLANE_HALF_H)
+  // Full Exhale: the high ring's center (just above the bar), or the screen's
+  // top if that's lower.
+  const topY = Math.min(screenTopY, bottomY + HIGH_RING_RISE)
   // Side reach: the narrower of the view's widths at the top and bottom rows.
   const wTop = hitFlightPlane(camera, 1, 1)
   const wBottom = hitFlightPlane(camera, 1, sliderNY)
@@ -115,90 +119,96 @@ export function applyPlaneGate(mainGroup, sideGroup, gate) {
 }
 
 // ---------------------------------------------------------------------------
-// Rounded-cube gates (in use; the cloud gates above are parked for later).
-// Exhale gates have a bar (a rounded cube stretched BAR_SCALE_X in X and
-// BAR_SCALE_Y in Y, spanning the screen) resting on the ground plane, at the
-// plane's wrong height, bottomY (full Inhale), so it flies over it; Inhale
-// gates have no bar. Every gate has a side wall resting on the ground plane,
-// out on one side, so the free lane is the other side. The wall is a cube
-// scaled SIDE_SCALE_X / SIDE_SCALE_Y, grown outward from its inner face (the
-// face nearest x = 0).
+// Bar + ring gates (in use; the cloud gates above are parked for later).
+// Every gate has a ring target (RING_R, the plane's wingspan) on a random
+// side, where the plane should fly through: Inhale rings touch the ground
+// plane, centered on bottomY (full Inhale); Exhale rings sit RING_GAP above
+// the bar, centered on topY (full Exhale). Exhale gates also have a bar (a
+// rounded cube stretched BAR_SCALE_X in X and BAR_SCALE_Y in Y, spanning the
+// screen) resting on the ground plane, so the plane flies over it.
 export const CUBE_SIZE = 2
 export const BAR_SCALE_X = 15
 export const BAR_SCALE_Y = 2
-export const SIDE_SCALE_X = 5
-export const SIDE_SCALE_Y = 5
 export const CUBE_RADIUS = 0.2
 export const BAR_W = CUBE_SIZE * BAR_SCALE_X
 export const BAR_H = CUBE_SIZE * BAR_SCALE_Y
-export const SIDE_W = CUBE_SIZE * SIDE_SCALE_X
-export const SIDE_H = CUBE_SIZE * SIDE_SCALE_Y
-// The inner face sits where a plain cube centered at SIDE_CENTER_FRAC of the
-// plane's side reach (spanX) would have its inner face.
+export const RING_R = 2 * PLANE_HALF_W   // to the tube's center
+export const RING_TUBE = 0.08            // tube radius
+const RING_GAP = 0.2                     // bar top -> high ring's bottom edge
+const RING_OUTER = RING_R + RING_TUBE
+// Low ring center (bottomY) -> high ring center: down the ring's outer radius
+// to the ground, up the bar, the gap, then the outer radius again.
+const HIGH_RING_RISE = BAR_H + RING_GAP
+// Ring x: SIDE_CENTER_FRAC of the plane's side reach (spanX), random side.
 const SIDE_CENTER_FRAC = 0.58
-// Collision: boxes count this much inside their faces (a plain cube's old
-// 0.9 x half-size), so grazing an edge doesn't count.
+// The plane counts as inside a ring when its center is within this of the
+// ring's center: the inner radius less the plane's half-height.
+const RING_HIT_R = RING_R - RING_TUBE - PLANE_HALF_H
+// Collision: the bar counts this much inside its faces, so grazing an edge
+// doesn't count.
 const CUBE_HIT_INSET = 0.1 * CUBE_SIZE / 2
 
-// The ground plane under the plane (ties, the bar and the side walls sit on
-// it): a plain cube's height below full Inhale.
+// The ground plane (ties and the bar sit on it): low enough that a ring
+// centered on bottomY touches it.
 export function groundY(limits) {
-  return limits.bottomY - CUBE_SIZE / 2
+  return limits.bottomY - RING_OUTER
 }
 
-// type: 'exhale' | 'inhale'; side: -1 (side wall on the left) | 1 (right).
-// Returns { bar, side }, each { x, y, w, h } (center and size); bar is null
-// for an Inhale gate.
+// type: 'exhale' | 'inhale'; side: -1 (ring on the left) | 1 (right).
+// Returns { bar, ring }: bar { x, y, w, h } (center and size), null for an
+// Inhale gate; ring { x, y } (center).
 export function makePlaneCubeGate(type, side, limits) {
-  const { spanX } = limits
+  const { spanX, topY, bottomY } = limits
   const ground = groundY(limits)
-  const innerX = side * (spanX * SIDE_CENTER_FRAC - CUBE_SIZE / 2)
   return {
     bar: type === 'exhale' ? { x: 0, y: ground + BAR_H / 2, w: BAR_W, h: BAR_H } : null,
-    side: { x: innerX + side * SIDE_W / 2, y: ground + SIDE_H / 2, w: SIDE_W, h: SIDE_H },
+    ring: { x: side * spanX * SIDE_CENTER_FRAC, y: type === 'exhale' ? Math.max(bottomY, topY) : bottomY },
   }
 }
 
-// Does the plane at (px, py) touch either box? x/y only, at the crossing.
-export function hitsPlaneCubes(gate, px, py) {
+// Is the plane at (px, py) inside the ring? x/y only, at the crossing.
+export function ringContainsPlane(ring, px, py) {
+  return Math.hypot(px - ring.x, py - ring.y) <= RING_HIT_R
+}
+
+// Does the plane at (px, py) touch the bar? x/y only, at the crossing.
+export function hitsPlaneBar(bar, px, py) {
+  if (!bar) return false
   const padX = PLANE_HALF_W * PLANE_HIT_PAD
   const padY = PLANE_HALF_H * PLANE_HIT_PAD
-  return [gate.bar, gate.side].some((b) => b &&
-    Math.abs(px - b.x) < b.w / 2 - CUBE_HIT_INSET + padX
-    && Math.abs(py - b.y) < b.h / 2 - CUBE_HIT_INSET + padY)
+  return Math.abs(px - bar.x) < bar.w / 2 - CUBE_HIT_INSET + padX
+    && Math.abs(py - bar.y) < bar.h / 2 - CUBE_HIT_INSET + padY
 }
 
-// Random point on either box's surface, in world space (gate at depth z).
-export function sampleCubeGateSurface(gate, z) {
-  const b = gate.bar && Math.random() < 0.6 ? gate.bar : gate.side
-  const half = [b.w / 2, b.h / 2, CUBE_SIZE / 2]
-  const p = half.map((h) => (Math.random() * 2 - 1) * h)
-  const axis = Math.floor(Math.random() * 3)   // push one axis out to a face
-  p[axis] = (Math.random() < 0.5 ? -1 : 1) * half[axis]
-  return [b.x + p[0], b.y + p[1], z + p[2]]
+// Random point on the ring's tube surface, in world space (ring at depth z).
+export function sampleRingSurface(ring, z) {
+  const a = Math.random() * Math.PI * 2
+  const b = Math.random() * Math.PI * 2
+  const r = RING_R + RING_TUBE * Math.cos(b)
+  return [ring.x + r * Math.cos(a), ring.y + r * Math.sin(a), z + RING_TUBE * Math.sin(b)]
+}
+export const RING_MAX_ABS_X = RING_OUTER   // burst speed: 0 at the center -> full at the edge
+
+// Has a part scrolled off the bottom of the screen? (x, yTop, zFront): its
+// top-front point in world space.
+const _p = new THREE.Vector3()
+export function isOffScreenBelow(camera, x, yTop, zFront) {
+  _p.set(x, yTop, zFront).project(camera)
+  return _p.y < -1
+}
+export function barTopFront(bar, z) {
+  return [bar.x, bar.y + bar.h / 2, z + CUBE_SIZE / 2]
+}
+export function ringTopFront(ring, z) {
+  return [ring.x, ring.y + RING_OUTER, z + RING_TUBE]
 }
 
-// Gate look: opaque, GATE_EMISSIVE glow, fading in over FADE_IN_S at spawn.
-// The cube targets' pulse (x1 -> x2 over z PULSE_START_Z -> 0, held after);
-// a miss ramps the glow to 0. Inhale gates (side wall only) wear the primary
-// color, Exhale gates the text color. Once judged, the gate falls and tips
-// over (in the gate files) while fading out over FALL_FADE_S.
+// Gate look: opaque, GATE_EMISSIVE glow in the secondary color, text-color
+// base, fading in over GATE_FADE_IN_S at spawn. The cube targets' pulse (x1
+// -> x2 over z PULSE_START_Z -> 0, held after); a miss ramps the glow to 0.
 export const GATE_EMISSIVE = 0.2
-export const FALL_FADE_S = 2
-export const FALL_GRAVITY = 6                    // units/s^2
-const FALL_SPIN_X = [0.3, 0.8]                   // rad/s, forward/back tip
-const FALL_SPIN_Z = [0.1, 0.3]                   // rad/s, a little sideways
 const GATE_FADE_IN_S = 1
 const PULSE_START_Z = -0.5
-
-function randSigned([min, max]) {
-  return (Math.random() < 0.5 ? -1 : 1) * (min + Math.random() * (max - min))
-}
-
-// Random tip-over spin [x, z] in rad/s.
-export function makeFallSpin() {
-  return [randSigned(FALL_SPIN_X), randSigned(FALL_SPIN_Z)]
-}
 
 export function createPlaneGateMaterial(palette) {
   return new THREE.MeshStandardMaterial({
@@ -211,16 +221,14 @@ export function createPlaneGateMaterial(palette) {
   })
 }
 
-// fadeElapsed: seconds since the gate appeared; judgedElapsed: seconds since
-// it crossed z = 0 (null before); miss: 0-1 miss factor; live: live palette.
-export function applyPlaneGateLook(material, type, z, fadeElapsed, judgedElapsed, miss, live) {
-  const fadeIn = THREE.MathUtils.smoothstep(fadeElapsed / GATE_FADE_IN_S, 0, 1)
-  const fadeOut = judgedElapsed == null ? 1 : 1 - THREE.MathUtils.smoothstep(judgedElapsed / FALL_FADE_S, 0, 1)
+// fadeElapsed: seconds since the gate appeared; miss: 0-1 miss factor;
+// live: live palette.
+export function applyPlaneGateLook(material, z, fadeElapsed, miss, live) {
   const t = THREE.MathUtils.smoothstep((z - PULSE_START_Z) / -PULSE_START_Z, 0, 1)
-  material.opacity = fadeIn * fadeOut
+  material.opacity = THREE.MathUtils.smoothstep(fadeElapsed / GATE_FADE_IN_S, 0, 1)
   material.emissiveIntensity = GATE_EMISSIVE * (1 + t) * (1 - miss)
   if (live) {
-    material.color.copy(type === 'inhale' ? live.primary : live.text)
+    material.color.copy(live.text)
     material.emissive.copy(live.secondary)
   }
 }

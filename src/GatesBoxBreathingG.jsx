@@ -2,41 +2,44 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { BOX_COUNTS } from './breathPace'
 import * as THREE from 'three'
-import { useGateBurstB, missFactor } from './gateReactionsB'
+import { useGateBurstB, missFactor, applyMissScale, CUBE_INHALE_MAX_ABS_X } from './gateReactionsB'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { CLOUD_BURST_SIZE } from './cloudShapeF'
-import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, CUBE_SIZE, CUBE_RADIUS, BAR_W, BAR_H, SIDE_W, SIDE_H, createPlaneGateMaterial, applyPlaneGateLook, makeFallSpin, FALL_FADE_S, FALL_GRAVITY } from './planeCloudsG'
+import {
+  planeLimits, makePlaneCubeGate, ringContainsPlane, hitsPlaneBar, sampleRingSurface, isOffScreenBelow, barTopFront, ringTopFront,
+  createPlaneGateMaterial, applyPlaneGateLook, CUBE_SIZE, CUBE_RADIUS, BAR_W, BAR_H, RING_R, RING_TUBE, RING_MAX_ABS_X,
+} from './planeCloudsG'
 
-// Shape G (Paper Airplane), Box Breathing: rounded-cube gates with
-// GatesBoxBreathingF's series timing -- BOX_COUNTS gates per phase, spawned
-// together from SPAWN_Z back, evenly spaced; the last one spawns the next
-// series as it reaches z = 0. A gate is a side cube plus (Exhale gates only)
-// a bar at the bottom (makePlaneCubeGate); every gate in a series blocks the
-// same side.
-// Judged at z = 0 by collision with the plane (planePosRef): clear = particle
-// burst, hit = emissive ramps to 0. Then it falls and tips over while fading
-// out over FALL_FADE_S.
+// Shape G (Paper Airplane), Box Breathing: ring targets (plus a bar on
+// Exhale gates) with GatesBoxBreathingF's series timing -- BOX_COUNTS gates
+// per phase, spawned together from SPAWN_Z back, evenly spaced; the last one
+// spawns the next series as it reaches z = 0. Every ring in a series is on
+// the same side (makePlaneCubeGate).
+// Judged at z = 0 against the plane (planePosRef), like the cube's targets:
+// plane inside the ring = particle burst, else the ring's glow ramps to 0 and
+// it shrinks; the plane touching the bar dims the bar. Each part keeps
+// scrolling until it's off the bottom of the screen, then disappears.
 const POOL_SIZE = 28
 const SPAWN_Z = -6
-const DESPAWN_Z = 10   // the camera's z, so falling gates finish fading
+const DESPAWN_Z = 10   // fallback; parts normally go once off the bottom of the screen
 
 function makeSlot() {
-  return { active: false, type: 'inhale', z: 0, speed: 0, isFirst: false, isLast: false, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, fallY: 0, fallVy: 0, spin: [0, 0], hasTriggeredFirst: false, hasPreTriggeredLast: false, gate: null }
+  return { active: false, type: 'inhale', z: 0, speed: 0, isFirst: false, isLast: false, fadeElapsed: 0, judged: false, ringMissElapsed: null, barMissElapsed: null, ringGone: false, barGone: false, hasTriggeredFirst: false, hasPreTriggeredLast: false, gate: null }
 }
 
 export default function GatesBoxBreathingG({ gatesEnabledRef, spawnIntervalRef, palette, onFirstGate, onLastGate, planePosRef, livePaletteRef, boxProgressRef }) {
   const slots = useRef(Array.from({ length: POOL_SIZE }, makeSlot))
   const groupRefs = useRef([])
-  const partRefs = useRef(Array.from({ length: POOL_SIZE }, () => ({ bar: null, side: null })))
+  const partRefs = useRef(Array.from({ length: POOL_SIZE }, () => ({ bar: null, ring: null })))
   const wasEnabled = useRef(false)
 
   const barGeometry = useMemo(() => new RoundedBoxGeometry(BAR_W, BAR_H, CUBE_SIZE, 4, CUBE_RADIUS), [])
-  const cubeGeometry = useMemo(() => new RoundedBoxGeometry(SIDE_W, SIDE_H, CUBE_SIZE, 4, CUBE_RADIUS), [])
-  const materials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createPlaneGateMaterial(palette)), [palette])
-  useEffect(() => () => { barGeometry.dispose(); cubeGeometry.dispose() }, [barGeometry, cubeGeometry])
-  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials])
+  const ringGeometry = useMemo(() => new THREE.TorusGeometry(RING_R, RING_TUBE, 16, 64), [])
+  const barMaterials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createPlaneGateMaterial(palette)), [palette])
+  const ringMaterials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createPlaneGateMaterial(palette)), [palette])
+  useEffect(() => () => { barGeometry.dispose(); ringGeometry.dispose() }, [barGeometry, ringGeometry])
+  useEffect(() => () => [...barMaterials, ...ringMaterials].forEach((m) => m.dispose()), [barMaterials, ringMaterials])
 
-  const gateBurst = useGateBurstB(palette.primaryColor, CLOUD_BURST_SIZE)
+  const gateBurst = useGateBurstB(palette.primaryColor)
 
   // Paced breath progress (boxProgressRef, same meaning as GatesBoxBreathingB's).
   const seriesRef = useRef({ type: 'inhale', spawnTime: 0, interval: 1, arrived: true })
@@ -61,11 +64,8 @@ export default function GatesBoxBreathingG({ gatesEnabledRef, spawnIntervalRef, 
         const gate = makePlaneCubeGate(type, side, limits)
         Object.assign(s, makeSlot(), { active: true, type, z: SPAWN_Z - n * spacing, speed, isFirst: n === 0, isLast: n === N - 1, gate })
         const parts = partRefs.current[i]
-        if (parts.bar) { parts.bar.visible = !!gate.bar; if (gate.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0) }
-        if (parts.side) parts.side.position.set(gate.side.x, gate.side.y, 0)
-        if (parts.bar) parts.bar.rotation.set(0, 0, 0)
-        if (parts.side) parts.side.rotation.set(0, 0, 0)
-        materials[i].color.set(type === 'inhale' ? palette.primaryColor : palette.textColor)
+        if (parts.bar && gate.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0)
+        if (parts.ring) { parts.ring.position.set(gate.ring.x, gate.ring.y, 0); parts.ring.scale.set(1, 1, 1) }
       }
     }
 
@@ -94,40 +94,40 @@ export default function GatesBoxBreathingG({ gatesEnabledRef, spawnIntervalRef, 
           onLastGate?.(s.type)
         }
 
-        if (s.z >= 0 && s.judgedElapsed == null) {
-          s.judgedElapsed = 0
-          s.spin = makeFallSpin()
+        const parts = partRefs.current[i]
+        const { bar, ring } = s.gate
+        if (s.z >= 0 && !s.judged) {
+          s.judged = true
           if (s.isLast) spawnSeries(s.type === 'inhale' ? 'exhale' : 'inhale')
           if (s.isFirst && s.type === seriesRef.current.type) seriesRef.current.arrived = true
           const pos = planePosRef?.current
-          if (pos && !hitsPlaneCubes(s.gate, pos.x, pos.y)) {
+          if (pos && ringContainsPlane(ring, pos.x, pos.y)) {
             const z = s.z
-            gateBurst.burstFrom(() => sampleCubeGateSurface(s.gate, z), limits.halfW, now)
+            gateBurst.burstFrom(() => sampleRingSurface(ring, z), RING_MAX_ABS_X, now, RING_MAX_ABS_X / CUBE_INHALE_MAX_ABS_X, ring.x)
           } else {
-            s.missElapsed = 0
+            s.ringMissElapsed = 0
           }
-        } else if (s.judgedElapsed != null) {
-          s.judgedElapsed += delta
+          if (pos && hitsPlaneBar(bar, pos.x, pos.y)) s.barMissElapsed = 0
         }
 
-        if (s.z > DESPAWN_Z || (s.judgedElapsed != null && s.judgedElapsed >= FALL_FADE_S)) {
+        // Past the plane, each part stays until it's off the bottom of the screen.
+        if (s.judged) {
+          if (!s.barGone) s.barGone = !bar || isOffScreenBelow(state.camera, ...barTopFront(bar, s.z))
+          if (!s.ringGone) s.ringGone = isOffScreenBelow(state.camera, ...ringTopFront(ring, s.z))
+        }
+        if (s.z > DESPAWN_Z || (s.barGone && s.ringGone)) {
           s.active = false; g.visible = false; continue
         }
 
-        if (s.missElapsed != null) s.missElapsed += delta
-        if (s.judgedElapsed != null) {
-          // Fall and tip over: gravity drop, each box spinning about its own center.
-          s.fallVy += FALL_GRAVITY * delta
-          s.fallY += s.fallVy * delta
-          const parts = partRefs.current[i]
-          for (const m of [parts.bar, parts.side]) {
-            if (!m) continue
-            m.rotation.x += s.spin[0] * delta
-            m.rotation.z += s.spin[1] * delta
-          }
-        }
-        applyPlaneGateLook(materials[i], s.type, s.z, s.fadeElapsed, s.judgedElapsed, missFactor(s.missElapsed), live)
-        g.position.set(0, -s.fallY, s.z)
+        if (s.ringMissElapsed != null) s.ringMissElapsed += delta
+        if (s.barMissElapsed != null) s.barMissElapsed += delta
+        const ringMiss = missFactor(s.ringMissElapsed)
+        applyPlaneGateLook(ringMaterials[i], s.z, s.fadeElapsed, ringMiss, live)
+        applyPlaneGateLook(barMaterials[i], s.z, s.fadeElapsed, missFactor(s.barMissElapsed), live)
+        applyMissScale(parts.ring, ringMiss)
+        if (parts.bar) parts.bar.visible = !!bar && !s.barGone
+        if (parts.ring) parts.ring.visible = !s.ringGone
+        g.position.set(0, 0, s.z)
         g.visible = true
       }
     } else {
@@ -148,8 +148,8 @@ export default function GatesBoxBreathingG({ gatesEnabledRef, spawnIntervalRef, 
       {gateBurst.points}
       {Array.from({ length: POOL_SIZE }, (_, i) => (
         <group key={i} ref={(el) => { groupRefs.current[i] = el }} visible={false}>
-          <mesh ref={(el) => { partRefs.current[i].bar = el }} geometry={barGeometry} material={materials[i]} />
-          <mesh ref={(el) => { partRefs.current[i].side = el }} geometry={cubeGeometry} material={materials[i]} />
+          <mesh ref={(el) => { partRefs.current[i].bar = el }} geometry={barGeometry} material={barMaterials[i]} />
+          <mesh ref={(el) => { partRefs.current[i].ring = el }} geometry={ringGeometry} material={ringMaterials[i]} />
         </group>
       ))}
     </>
