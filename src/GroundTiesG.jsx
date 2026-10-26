@@ -8,7 +8,8 @@ import { planeLimits, groundY, BAR_W } from './planeCloudsG'
 // bottom of the gates' bar), scrolling toward the camera with the gates so
 // the ground reads clearly. A steady, even scroll (not the cube's
 // gate-anchored ties): evenly spaced from TIE_FAR_Z to TIE_NEAR_Z, wrapping
-// back to the far end, fading in over the farthest TIE_FADE units.
+// back to the far end, fading in over the farthest TIE_FADE units. Alpha also
+// falls off with distance: full at DEPTH_FADE_NEAR_Z, 0 at DEPTH_FADE_FAR_Z.
 const TIE_WIDTH = BAR_W
 const TIE_HEIGHT = 0.04
 const TIE_DEPTH = 0.08
@@ -18,6 +19,8 @@ const TIE_SPACING = 2
 const TIE_FAR_Z = -40
 const TIE_NEAR_Z = 10
 const TIE_FADE = 5
+const DEPTH_FADE_NEAR_Z = 0
+const DEPTH_FADE_FAR_Z = -50
 const TIE_COUNT = Math.round((TIE_NEAR_Z - TIE_FAR_Z) / TIE_SPACING)
 // Speed follows the gates (LandscapeB's rule): distance a gate travels per
 // spawn interval; Own Pace / Tutorial drift at a fixed interval.
@@ -48,7 +51,8 @@ export default function GroundTiesG({ mode, spawnIntervalRef, livePaletteRef, pa
       const z = TIE_FAR_Z + i * TIE_SPACING + offsetRef.current
       m.position.set(0, y, z)
       const mat = materials[i]
-      mat.opacity = TIE_ALPHA * THREE.MathUtils.smoothstep(z, TIE_FAR_Z, TIE_FAR_Z + TIE_FADE)
+      const depthFade = THREE.MathUtils.clamp((z - DEPTH_FADE_FAR_Z) / (DEPTH_FADE_NEAR_Z - DEPTH_FADE_FAR_Z), 0, 1)
+      mat.opacity = TIE_ALPHA * depthFade * THREE.MathUtils.smoothstep(z, TIE_FAR_Z, TIE_FAR_Z + TIE_FADE)
       if (live) mat.color.copy(live.primary)
     }
   })
