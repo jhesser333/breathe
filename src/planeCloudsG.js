@@ -116,18 +116,21 @@ export function applyPlaneGate(mainGroup, sideGroup, gate) {
 
 // ---------------------------------------------------------------------------
 // Rounded-cube gates (in use; the cloud gates above are parked for later).
-// Exhale gates have a bar (a rounded cube stretched BAR_SCALE_X in X, spanning
-// the screen) on the plane's wrong height, bottomY (full Inhale), so it flies
-// over it; Inhale gates have no bar. Every gate has a side wall centered on
-// the plane's right height, out on one side, so the free lane is the other
-// side. The wall is a cube scaled SIDE_SCALE_X / SIDE_SCALE_Y, grown outward
-// from its inner face (the face nearest x = 0).
+// Exhale gates have a bar (a rounded cube stretched BAR_SCALE_X in X and
+// BAR_SCALE_Y in Y, spanning the screen) resting on the ground plane, at the
+// plane's wrong height, bottomY (full Inhale), so it flies over it; Inhale
+// gates have no bar. Every gate has a side wall resting on the ground plane,
+// out on one side, so the free lane is the other side. The wall is a cube
+// scaled SIDE_SCALE_X / SIDE_SCALE_Y, grown outward from its inner face (the
+// face nearest x = 0).
 export const CUBE_SIZE = 2
 export const BAR_SCALE_X = 15
+export const BAR_SCALE_Y = 2
 export const SIDE_SCALE_X = 5
 export const SIDE_SCALE_Y = 5
 export const CUBE_RADIUS = 0.2
 export const BAR_W = CUBE_SIZE * BAR_SCALE_X
+export const BAR_H = CUBE_SIZE * BAR_SCALE_Y
 export const SIDE_W = CUBE_SIZE * SIDE_SCALE_X
 export const SIDE_H = CUBE_SIZE * SIDE_SCALE_Y
 // The inner face sits where a plain cube centered at SIDE_CENTER_FRAC of the
@@ -137,7 +140,8 @@ const SIDE_CENTER_FRAC = 0.58
 // 0.9 x half-size), so grazing an edge doesn't count.
 const CUBE_HIT_INSET = 0.1 * CUBE_SIZE / 2
 
-// The ground plane under the plane (ties sit on it): the bottom of the bar.
+// The ground plane under the plane (ties, the bar and the side walls sit on
+// it): a plain cube's height below full Inhale.
 export function groundY(limits) {
   return limits.bottomY - CUBE_SIZE / 2
 }
@@ -146,12 +150,12 @@ export function groundY(limits) {
 // Returns { bar, side }, each { x, y, w, h } (center and size); bar is null
 // for an Inhale gate.
 export function makePlaneCubeGate(type, side, limits) {
-  const { topY, bottomY, spanX } = limits
-  const rightY = type === 'exhale' ? topY : bottomY
+  const { spanX } = limits
+  const ground = groundY(limits)
   const innerX = side * (spanX * SIDE_CENTER_FRAC - CUBE_SIZE / 2)
   return {
-    bar: type === 'exhale' ? { x: 0, y: bottomY, w: BAR_W, h: CUBE_SIZE } : null,
-    side: { x: innerX + side * SIDE_W / 2, y: rightY, w: SIDE_W, h: SIDE_H },
+    bar: type === 'exhale' ? { x: 0, y: ground + BAR_H / 2, w: BAR_W, h: BAR_H } : null,
+    side: { x: innerX + side * SIDE_W / 2, y: ground + SIDE_H / 2, w: SIDE_W, h: SIDE_H },
   }
 }
 
