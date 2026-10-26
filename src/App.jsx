@@ -1903,6 +1903,9 @@ export default function App() {
         tiltFailed={tiltFailed}
         micFailed={micFailed}
         onHome={() => setScreen('selectMode')}
+        onStart={() => handleSelectMode(selectedMode)}
+        onArtOptions={() => setScreen('personalize')}
+        modeLabel={MODE_LABELS[selectedMode]}
         palette={palette}
       />
     )
@@ -1916,6 +1919,9 @@ export default function App() {
           if (v === 'g') requestTiltPermission()
         }}
         onSelectMode={() => setScreen('selectMode')}
+        onStart={() => handleSelectMode(selectedMode)}
+        onControlOptions={() => setScreen('sliderLayouts')}
+        modeLabel={MODE_LABELS[selectedMode]}
         palette={palette}
       />
     )

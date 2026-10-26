@@ -1,3 +1,5 @@
+import OptionsNav from './OptionsNav'
+
 function optionBtn(selected, palette) {
   return {
     width: '100%', maxWidth: 320,
@@ -10,7 +12,7 @@ function optionBtn(selected, palette) {
   }
 }
 
-export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelectMode, palette }) {
+export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelectMode, onStart, onControlOptions, modeLabel, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -43,25 +45,14 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         </button>
       </div>
 
-      <div style={{
-        position: 'absolute', bottom: 16, left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex', flexDirection: 'column',
-        gap: 20, alignItems: 'center',
-      }}>
-        {[
-          { label: 'Home', onClick: onSelectMode },
-        ].map(({ label, onClick }) => (
-          <button key={label} onClick={onClick} style={{
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-            padding: '8px 14px', fontSize: 13,
-            cursor: 'pointer', fontFamily: 'sans-serif',
-            whiteSpace: 'nowrap',
-          }}>{label}</button>
-        ))}
-      </div>
+      <OptionsNav
+        onHome={onSelectMode}
+        onStart={onStart}
+        otherLabel="Control Options"
+        onOther={onControlOptions}
+        modeLabel={modeLabel}
+        palette={palette}
+      />
     </div>
   )
 }

@@ -1,3 +1,5 @@
+import OptionsNav from './OptionsNav'
+
 function optionBtn(selected, palette) {
   return {
     width: '100%', maxWidth: 320,
@@ -20,14 +22,14 @@ const OPTIONS = [
   { id: 'blow', label: 'Blow on the Mic', desc: 'When you exhale, blow gently through pursed lips toward your phone. When you inhale, stay quiet. To hold your breath, touch the screen.' },
 ]
 
-export default function SliderLayoutsScreen({ selected, onSelect, onHome, palette, tiltFailed = false, micFailed = false }) {
+export default function SliderLayoutsScreen({ selected, onSelect, onHome, onStart, onArtOptions, modeLabel, palette, tiltFailed = false, micFailed = false }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
       background: palette.background,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      gap: 12, padding: 32, paddingBottom: 72,
+      gap: 12, padding: 32, paddingBottom: 150,
       fontFamily: 'sans-serif',
     }}>
       <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
@@ -46,19 +48,14 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, palett
         </button>
       ))}
 
-      <button
-        onClick={onHome}
-        style={{
-          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          borderRadius: 8, color: 'rgba(255,255,255,0.7)',
-          padding: '8px 14px', fontSize: 13,
-          cursor: 'pointer', fontFamily: 'sans-serif',
-        }}
-      >
-        Home
-      </button>
+      <OptionsNav
+        onHome={onHome}
+        onStart={onStart}
+        otherLabel="Art Options"
+        onOther={onArtOptions}
+        modeLabel={modeLabel}
+        palette={palette}
+      />
     </div>
   )
 }

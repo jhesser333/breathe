@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { MODE_LABELS } from './copy'
+import StartButton from './StartButton'
 
 // Breathe at Your Own Pace ('basic') and Paced Breathing ('timed') are hidden
 // from the picker but still fully implemented.
@@ -20,14 +20,6 @@ const OPTIONS = [
     desc: 'The app gently helps you slow the pace of your breathing',
   },
 ]
-
-function hexToRgba(hex, alpha) {
-  const clean = hex.replace('#', '')
-  const r = parseInt(clean.substring(0, 2), 16)
-  const g = parseInt(clean.substring(2, 4), 16)
-  const b = parseInt(clean.substring(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
 
 const pillStyle = {
   background: 'rgba(255,255,255,0.08)',
@@ -50,7 +42,6 @@ function modeBtnStyle(selected, palette) {
 }
 
 export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange, onAnyTap }) {
-  const [startPressed, setStartPressed] = useState(false)
   return (
     <div onPointerDown={onAnyTap} style={{
       position: 'fixed', inset: 0,
@@ -66,22 +57,7 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
         display: 'flex', flexDirection: 'column',
         gap: 20, alignItems: 'center',
       }}>
-        <button
-          onClick={() => onStart(selectedMode)}
-          onPointerDown={() => setStartPressed(true)}
-          onPointerUp={() => setStartPressed(false)}
-          onPointerLeave={() => setStartPressed(false)}
-          onPointerCancel={() => setStartPressed(false)}
-          style={{
-            width: 110, height: 110, borderRadius: '50%',
-            background: hexToRgba(palette.primaryColor, startPressed ? 0.75 : 0.25),
-            border: `2px solid ${palette.primaryColor}`,
-            color: palette.primaryColor, fontSize: 20, fontWeight: 700,
-            fontFamily: 'sans-serif', cursor: 'pointer',
-          }}
-        >
-          Start
-        </button>
+        <StartButton onClick={() => onStart(selectedMode)} palette={palette} />
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={onPersonalize} style={pillStyle}>
             Art Options
