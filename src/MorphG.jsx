@@ -25,6 +25,10 @@ const BLOW_GLOW_SMOOTH_S = 0.15
 const RISE_TIME = 1.5
 const SINK_TIME = 2.5   // slower, so it drifts down rather than drops
 const SIDE_TIME = 1.5
+// The target height reaches its end once the slider is this far through the
+// breath: 80% up = full Inhale height, 80% down = full Exhale height.
+const ARRIVE_LOW = 0.2
+const ARRIVE_HIGH = 0.8
 
 // Tilt: banks into sideways movement and pitches with vertical movement.
 const BANK_MAX = 0.6            // radians at TILT_FULL_SPEED sideways
@@ -103,7 +107,7 @@ export default function MorphG({ leftVal, palette, planePosRef, blowRef }) {
   useFrame(({ camera, size }, delta) => {
     const dt = Math.min(delta, 0.05)
     const s = state.current
-    const lv = THREE.MathUtils.smoothstep(leftVal.current, 0, 1)
+    const lv = THREE.MathUtils.smoothstep(leftVal.current, ARRIVE_LOW, ARRIVE_HIGH)
 
     const { topY, bottomY, spanX } = planeLimits(camera, size)
 

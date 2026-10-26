@@ -22,14 +22,15 @@ const TILT_INHALE_DEG = 65        // 25 degrees back from vertical
 const TILT_SMOOTH_S = 0.15
 const TILT_NO_READING_MS = 1000   // no reading this long after starting = no sensor
 // Blow on the Mic. Blowing on a mic is loud, noise-like and mostly low
-// frequency; speech and the app's own sounds are tonal (low flatness).
+// frequency; a breath from arm's length is a quieter, higher hiss. Speech
+// and the app's own sounds are tonal (low flatness).
 const FFT_SIZE = 1024
 const BLOW_LOW_HZ = 50            // band the blow is measured in
-const BLOW_HIGH_HZ = 1000
-const BLOW_ON_DB = 12             // above the room's noise floor = blowing
-const BLOW_OFF_DB = 7             // blowing stops below this (hysteresis)
-const BLOW_RANGE_DB = 20          // OFF + this = full strength
-const BLOW_MIN_FLATNESS = 0.2     // spectral flatness needed to start (0 tone -> 1 noise)
+const BLOW_HIGH_HZ = 3000
+const BLOW_ON_DB = 7              // above the room's noise floor = blowing
+const BLOW_OFF_DB = 4             // blowing stops below this (hysteresis)
+const BLOW_RANGE_DB = 15          // OFF + this = full strength
+const BLOW_MIN_FLATNESS = 0.15    // spectral flatness needed to start (0 tone -> 1 noise)
 const BLOW_LEVEL_SMOOTH_S = 0.05
 const FLOOR_FALL_S = 0.5          // noise floor follows a quieter room quickly...
 const FLOOR_RISE_S = 20           // ...and a louder one slowly while not blowing...

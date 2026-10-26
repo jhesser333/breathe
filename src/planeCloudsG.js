@@ -120,6 +120,8 @@ export function applyPlaneGate(mainGroup, sideGroup, gate) {
 
 // ---------------------------------------------------------------------------
 // Bar + ring gates (in use; the cloud gates above are parked for later).
+// Bars use the plane-gate look below; rings use the cube targets' look
+// (ringPulseEmissive).
 // Every gate has a ring target (RING_R, the plane's wingspan) on a random
 // side, where the plane should fly through: Inhale rings touch the ground
 // plane, centered on bottomY (full Inhale); Exhale rings sit RING_GAP above
@@ -203,7 +205,7 @@ export function ringTopFront(ring, z) {
   return [ring.x, ring.y + RING_OUTER, z + RING_TUBE]
 }
 
-// Gate look: opaque, GATE_EMISSIVE glow in the secondary color, text-color
+// Bar look: opaque, GATE_EMISSIVE glow in the secondary color, text-color
 // base, fading in over GATE_FADE_IN_S at spawn. The cube targets' pulse (x1
 // -> x2 over z PULSE_START_Z -> 0, held after); a miss ramps the glow to 0.
 export const GATE_EMISSIVE = 0.2
@@ -231,4 +233,16 @@ export function applyPlaneGateLook(material, z, fadeElapsed, miss, live) {
     material.color.copy(live.text)
     material.emissive.copy(live.secondary)
   }
+}
+
+// Ring look: the Morphing Cube's targets (createCubeMorphMaterial +
+// applyGateLook in cubeMaterialB.js). This is their emissive: 1 on the
+// approach, pulsing 1 -> 2 over z RING_PULSE_START_Z -> 0, held at 2 after.
+// On a success the ring then fades out over RING_FADE_OUT_S.
+const RING_PULSE_START_Z = -0.5
+export const RING_FADE_OUT_S = 1
+export function ringPulseEmissive(z) {
+  if (z >= 0) return 2
+  if (z < RING_PULSE_START_Z) return 1
+  return 1 + THREE.MathUtils.smoothstep((z - RING_PULSE_START_Z) / -RING_PULSE_START_Z, 0, 1)
 }
