@@ -177,3 +177,50 @@ export function sampleCubeGateSurface(gate, z) {
   p[axis] = (Math.random() < 0.5 ? -1 : 1) * half[axis]
   return [b.x + p[0], b.y + p[1], z + p[2]]
 }
+
+// Gate look: opaque, GATE_EMISSIVE glow, fading in over FADE_IN_S at spawn.
+// The cube targets' pulse (x1 -> x2 over z PULSE_START_Z -> 0, held after);
+// a miss ramps the glow to 0. Inhale gates (side wall only) wear the primary
+// color, Exhale gates the text color. Once judged, the gate falls and tips
+// over (in the gate files) while fading out over FALL_FADE_S.
+export const GATE_EMISSIVE = 0.2
+export const FALL_FADE_S = 2
+export const FALL_GRAVITY = 6                    // units/s^2
+const FALL_SPIN_X = [0.3, 0.8]                   // rad/s, forward/back tip
+const FALL_SPIN_Z = [0.1, 0.3]                   // rad/s, a little sideways
+const GATE_FADE_IN_S = 1
+const PULSE_START_Z = -0.5
+
+function randSigned([min, max]) {
+  return (Math.random() < 0.5 ? -1 : 1) * (min + Math.random() * (max - min))
+}
+
+// Random tip-over spin [x, z] in rad/s.
+export function makeFallSpin() {
+  return [randSigned(FALL_SPIN_X), randSigned(FALL_SPIN_Z)]
+}
+
+export function createPlaneGateMaterial(palette) {
+  return new THREE.MeshStandardMaterial({
+    color: palette.textColor,
+    emissive: palette.secondaryColor,
+    emissiveIntensity: GATE_EMISSIVE,
+    transparent: true,
+    opacity: 1,
+    depthWrite: true,
+  })
+}
+
+// fadeElapsed: seconds since the gate appeared; judgedElapsed: seconds since
+// it crossed z = 0 (null before); miss: 0-1 miss factor; live: live palette.
+export function applyPlaneGateLook(material, type, z, fadeElapsed, judgedElapsed, miss, live) {
+  const fadeIn = THREE.MathUtils.smoothstep(fadeElapsed / GATE_FADE_IN_S, 0, 1)
+  const fadeOut = judgedElapsed == null ? 1 : 1 - THREE.MathUtils.smoothstep(judgedElapsed / FALL_FADE_S, 0, 1)
+  const t = THREE.MathUtils.smoothstep((z - PULSE_START_Z) / -PULSE_START_Z, 0, 1)
+  material.opacity = fadeIn * fadeOut
+  material.emissiveIntensity = GATE_EMISSIVE * (1 + t) * (1 - miss)
+  if (live) {
+    material.color.copy(type === 'inhale' ? live.primary : live.text)
+    material.emissive.copy(live.secondary)
+  }
+}

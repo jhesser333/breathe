@@ -3,8 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGateBurstB, missFactor } from './gateReactionsB'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
-import { createCloudMaterial, applyCloudLook, FADE_OUT_S, CLOUD_BURST_SIZE } from './cloudShapeF'
-import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, CUBE_SIZE, CUBE_RADIUS, BAR_W, BAR_H, SIDE_W, SIDE_H } from './planeCloudsG'
+import { CLOUD_BURST_SIZE } from './cloudShapeF'
+import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, CUBE_SIZE, CUBE_RADIUS, BAR_W, BAR_H, SIDE_W, SIDE_H, createPlaneGateMaterial, applyPlaneGateLook, makeFallSpin, FALL_FADE_S, FALL_GRAVITY } from './planeCloudsG'
 
 // Shape G (Paper Airplane), Slowing Down / Paced: rounded-cube gates with
 // GatesF's timing. Exhale gates spawn at SPAWN_Z every interval; each one
@@ -12,11 +12,11 @@ import { planeLimits, makePlaneCubeGate, hitsPlaneCubes, sampleCubeGateSurface, 
 // GATE_B_FADE_Z. A gate is a side cube on a random side, plus (Exhale gates
 // only) a bar at the bottom (makePlaneCubeGate). Judged at z = 0 by collision with the plane
 // (planePosRef): clear = particle burst, hit = emissive ramps to 0. Then it
-// fades out over FADE_OUT_S.
+// falls and tips over while fading out over FALL_FADE_S.
 const POOL_SIZE = 8
 const SPAWN_Z = -20
 const GATE_B_FADE_Z = -20
-const DESPAWN_Z = 6
+const DESPAWN_Z = 10   // the camera's z, so falling gates finish fading
 
 // Same as GatesB: the Inhale gate arrives `inhale` seconds after the Exhale
 // gate it spawns with (ratio 1.5 outside Slowing Down's ramp).
@@ -29,7 +29,7 @@ function computeGateBZ(inhaleSecondsRef, exhaleSecondsRef, spawnIntervalRef) {
 }
 
 function makeSlot() {
-  return { active: false, type: 'exhale', z: 0, speed: 0, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, gate: null }
+  return { active: false, type: 'exhale', z: 0, speed: 0, fadeElapsed: 0, judgedElapsed: null, missElapsed: null, fallY: 0, fallVy: 0, spin: [0, 0], gate: null }
 }
 
 export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, breathPhaseRef, inhaleSecondsRef, exhaleSecondsRef, planePosRef, livePaletteRef, paceProgressRef, startOnInhale = false }) {
@@ -39,7 +39,7 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
 
   const barGeometry = useMemo(() => new RoundedBoxGeometry(BAR_W, BAR_H, CUBE_SIZE, 4, CUBE_RADIUS), [])
   const cubeGeometry = useMemo(() => new RoundedBoxGeometry(SIDE_W, SIDE_H, CUBE_SIZE, 4, CUBE_RADIUS), [])
-  const materials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createCloudMaterial(palette)), [palette])
+  const materials = useMemo(() => Array.from({ length: POOL_SIZE }, () => createPlaneGateMaterial(palette)), [palette])
   useEffect(() => () => { barGeometry.dispose(); cubeGeometry.dispose() }, [barGeometry, cubeGeometry])
   useEffect(() => () => materials.forEach((m) => m.dispose()), [materials])
 
@@ -76,6 +76,9 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
       const parts = partRefs.current[i]
       if (parts.bar) { parts.bar.visible = !!gate.bar; if (gate.bar) parts.bar.position.set(gate.bar.x, gate.bar.y, 0) }
       if (parts.side) parts.side.position.set(gate.side.x, gate.side.y, 0)
+      if (parts.bar) parts.bar.rotation.set(0, 0, 0)
+      if (parts.side) parts.side.rotation.set(0, 0, 0)
+      materials[i].color.set(type === 'inhale' ? palette.primaryColor : palette.textColor)
     }
     const spawnA = () => {
       const speed = Math.abs(SPAWN_Z) / spawnIntervalRef.current
@@ -107,6 +110,7 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
 
       if (s.z >= 0 && s.judgedElapsed == null) {
         s.judgedElapsed = 0
+        s.spin = makeFallSpin()
         if (breathPhaseRef) breathPhaseRef.current = s.type === 'exhale' ? 'inhale' : 'exhale'   // the phase to breathe next
         const pos = planePosRef?.current
         if (pos && !hitsPlaneCubes(s.gate, pos.x, pos.y)) {
@@ -121,15 +125,26 @@ export default function GatesG({ gatesEnabledRef, spawnIntervalRef, palette, bre
         s.judgedElapsed += delta
       }
 
-      if (s.z > DESPAWN_Z || (s.judgedElapsed != null && s.judgedElapsed >= FADE_OUT_S)) {
+      if (s.z > DESPAWN_Z || (s.judgedElapsed != null && s.judgedElapsed >= FALL_FADE_S)) {
         s.active = false; group.visible = false; return
       }
       if (s.z < GATE_B_FADE_Z) { group.visible = false; return }
 
       s.fadeElapsed += delta
       if (s.missElapsed != null) s.missElapsed += delta
-      applyCloudLook(materials[i], s.z, s.fadeElapsed, s.judgedElapsed, missFactor(s.missElapsed), live)
-      group.position.set(0, 0, s.z)
+      if (s.judgedElapsed != null) {
+        // Fall and tip over: gravity drop, each box spinning about its own center.
+        s.fallVy += FALL_GRAVITY * delta
+        s.fallY += s.fallVy * delta
+        const parts = partRefs.current[i]
+        for (const m of [parts.bar, parts.side]) {
+          if (!m) continue
+          m.rotation.x += s.spin[0] * delta
+          m.rotation.z += s.spin[1] * delta
+        }
+      }
+      applyPlaneGateLook(materials[i], s.type, s.z, s.fadeElapsed, s.judgedElapsed, missFactor(s.missElapsed), live)
+      group.position.set(0, -s.fallY, s.z)
       group.visible = true
     })
 
