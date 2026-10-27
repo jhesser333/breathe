@@ -1666,12 +1666,13 @@ export default function App() {
     audioGroupIndexRef.current = 0
     // Tilt Your Phone: ask for motion access inside this tap (iOS).
     if (sliderLayout === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
-    // Blow on the Mic: open the mic inside this tap.
-    if (sliderLayout === 'blow') requestMicAccess().then((ok) => setMicFailed(!ok))
     // Paper Airplane steers by side tilt: ask for motion access in this tap too.
     if (shapeRef.current === 'g' && sliderLayout !== 'tilt') requestTiltPermission()
     audioRef.current.unlock()
     audioRef.current.start(0)
+    // Blow on the Mic: open the mic inside this tap, after the app's sound has
+    // set up its own audio context (doing it first could leave the mic silent).
+    if (sliderLayout === 'blow') requestMicAccess().then((ok) => setMicFailed(!ok))
     audioRef.current.setSlider(leftVal.current)
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
