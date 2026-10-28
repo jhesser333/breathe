@@ -7,7 +7,7 @@ import { ringContainsPlane, sampleRingSurface, createPlaneGateMaterial, ringPuls
 import { createCubeMorphMaterial, gateLookT, applyGateLook } from './cubeMaterialB'
 import { computePhaseDurations } from './BackgroundRingsD'
 import {
-  balloonLimits, COURSE_W, WALL_H, WALL_D, WALL_HEIGHTS, SHORT_H, SHORT_D, DOOR_T, SEGMENT_LEN, RING_COUNT, RING_SIDE_FRAC,
+  balloonLimits, WALL_H, WALL_D, WALL_HEIGHTS, SHORT_H, SHORT_D, DOOR_T, SEGMENT_LEN, RING_COUNT, RING_SIDE_FRAC,
   wallFrontZ, wallCenterZ,
 } from './balloonH'
 
@@ -81,9 +81,9 @@ export default function BalloonCourseH({
       det: { dir: 'down', peak: 0, trough: 0 } }
   }
 
-  const shortGeometry = useMemo(() => new RoundedBoxGeometry(COURSE_W, SHORT_H, SHORT_D, 2, 0.05), [])
-  const wallGeometry = useMemo(() => new RoundedBoxGeometry(COURSE_W, WALL_H, WALL_D, 4, 0.2), [])
-  const doorGeometry = useMemo(() => new RoundedBoxGeometry(COURSE_W, 1, DOOR_T, 2, 0.04), [])
+  const shortGeometry = useMemo(() => new RoundedBoxGeometry(WALL_H, SHORT_H, SHORT_D, 2, 0.05), [])
+  const wallGeometry = useMemo(() => new RoundedBoxGeometry(WALL_H, WALL_H, WALL_D, 4, 0.2), [])
+  const doorGeometry = useMemo(() => new RoundedBoxGeometry(WALL_H, 1, DOOR_T, 2, 0.04), [])
   const ringGeometry = useMemo(() => new THREE.TorusGeometry(RING_R, RING_TUBE, 16, 64), [])
   useEffect(() => () => [shortGeometry, wallGeometry, doorGeometry, ringGeometry].forEach((g) => g.dispose()), [shortGeometry, wallGeometry, doorGeometry, ringGeometry])
 
@@ -221,10 +221,11 @@ export default function BalloonCourseH({
       r.group.position.set(0, 0, origin)
       r.group.visible = true
 
-      // Barriers: flat GATE_EMISSIVE, the door in the primary color.
+      // Barriers: no emissive (the short barrier only glows in its Box
+      // Hold-out pulse); the door: GATE_EMISSIVE in the primary color.
       const fade = THREE.MathUtils.smoothstep(slot.fade / FADE_IN_S, 0, 1)
       const isCur = i === s.cur
-      for (const [mat, color, pulse] of [[m.wall, 'text', 1], [m.short, 'text', isCur ? shortPulse : 1], [m.door, 'primary', isCur ? doorPulse : 1]]) {
+      for (const [mat, color, pulse] of [[m.wall, 'text', 0], [m.short, 'text', isCur ? shortPulse - 1 : 0], [m.door, 'primary', isCur ? doorPulse : 1]]) {
         mat.opacity = fade
         mat.emissiveIntensity = GATE_EMISSIVE * pulse
         if (live) { mat.color.copy(live[color]); mat.emissive.copy(live.secondary) }
@@ -233,7 +234,7 @@ export default function BalloonCourseH({
       r.walls.forEach((w, n) => {
         if (!w) return
         const h = WALL_HEIGHTS[n]
-        w.scale.y = h
+        w.scale.set(h, h, 1)   // as wide as it is tall
         w.position.set(0, limits.groundY + WALL_H * h / 2, wallCenterZ(n))
       })
 

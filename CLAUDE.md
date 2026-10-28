@@ -191,7 +191,7 @@ Art Options card "Balloon (in-progress)" (id `'h'`, after the Paper Airplane). C
   - A door (live primary base) standing on the first wall's front edge, pivoting on its back-bottom edge.
   - Walls `WALL_HEIGHTS` [1, 1, 1, 0.75, 0.5, 0.25] × `WALL_H`, every `WALL_STEP` 2.3.
   - Rings (the airplane's ring look, judging and burst) at `flightY` over walls 1–5, all on one random side (`RING_SIDE_FRAC` 0.58 × spanX).
-  - Barriers are the airplane bar material at a flat `GATE_EMISSIVE` 0.2, with no reactions.
+  - Barriers (walls, short barrier) are the airplane bar material with no emissive and no reactions; the short barrier glows only in its Box Hold-out pulse. Each wall is as wide as it is tall (`WALL_H` 3 wide, the stepped ones scaled down in X and Y together); the short barrier and the door are a full wall's width (3). The door keeps `GATE_EMISSIVE` 0.2.
   - 4 slots (segments cur−1 … cur+2), new ones fading in over 1 s.
 - **Pace phases** (`balloonPaceRef.phase`; paced = `gatesEnabledRef`). Exhale/inhale starts use a `DEADBAND` 0.05 turn from the last peak/trough.
   - `inhale`:

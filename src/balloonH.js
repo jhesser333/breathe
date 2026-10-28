@@ -14,9 +14,9 @@ export const KNOT_R = 0.1
 export const KNOT_H = 0.14
 export const EXHALE_SCALE = [0.18, 1.6, 0.18]
 
-// Course pieces: rounded slabs spanning the screen, like the airplane's bar.
-export const COURSE_W = 30
-export const WALL_H = 3          // full-height wall
+// Course pieces: rounded slabs like the airplane's bar. Each wall is as wide
+// as it is tall; the short barrier and door match a full wall's width.
+export const WALL_H = 3          // full-height wall (and its width)
 export const WALL_D = 2          // wall depth (z)
 export const WALL_STEP = 2.3     // wall front to next wall front
 export const WALL_HEIGHTS = [1, 1, 1, 0.75, 0.5, 0.25]   // × WALL_H, the staircase down
