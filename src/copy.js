@@ -70,4 +70,6 @@ export const TEXTS = {
   boxInhale:    'Inhale',
   boxHold:      'Hold',
   boxExhale:    'Exhale',
+  // Balloon (Shape H): the door closed because no exhale came after the bell.
+  balloonRetry: 'Try inhale again and exhale when the bell rings.',
 }

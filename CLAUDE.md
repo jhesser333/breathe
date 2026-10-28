@@ -171,6 +171,47 @@ Art Options card "Paper Airplane (in-progress)" (id `'g'`, after the balloon). P
   - **Timing:** `GatesG` = `GatesF`'s (Slowing Down/Paced: Exhale gate at −20, Inhale gate at `computeGateBZ`, `startOnInhale`, `breathPhaseRef`, `paceProgressRef`; pool 12), but each cycle spawns one interval further back (`LOOKAHEAD_Z` 20, same speed, so arrival times don't change; on enable the first cycle spawns at the usual spots plus one lookahead cycle). Gates are hidden beyond `VISIBLE_Z` −30, so at each crossing the next two are already visible. `GatesBoxBreathingG` = `GatesBoxBreathingF`'s series (`BOX_COUNTS` per phase, `onFirstGate`/`onLastGate`, `boxProgressRef`; pool 28), but a last gate crossing spawns the series *after next* (same type) one series length further back (−18 … −24), and on enable both the Inhale series (−6) and the Exhale series after it spawn; `startSeriesClock` drives `boxProgressRef` for the series arriving next.
 - **Flow:** no count or background yet. It's in `isAmbientArt` (App.jsx, with D and E) for ambient copy and the paced hand-off. No 5-breath count, so Tutorial Part 2 (waits for 10 counted breaths) doesn't advance with this art, and Own Pace's count captions don't show.
 
+## Shape Option H — Balloon (in-progress, `MorphH.jsx`, `BalloonCourseH.jsx`, `balloonH.js`)
+Art Options card "Balloon (in-progress)" (id `'h'`, after the Paper Airplane). Camera = the airplane's (`CAMERA_BY_SHAPE.h` `[0, 7, 10]`, fov 50). Design: `Concepts_Reference/10_28_26_BalloonStoryboard_a.png` and `10_28_26_BalloonStates_a.png`. Unlike every other art, nothing scrolls on a clock. The course stands still while the user inhales, and it moves toward the camera only once the app sees the user start to exhale through an open door: one `SEGMENT_LEN` (17) per exhale, arriving in the pace's exhale time.
+- **Balloon (`MorphH`):** gray-box sphere, radius `BALLOON_R` 0.7 (diameter = the airplane's wingspan), with a small cone knot under it. Pivot at the sphere's center. Breath (eased `breathRef`) drives:
+  - Scale, in the balloon's own axes: `EXHALE_SCALE` [0.18, 1.6, 0.18] (tall and thin, the start state) → [1, 1, 1] (round).
+  - Height: `restY` → `flightY`.
+  - Phone side tilt moves it like the airplane.
+- **Overrides** (`balloonStateRef`, written by the course):
+  - `'travel'`: tips 90° (top toward −Z) and holds the height it left at until the last 20% of the exhale (`DROP_START`), then drops and turns upright. It stays tipped until the course is `TIP_HOLD_P` 0.85 along.
+  - `'deflate'`: back to full Exhale over ~0.6 s, ignoring the controls.
+  - `bounceStart`: forward to the door/wall face, squashed flat, sprung back (~1.15 s).
+  - MorphH writes `planePosRef` and `balloonStateRef.bottom`.
+- **Heights (`balloonLimits`):**
+  - The rest bottom sits where the plane's bottom sits at full Inhale.
+  - The ground is under the short barrier (`SHORT_H` 0.2); walls are `WALL_H` 3 tall.
+  - `flightY` = the airplane's `topY`, or just high enough to clear the walls.
+  - The door reaches `DOOR_CLEAR` above the balloon's top at flight height.
+- **Segment** (from its start, the short barrier under the balloon):
+  - A door (live primary base) standing on the first wall's front edge, pivoting on its back-bottom edge.
+  - Walls `WALL_HEIGHTS` [1, 1, 1, 0.75, 0.5, 0.25] × `WALL_H`, every `WALL_STEP` 2.3.
+  - Rings (the airplane's ring look, judging and burst) at `flightY` over walls 1–5, all on one random side (`RING_SIDE_FRAC` 0.58 × spanX).
+  - Barriers are the airplane bar material at a flat `GATE_EMISSIVE` 0.2, with no reactions.
+  - 4 slots (segments cur−1 … cur+2), new ones fading in over 1 s.
+- **Pace phases** (`balloonPaceRef.phase`; paced = `gatesEnabledRef`). Exhale/inhale starts use a `DEADBAND` 0.05 turn from the last peak/trough.
+  - `inhale`:
+    - Paced: lasts the inhale time (Inhale bell), and an exhale bumps the balloon into the door/wall.
+    - Before the pace (free travel: Tutorial Part 2, Own Pace, Slowing Down's recording): no limit, no bells. Any exhale starts a `FREE_EXHALE_S` 6 s trip if the balloon's bottom clears the wall top; otherwise it bumps the wall.
+  - `hold-in` (Box): the door pulses on each of the 4 counts.
+  - `door-open`: Exhale bell, the door swings down over 0.5 s.
+    - An exhale within `DOOR_WINDOW_S` 1 s starts the trip if the balloon clears the wall. Otherwise it bumps the wall and it's a miss.
+    - No exhale is a miss.
+  - `retry`: door closed, balloon deflating, and `TEXTS.balloonRetry` fades in.
+    - After `DEFLATE_MIN_S` 1.2 s with the controls at full exhale, the balloon follows them again.
+    - The next inhale start hides the text.
+    - Full inhale reopens the door with a new Exhale bell (`bellSeq`).
+  - `exhale`: the trip, at a trapezoid speed (`TRAVEL_RAMP` 0.15 ease in/out).
+  - `hold-out` (Box): the short barrier under the balloon pulses on each count.
+- **App wiring:** `balloonPhaseNow()` makes `getBellPhase` (Exhale key `exhale:<bellSeq>`; `PaceAudioDriver` strips the suffix), `getLabelPhase`, `getHoldPhase` and `getQuietRate` follow the course instead of the box/slowing clocks.
+  - Box captions for `'h'` are plain Inhale/Hold/Exhale/Hold text following the phases for `BALLOON_CAPTION_CYCLES` 4 box cycles, with no timed fades.
+  - The course is mounted under `showBackgroundArt` (Tutorial Part 1 shows only the balloon) and there are no Gates components.
+  - In `isAmbientArt`: no 5-breath count, so Tutorial Part 2 doesn't advance with this art (as with the airplane).
+
 ## Shape D pace rings (PaceRingsD.jsx) — Box Breathing + Slowing Down
 **Ring particles (`RingParticlesD.jsx`)** are hard-edged dots: full alpha right up to the dot's edge (no soft falloff), still with twinkle. Sparkle birth size runs `uSize` 200 up to 268 (`SPARKLE_MAX_SIZE_MULT` 0.67 of the old 400 max, via `uSizeSpread`).
 Shared hook `usePaceRings` drives three ring types, identical in both modes: **Pulse/Hold ring** (inner, `PULSE_RING_TUBE`), **Pulse/Hold Exhale ring** (outer, half the inner tube, Y-fade shader with its fade band at half height, sits at the count rings' max X scale), and **count rings** (quarter of the inner tube, X-scaling, Y-fade shader whose fade band animates with X position — full size at the inner ring, the Exhale ring's half-height band at the outer ring).
@@ -405,6 +446,9 @@ src/
   GatesG.jsx                — Shape G, Slowing Down/Paced: ring targets (+ bar on Exhale gates) on GatesF's timing, judged against the plane
   GatesBoxBreathingG.jsx    — Shape G, Box Breathing: ring targets (+ bar) on GatesBoxBreathingF's series timing, one side per series
   GroundTiesG.jsx           — Shape G, every mode: tie lines on the ground plane (groundY), scrolling with the gates
+  MorphH.jsx                — Shape H (Balloon): gray-box balloon, breath inflates/raises it, side tilt, travel/deflate/bounce overrides from balloonStateRef
+  BalloonCourseH.jsx        — Shape H: walls, door and rings, plus the user-gated pace state machine (balloonPaceRef) that the bells/labels/captions follow
+  balloonH.js               — Shape H: shared sizes, segment layout and balloonLimits
   GatesF.jsx                — Shape F, Slowing Down/Paced: cloud gates on GatesB's timing (no ties)
   GatesBoxBreathingF.jsx    — Shape F, Box Breathing: cloud gates on GatesBoxBreathingB's series timing
   LandscapeF.jsx            — Shape F only: copy of LandscapeB (identical behavior), currently not mounted

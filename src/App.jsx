@@ -9,6 +9,8 @@ import MorphC from './MorphC'
 import MorphE from './MorphE'
 import MorphF from './MorphF'
 import MorphG from './MorphG'
+import MorphH from './MorphH'
+import BalloonCourseH from './BalloonCourseH'
 import GatesF from './GatesF'
 import GatesBoxBreathingF from './GatesBoxBreathingF'
 import GatesG from './GatesG'
@@ -129,6 +131,7 @@ const CAMERA_BY_SHAPE = {
   e: { position: [0, 0, 5], rotation: [0, 0, 0], fov: 50 },
   f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 135 },  // Sphere Morph's (d) placement, wider fov
   g: { position: [0, 7, 10], fov: 50 },   // the cube's (b) look-at-origin angle, twice as far back
+  h: { position: [0, 7, 10], fov: 50 },   // the Paper Airplane's camera
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
@@ -138,7 +141,7 @@ const usesCubeFlow = (shape) => shape === 'b' || shape === 'f'
 // Shapes on the D/E paced hand-off (gates with startOnInhale, no count
 // counted from the pace) and their ambient copy. The Paper Airplane (g) has
 // cloud obstacles but no count, so it follows this flow.
-const isAmbientArt = (shape) => shape === 'd' || shape === 'e' || shape === 'g'
+const isAmbientArt = (shape) => shape === 'd' || shape === 'e' || shape === 'g' || shape === 'h'
 
 // Breath-count palette cycle (see MorphC.jsx / breathCyclePalettes.js):
 // MorphC decides WHEN to cycle (breath 1's inhale of a new group) and calls
@@ -269,13 +272,19 @@ function PaceAudioDriver({ audioRef, getPaceProgress, getBellPhase }) {
     if (phase === prevBellRef.current) return
     prevBellRef.current = phase
     if (phase === null) audioRef.current.stopBell()
-    else audioRef.current.playBell(phase === 'inhale' || phase === 'exhale' ? BELL_INHALE_EXHALE : BELL_HOLD,
-      phase === 'inhale' ? BELL_INHALE_GAIN : 1)
+    else {
+      const kind = phase.split(':')[0]   // 'exhale:3' = the Balloon's 3rd Exhale bell
+      audioRef.current.playBell(kind === 'inhale' || kind === 'exhale' ? BELL_INHALE_EXHALE : BELL_HOLD,
+        kind === 'inhale' ? BELL_INHALE_GAIN : 1)
+    }
   })
   return null
 }
 
 const PACED_CAPTION_BREATHS = 5
+// Balloon (h) Box Breathing captions: shown for this many box cycles.
+const BALLOON_CAPTION_CYCLES = 4
+const BALLOON_CAPTION_FADE_MS = 300
 const PACED_CAPTION_ALPHA = [1, 1, 1, 0.5, 0.15]   // per breath: last two fade out, like Box Breathing's ROUND_ALPHA
 
 export default function App() {
@@ -315,7 +324,7 @@ export default function App() {
     // Rotating Rings (e) is hidden from Art Options; move anyone who last
     // picked it to the default so they aren't stuck on a shape with no card.
     if (saved === 'e') saved = 'd'
-    return ['a', 'b', 'c', 'd', 'e', 'f', 'g'].includes(saved) ? saved : 'a'
+    return ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].includes(saved) ? saved : 'a'
   })
   // Control Options (sliderLayout key kept): 'diagonal' = Double Sliders,
   // 'single' / 'touch' / 'tilt' / 'blow' drive the Diagonal sliders' thumbs
@@ -391,6 +400,13 @@ export default function App() {
   // Blow on the Mic: 1 while the mic hears a blow (useBreathControl), read by
   // the Paper Airplane to glow brighter.
   const blowRef = useRef(0)
+  // Balloon (h): BalloonCourseH's overrides for MorphH (mode 'follow' /
+  // 'travel' / 'deflate', trip progress, bounce time; MorphH writes bottom)
+  // and its user-gated pace (phase, bellSeq, inhaleDur, paced) for the bells,
+  // labels and captions.
+  const balloonStateRef = useRef({ mode: 'follow', travelP: 0, bounceStart: -Infinity, bottom: 0 })
+  const balloonPaceRef = useRef({ paced: false, phase: null, bellSeq: 0, inhaleDur: 1 })
+  const balloonCaptionRef = useRef({ phase: null, cycles: 0 })
   shapeRef.current = shapeOption
 
   const lastMoveTime = useRef(0)
@@ -837,26 +853,43 @@ export default function App() {
     return breathPhaseRef.current === 'inhale' || breathPhaseRef.current === 'exhale' ? breathPhaseRef.current : null
   }, [])
 
+  // Balloon (h): its course owns the pace (the user's exhale starts each
+  // trip), so the bells/labels/holds follow its phase instead of the clocks.
+  const balloonPhaseNow = useCallback(() => {
+    if (shapeRef.current !== 'h') return undefined
+    const p = balloonPaceRef.current
+    return p.paced ? p.phase : null
+  }, [])
+
   const getLabelPhase = useCallback(() => {
+    const bp = balloonPhaseNow()
+    if (bp !== undefined && mode !== 'basic') {
+      if (bp === null) return null
+      return bp === 'inhale' || bp === 'hold-in' || bp === 'retry' ? 'inhale' : 'exhale'
+    }
     if (mode === 'box') {
       const p = boxPhaseNow()
       return p === null ? null : p.index < 2 ? 'inhale' : 'exhale'
     }
     if (mode === 'slowing' || mode === 'tutorial') return slowingPhaseNow()
     return null
-  }, [mode, boxPhaseNow, slowingPhaseNow])
+  }, [mode, boxPhaseNow, slowingPhaseNow, balloonPhaseNow])
 
   // Box Breathing's "hold" slider labels: 'in' during Hold-in, 'out' during Hold-out.
   const getHoldPhase = useCallback(() => {
     if (mode !== 'box') return null
+    const bp = balloonPhaseNow()
+    if (bp !== undefined) return bp === 'hold-in' ? 'in' : bp === 'hold-out' ? 'out' : null
     const p = boxPhaseNow()
     return p === null ? null : p.index === 1 ? 'in' : p.index === 3 ? 'out' : null
-  }, [mode, boxPhaseNow])
+  }, [mode, boxPhaseNow, balloonPhaseNow])
 
   // Blow on the Mic: how fast quiet rises (v/s). Once a pace runs, quiet
   // rises at the pace's inhale speed (holding is the user's touch, not
   // automatic). null = no pace yet.
   const getQuietRate = useCallback(() => {
+    const bp = balloonPhaseNow()
+    if (bp !== undefined && mode !== 'basic') return bp === null ? null : 1 / Math.max(0.05, balloonPaceRef.current.inhaleDur)
     if (mode === 'box') {
       if (boxPhaseNow() === null) return null
       return 1 / Math.max(0.05, spawnIntervalRef.current)
@@ -867,7 +900,7 @@ export default function App() {
       return 1 / Math.max(0.05, inhaleDuration)
     }
     return null
-  }, [mode, boxPhaseNow, slowingPhaseNow])
+  }, [mode, boxPhaseNow, slowingPhaseNow, balloonPhaseNow])
 
   // Which paced phase's bell should be ringing: Box 'inhale'/'hold'/'exhale'/
   // 'hold-out' from the caption clock; Slowing Down 'inhale'/'exhale', from the
@@ -875,6 +908,15 @@ export default function App() {
   // captions do). null = no bells.
   const bellSawInhaleRef = useRef(false)
   const getBellPhase = useCallback(() => {
+    const bp = balloonPhaseNow()
+    if (bp !== undefined && mode !== 'basic') {
+      // The Exhale bell's key carries its count, so a retry rings it again.
+      if (bp === null) return null
+      if (bp === 'inhale') return 'inhale'
+      if (bp === 'hold-in') return 'hold'
+      if (bp === 'hold-out') return 'hold-out'
+      return `exhale:${balloonPaceRef.current.bellSeq}`
+    }
     if (mode === 'box') {
       const p = boxPhaseNow()
       return p === null ? null : ['inhale', 'hold', 'exhale', 'hold-out'][p.index]
@@ -886,7 +928,7 @@ export default function App() {
       return bellSawInhaleRef.current ? phase : null
     }
     return null
-  }, [mode, boxPhaseNow, slowingPhaseNow])
+  }, [mode, boxPhaseNow, slowingPhaseNow, balloonPhaseNow])
 
   // Paced audio pair: 0 exhale -> 1 inhale following the app's paced breath
   // (Box: eased over Inhale/Exhale, held through the Holds; Slowing Down:
@@ -894,6 +936,7 @@ export default function App() {
   const paceAudioPhaseRef = useRef({ phase: null, start: 0 })
   const getPaceProgress = useCallback(() => {
     if (PACE_AUDIO_FROM_RIGHT_SLIDER) return THREE.MathUtils.smoothstep(1 - rightVal.current, 0, 1)
+    if (balloonPhaseNow() !== undefined) return null   // Balloon: no paced pair (it's off anyway)
     if (mode === 'box') {
       const p = boxPhaseNow()
       if (p === null) return null
@@ -912,7 +955,7 @@ export default function App() {
       return phase === 'inhale' ? e : 1 - e
     }
     return null
-  }, [mode, boxPhaseNow, slowingPhaseNow])
+  }, [mode, boxPhaseNow, slowingPhaseNow, balloonPhaseNow])
 
   // Fade the current text out (or wait for a fade-out already running),
   // then swap in `text` and fade it in -- the words never change while visible.
@@ -952,6 +995,13 @@ export default function App() {
     tutorialVisibleRef.current = false
     textFadeOutEndRef.current = performance.now() + COUNT_FADE_MS
   }, [])
+
+  // Balloon (h): the door closed on a missed exhale -- "Try inhale again..."
+  // fades in, and out as the user starts the next inhale.
+  const handleBalloonRetryText = useCallback((on) => {
+    if (on) fadeToText(TEXTS.balloonRetry)
+    else if (currentMainTextRef.current === TEXTS.balloonRetry) hideCountText()
+  }, [fadeToText, hideCountText])
 
   // ---- Guided Breathing: Tutorial mode ----
   const tutorialLater = useCallback((fn, ms) => {
@@ -1527,10 +1577,33 @@ export default function App() {
       // checking only that would hide the intro text within one tick.
       if (!boxCaptionsStartedRef.current) return
       if (!bbTutorialActiveRef.current) {
-        if (tutorialVisibleRef.current) {
+        if (tutorialVisibleRef.current && currentMainTextRef.current !== TEXTS.balloonRetry) {
           setTutorialVisible(false)
           tutorialVisibleRef.current = false
         }
+        return
+      }
+      // Balloon (h): its course sets the pace, so the captions follow its
+      // phases as plain text (no timed fades): Inhale, Hold, Exhale, Hold,
+      // for BALLOON_CAPTION_CYCLES box cycles.
+      if (shapeRef.current === 'h') {
+        const bp = balloonPaceRef.current.phase
+        const cap = balloonCaptionRef.current
+        if (bp === cap.phase) return
+        if (bp === 'retry') { cap.phase = bp; return }   // the retry text shows instead
+        if (bp === 'inhale' && cap.phase === 'hold-out' && ++cap.cycles >= BALLOON_CAPTION_CYCLES) {
+          bbTutorialActiveRef.current = false
+          return
+        }
+        cap.phase = bp
+        const nextText = bp === 'hold-in' || bp === 'hold-out' ? TEXTS.boxHold
+          : bp === 'door-open' || bp === 'exhale' ? TEXTS.boxExhale : TEXTS.boxInhale
+        if (nextText === currentMainTextRef.current && tutorialVisibleRef.current) return
+        currentMainTextRef.current = nextText
+        setTutorialFadeMs(BALLOON_CAPTION_FADE_MS)
+        setTutorialText(nextText)
+        setTutorialVisible(true)
+        tutorialVisibleRef.current = true
         return
       }
       const interval = Math.max(0.05, spawnIntervalRef.current)
@@ -1667,7 +1740,7 @@ export default function App() {
     // Tilt Your Phone: ask for motion access inside this tap (iOS).
     if (sliderLayout === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
     // Paper Airplane steers by side tilt: ask for motion access in this tap too.
-    if (shapeRef.current === 'g' && sliderLayout !== 'tilt') requestTiltPermission()
+    if ((shapeRef.current === 'g' || shapeRef.current === 'h') && sliderLayout !== 'tilt') requestTiltPermission()
     audioRef.current.unlock()
     audioRef.current.start(0)
     // Blow on the Mic: open the mic inside this tap, after the app's sound has
@@ -1686,6 +1759,9 @@ export default function App() {
     bbCycleRef.current = 0
     bbTutorialActiveRef.current = false
     boxCaptionsStartedRef.current = false
+    balloonStateRef.current = { mode: 'follow', travelP: 0, bounceStart: -Infinity, bottom: 0 }
+    balloonPaceRef.current = { paced: false, phase: null, bellSeq: 0, inhaleDur: 1 }
+    balloonCaptionRef.current = { phase: null, cycles: 0 }
     pacedWaitForBottomRef.current = false
     pacedCueStageRef.current = 'off'
     pacedBreathNumRef.current = 0
@@ -1917,7 +1993,7 @@ export default function App() {
         shapeOption={shapeOption}
         onSelectShape={(v) => {
           setShapeOption(v)
-          if (v === 'g') requestTiltPermission()
+          if (v === 'g' || v === 'h') requestTiltPermission()
         }}
         onSelectMode={() => setScreen('selectMode')}
         onStart={() => handleSelectMode(selectedMode)}
@@ -1952,7 +2028,7 @@ export default function App() {
   const tutorialScreenRegion = usesScreens(mode) && tutorialAtTop
     ? { top: MODE_CAPTION_TOP + modeLabelLines * MODE_CAPTION_LINE_PX, bottom: continueBottom + continueHeight }
     : null
-  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : shapeOption === 'g' ? MorphG : MorphA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : shapeOption === 'g' ? MorphG : shapeOption === 'h' ? MorphH : MorphA
   const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'g' ? GatesG : shapeOption === 'e' ? GatesHeadlessE : GatesA
   const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'g' ? GatesBoxBreathingG : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
@@ -1970,8 +2046,14 @@ export default function App() {
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} getBellPhase={getBellPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
-        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} blowRef={blowRef} />
+        <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} blowRef={blowRef} balloonStateRef={balloonStateRef} />
         {showBackgroundArt && shapeOption === 'b' && <LandscapeB mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
+        {showBackgroundArt && shapeOption === 'h' && (
+          <BalloonCourseH leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} isBox={mode === 'box'} spawnIntervalRef={spawnIntervalRef}
+            inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} breathPhaseRef={breathPhaseRef}
+            balloonStateRef={balloonStateRef} balloonPaceRef={balloonPaceRef} planePosRef={planePosRef}
+            palette={palette} livePaletteRef={livePaletteRef} onRetryText={handleBalloonRetryText} />
+        )}
         {showBackgroundArt && shapeOption === 'g' && <GroundTiesG mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && backgroundOption === 'rings' && <BackgroundRingsD baseColor={palette.background} emissiveColor={palette.secondaryColor} breathPhaseRef={breathPhaseRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef} inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} paceProgressRef={ringPaceProgressRef} livePaletteRef={livePaletteRef} />}
@@ -1983,7 +2065,7 @@ export default function App() {
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
-        {hasGates && mode !== 'box' && (
+        {hasGates && mode !== 'box' && shapeOption !== 'h' && (
           <GatesComponent
             palette={palette}
             rightVal={rightVal}
@@ -2000,7 +2082,7 @@ export default function App() {
             startOnInhale={mode === 'slowing' || mode === 'tutorial'}
           />
         )}
-        {mode === 'box' && hasGates && (
+        {mode === 'box' && hasGates && shapeOption !== 'h' && (
           <BoxGatesComponent
             palette={palette}
             rightVal={rightVal}
@@ -2087,16 +2169,16 @@ export default function App() {
         )}
         <TutorialText region={tutorialScreenRegion} topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           size={tutorialAtTop ? TEXT_SIZE_INTRO
-            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION
+            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale || tutorialText === TEXTS.boxHold) ? TEXT_SIZE_CAPTION
             : TEXT_SIZE_TUTORIAL}
           liftPx={tutorialAtTop ? 0
-            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXT_SIZE_CAPTION * 1.2   // captions: 1 line up
+            : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale || tutorialText === TEXTS.boxHold) ? TEXT_SIZE_CAPTION * 1.2   // captions: 1 line up
             : TUTORIAL_TEXT_LIFT_PX}
-          subText={mode === 'box' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold
+          subText={mode === 'box' && shapeOption !== 'h' && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale) ? TEXTS.boxHold
             : usesScreens(mode) ? tutorialSub : null}
           subVisible={tutorialSubVisible} subFadeMs={tutorialSubFadeMs}
           subGapPx={usesScreens(mode) && tutorialText !== TEXTS.boxInhale && tutorialText !== TEXTS.boxExhale ? TUTORIAL_SUB_GAP_PX : 0}
-          pulseActive={(mode === 'box' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
+          pulseActive={(mode === 'box' && shapeOption !== 'h' && tutorialVisible && (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale))
             || (mode === 'slowing' && pacedCaptionsOn && tutorialVisible)}
           pulseMode={mode === 'slowing' ? 'paced' : 'box'}
           pulseCycleStartRef={boxClockStartRef} pulseIntervalRef={spawnIntervalRef} pacedCaptionRef={pacedCaptionRef}
