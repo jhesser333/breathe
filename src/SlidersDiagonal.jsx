@@ -38,7 +38,7 @@ const holdStyle = (key) => ({
   textShadow: 'var(--hold-label-glow, none)',
 })
 
-function DiagonalTrack({ sliderRef, value, side }) {
+function DiagonalTrack({ sliderRef, value, side, labelsOnly }) {
   const isLeft = side === 'left'
   const w = CURVE_BOX_W, h = CURVE_BOX_H
 
@@ -82,7 +82,7 @@ function DiagonalTrack({ sliderRef, value, side }) {
       </span>
       <div
         ref={sliderRef}
-        style={{ position: 'absolute', inset: 0, cursor: 'pointer', userSelect: 'none', touchAction: 'none' }}
+        style={{ position: 'absolute', inset: 0, cursor: 'pointer', userSelect: 'none', touchAction: 'none', visibility: labelsOnly ? 'hidden' : 'visible' }}
       >
         <svg
           width={w} height={h} viewBox={`0 0 ${w} ${h}`}
@@ -122,7 +122,8 @@ function DiagonalTrack({ sliderRef, value, side }) {
 
 // drivenValue (0 exhale -> 1 inhale, or null): another Control Option is
 // driving the breath, so the thumbs show it and the tracks ignore touches.
-export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null, drivenValue = null }) {
+// labelsOnly: hide the tracks and thumbs, keep the inhale/exhale/hold labels.
+export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null, drivenValue = null, labelsOnly = false }) {
   const driven = drivenValue !== null
   const drivenRef = useRef(driven)
   drivenRef.current = driven
@@ -141,8 +142,8 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawR
 
   return (
     <div style={{ position: 'absolute', inset: 0, transform: `translateY(-${shiftUp}px)` }}>
-      <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" />
-      <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" />
+      <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" labelsOnly={labelsOnly} />
+      <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" labelsOnly={labelsOnly} />
       <span style={{ ...labelStyle, color: 'var(--exhale-label-color, var(--live-tertiary-color, #276d8c))', opacity: 'var(--exhale-label-opacity, 0.5)', textShadow: 'var(--exhale-label-glow, none)', bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
         exhale
       </span>

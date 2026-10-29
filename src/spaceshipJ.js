@@ -31,6 +31,8 @@ export const FRONT_DOOR_CLEAR = 0.3  // door top above the ship's top at full he
 export const COLUMN_R = 0.12
 export const GLOW_COLUMN_SCALE = 1.15
 export const COLUMN_MARGIN = 0.15    // column's outer edge inside the screen edge
+export const COLUMN_HEIGHT_FRAC = 0.75   // columns: this much of floor -> past the screen's top
+export const FULL_HEIGHT_FRAC = 0.5     // full-inhale height: this much of floor -> midway up the balloon's range
 
 // Cube targets: rows along -Z in one of three lanes.
 export const LANE_X = [-1, 0, 1]
@@ -58,17 +60,20 @@ function hitZ0(camera, nx, ny) {
 // Heights and edges at z = 0 in world units:
 // hoverY (ship center after rising: the plane's full-Inhale spot, clear of
 // the sliders), floorTop, fullY (full inhale: midway between the balloon's
-// lowest and highest heights), columnX (column centers), columnTop.
+// lowest and highest heights, × FULL_HEIGHT_FRAC above the floor), columnX
+// (column centers), columnTop (COLUMN_HEIGHT_FRAC of the way to past the
+// screen's top). Pass the unshifted reference camera (SpaceshipBayJ).
 export function shipLimits(camera, size) {
   const { bottomY, topY } = planeLimits(camera, size)
   const hoverY = bottomY
   const floorTop = hoverY - THICKNESS / 2 - HOVER_GAP
   const { restY, flightY } = balloonLimits(camera, size)
-  const fullY = THREE.MathUtils.clamp((restY + flightY) / 2, hoverY + 0.3, Math.max(hoverY + 0.3, topY))
+  const midY = THREE.MathUtils.clamp((restY + flightY) / 2, hoverY + 0.3, Math.max(hoverY + 0.3, topY))
+  const fullY = Math.max(hoverY + 0.2, floorTop + FULL_HEIGHT_FRAC * (midY - floorTop))
   const edge = hitZ0(camera, 1, 0)
   const columnX = Math.max(WINGSPAN / 2 + COLUMN_R, (edge ? edge.x : 1.3) - COLUMN_R * GLOW_COLUMN_SCALE - COLUMN_MARGIN)
   const top = hitZ0(camera, 0, 1)
-  const columnTop = (top ? top.y : fullY + 3) + 1
+  const columnTop = floorTop + COLUMN_HEIGHT_FRAC * ((top ? top.y : midY + 3) + 1 - floorTop)
   return { hoverY, floorTop, fullY, columnX, columnTop }
 }
 

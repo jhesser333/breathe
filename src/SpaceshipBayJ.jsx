@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { useGateBurstB, missFactor, applyMissScale } from './gateReactionsB'
@@ -29,8 +29,15 @@ import {
 //                doesn't matter), steered by phone side tilt, judging each
 //                cube it passes. STOP_GRACE_S without a blow -> 'slowing'.
 //   'slowing' -- SLOW_FACTOR speed for SLOW_S; a blow goes back to 'flying'.
-//   'fading'  -- the ship fades out, the cubes fade out and the glowing
-//                columns sink; then a new course and the next 'inhale'.
+//   'exiting' -- the ship dives down and off the side the phone is tipped
+//                toward (random when it's level), the cubes fade out and the
+//                glowing columns sink. Once it's off the screen it pops out,
+//                and a new course and the next 'inhale' start.
+//
+// Screen placement: the layout is worked out on an unshifted copy of the
+// camera, then the real camera gets a lens shift (setViewOffset, no zoom)
+// that puts the floor's front edge FLOOR_SCREEN_PX above the screen's bottom,
+// just above Home/Restart.
 
 const DOOR_SLIDE_S = 0.6        // floor doors open/close
 const RISE_DELAY_S = 0.3        // the ship starts rising this long after the Inhale bell
@@ -41,11 +48,15 @@ const SHIP_SPEED = 2.5          // units/s
 const STOP_GRACE_S = 0.3        // blow-off this long counts as the exhale stopping
 const SLOW_S = 1
 const SLOW_FACTOR = 0.25
-const SHIP_FADE_S = 1
+const EXIT_DOWN_ACCEL = 5       // units/s² down while it flies off (sideways is in MorphJ)
+const EXIT_TILT_DEADZONE_DEG = 3 // phone roll under this = level: random exit side
+const EXIT_OFFSCREEN_NDC = 1.15  // pops out once past this far off the screen
+const EXIT_MAX_S = 4             // ...or after this long
+const FLOOR_SCREEN_PX = 80       // floor front edge above the screen's bottom
 const CUBE_FADE_S = 1
 const COLUMN_SINK_S = 0.6
 const SLIDER_BLOW_RATE = 0.08   // mic failed (Double Sliders): breath falling this fast (per s) = blowing
-const FLYING = { flying: true, slowing: true, fading: true }
+const FLYING = { flying: true, slowing: true, exiting: true }
 
 // One cube's state on the current course.
 const makeCube = ({ x, z }) => ({ x, z, judged: false, missElapsed: null })
@@ -63,8 +74,8 @@ export default function SpaceshipBayJ({
   const st = useRef(null)
   if (st.current === null) {
     st.current = {
-      phase: 'idle', start: 0, lastBlow: -Infinity, z: 0, seq: 0, doorOpen: 0, frontDoor: 1, columnH: 0,
-      courseFade: 0, courseFading: false, cubes: makeCourse().map(makeCube), prevV: null, fallRate: 0,
+      phase: 'idle', start: 0, lastBlow: -Infinity, z: 0, exitDir: 0, exitVy: 0, exitDrop: 0, seq: 0, doorOpen: 0, frontDoor: 1, columnH: 0,
+      courseFade: 0, cubes: makeCourse().map(makeCube), prevV: null, fallRate: 0,
     }
   }
   const refs = useRef({ panels: [], columns: [], glows: [], frontDoor: null, cubes: [] })
@@ -91,12 +102,37 @@ export default function SpaceshipBayJ({
 
   const gateBurst = useGateBurstB(palette.primaryColor)
 
+  // Unshifted copy of the camera for the layout, and the lens shift's cleanup.
+  const { camera } = useThree()
+  const refCam = useMemo(() => new THREE.PerspectiveCamera(), [])
+  const shiftRef = useRef(null)
+  useEffect(() => () => { camera.clearViewOffset(); camera.updateProjectionMatrix() }, [camera])
+  const _v = useMemo(() => new THREE.Vector3(), [])
+
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
     const dt = Math.min(delta, 0.05)
     const s = st.current
     const live = livePaletteRef && livePaletteRef.current
-    const limits = shipLimits(state.camera, state.size)
+    const cam = state.camera
+    const { width: W, height: H } = state.size
+    refCam.fov = cam.fov
+    refCam.aspect = W / H
+    refCam.near = cam.near
+    refCam.far = cam.far
+    refCam.position.copy(cam.position)
+    refCam.quaternion.copy(cam.quaternion)
+    refCam.updateProjectionMatrix()
+    refCam.updateMatrixWorld()
+    const limits = shipLimits(refCam, state.size)
+    // Lens shift: drop the scene so the floor's front edge sits FLOOR_SCREEN_PX up.
+    _v.set(0, limits.floorTop, PANEL_D / 2).project(refCam)
+    const shift = (_v.y + 1) / 2 * H - FLOOR_SCREEN_PX
+    if (shiftRef.current === null || Math.abs(shift - shiftRef.current) > 0.5) {
+      shiftRef.current = shift
+      cam.setViewOffset(W, H, 0, -shift, W, H)
+      cam.updateProjectionMatrix()
+    }
     const paced = !!gatesEnabledRef.current
     const { inhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
     const inhaleDur = Math.max(0.05, inhaleDuration)
@@ -113,6 +149,15 @@ export default function SpaceshipBayJ({
       setPhase('inhale')
       s.seq++
       s.z = 0
+      s.exitDir = 0
+    }
+    // Exit side: the way the phone is tipped, or random when it's level.
+    const startExit = () => {
+      setPhase('exiting')
+      const gamma = shipStateRef.current.gamma
+      s.exitDir = gamma == null || Math.abs(gamma) < EXIT_TILT_DEADZONE_DEG ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(gamma)
+      s.exitVy = 0
+      s.exitDrop = 0
     }
 
     if (s.phase === 'idle' && paced) startInhale()
@@ -128,21 +173,30 @@ export default function SpaceshipBayJ({
       case 'flying':
         s.z -= SHIP_SPEED * dt
         if (now - s.lastBlow > STOP_GRACE_S) setPhase('slowing')
-        if (s.z <= COURSE_END_Z) setPhase('fading')
+        if (s.z <= COURSE_END_Z) startExit()
         break
       case 'slowing':
         s.z -= SHIP_SPEED * SLOW_FACTOR * dt
         if (blowing) setPhase('flying')
-        else if (elapsed >= SLOW_S || s.z <= COURSE_END_Z) setPhase('fading')
+        else if (elapsed >= SLOW_S || s.z <= COURSE_END_Z) startExit()
         break
-      case 'fading':
+      case 'exiting': {
         s.z -= SHIP_SPEED * SLOW_FACTOR * dt
-        if (elapsed >= SHIP_FADE_S) {
+        s.exitVy += EXIT_DOWN_ACCEL * dt
+        s.exitDrop += s.exitVy * dt
+        const pos = planePosRef?.current
+        let off = elapsed >= EXIT_MAX_S
+        if (pos && !off) {
+          _v.set(pos.x, pos.y, pos.z ?? s.z).project(cam)
+          off = Math.abs(_v.x) > EXIT_OFFSCREEN_NDC || _v.y < -EXIT_OFFSCREEN_NDC
+        }
+        if (off) {
           s.cubes = makeCourse().map(makeCube)
           s.courseFade = 0
           startInhale()
         }
         break
+      }
       default:
     }
     const pe = now - s.start   // elapsed in the (possibly new) phase
@@ -153,6 +207,7 @@ export default function SpaceshipBayJ({
     ship.seq = s.seq
     ship.z = s.z
     ship.steer = !!FLYING[s.phase]
+    ship.exitDir = s.phase === 'exiting' ? s.exitDir : 0
     if (s.phase === 'idle') {
       Object.assign(ship, { y: belowY, alpha: 0, rev: 0, rock: 0, emit: 0 })
     } else if (s.phase === 'inhale') {
@@ -164,8 +219,8 @@ export default function SpaceshipBayJ({
     } else if (s.phase === 'ready') {
       Object.assign(ship, { y: limits.fullY, alpha: 1, rev: 1, rock: 1, emit: 1 })
     } else {
-      const fade = s.phase === 'fading' ? 1 - THREE.MathUtils.smoothstep(pe / SHIP_FADE_S, 0, 1) : 1
-      Object.assign(ship, { y: limits.fullY, alpha: fade, rev: 1, rock: 0, emit: (s.phase === 'flying' ? 1 : 0.4) * fade })
+      const drop = s.phase === 'exiting' ? s.exitDrop : 0
+      Object.assign(ship, { y: limits.fullY - drop, alpha: 1, rev: 1, rock: 0, emit: s.phase === 'flying' ? 1 : 0.4 })
     }
 
     // Floor doors: apart while the ship rises, closed under it after.
@@ -183,7 +238,7 @@ export default function SpaceshipBayJ({
     const colH = limits.columnTop - limits.floorTop
     if (s.phase === 'inhale') s.columnH = THREE.MathUtils.clamp(pe / inhaleDur, 0, 1)
     else if (s.phase === 'idle') s.columnH = 0
-    else if (s.phase === 'fading') s.columnH = approach(s.columnH, 0, COLUMN_SINK_S, dt)
+    else if (s.phase === 'exiting') s.columnH = approach(s.columnH, 0, COLUMN_SINK_S, dt)
     else s.columnH = 1
     for (let n = 0; n < 2; n++) {
       const x = (n === 0 ? -1 : 1) * limits.columnX
@@ -218,7 +273,7 @@ export default function SpaceshipBayJ({
     if (live) { mats.column.color.copy(live.tertiary); mats.glow.color.copy(live.tertiary); mats.glow.emissive.copy(live.tertiary) }
 
     // Cube targets: fade out with the ship, fade in with a new course.
-    s.courseFade = s.phase === 'fading'
+    s.courseFade = s.phase === 'exiting'
       ? Math.min(s.courseFade, 1 - THREE.MathUtils.smoothstep(pe / CUBE_FADE_S, 0, 1))
       : approach(s.courseFade, 1, CUBE_FADE_S, dt)
     const courseFade = THREE.MathUtils.smoothstep(s.courseFade, 0, 1)

@@ -7,8 +7,10 @@ import { WINGSPAN, THICKNESS, LENGTH, ENGINE_R, ENGINE_LEN, ENGINE_X, SIDE_TILT_
 // writes shipStateRef each frame: { y, z, alpha, rev 0-1, rock 0-1, steer,
 // emit 0-1, seq }. This draws it there: rev brightens the engines, rock sets
 // how much it rocks side to side, emit sets the engine particle rate, steer
-// lets phone side tilt move it left/right (only while it flies). Its
-// rendered position goes to planePosRef for the cube targets' hit checks.
+// lets phone side tilt move it left/right (only while it flies), exitDir
+// (-1/1, 0 = none) sends it accelerating off that side. Its rendered position
+// goes to planePosRef for the cube targets' hit checks, and the live phone
+// roll to shipStateRef.gamma (null = no reading) for choosing the exit side.
 
 const BODY_EMISSIVE = 0.3
 const ENGINE_EMISSIVE_MAX = 3
@@ -17,6 +19,7 @@ const SIDE_TIME = 1.5           // seconds to (mostly) reach a new side position
 const BANK_MAX = 0.6            // radians at BANK_FULL_SPEED sideways
 const BANK_FULL_SPEED = 3
 const BANK_SMOOTH_S = 0.15
+const EXIT_SIDE_ACCEL = 5      // units/s² sideways while it flies off
 
 // Rocking while it revs up: random-sized swings, scaled by rock.
 const ROCK_MAX = 0.12
@@ -142,8 +145,8 @@ export default function MorphJ({ palette, shipStateRef, planePosRef, livePalette
   }, [palette])
   useEffect(() => () => { particles.geometry.dispose(); particles.material.dispose() }, [particles])
 
-  const st = useRef({ x: 0, vx: { v: 0 }, bank: 0, seq: -1 })
-  const gammaRef = useRef(0)
+  const st = useRef({ x: 0, vx: { v: 0 }, bank: 0, seq: -1, exitV: 0 })
+  const gammaRef = useRef(null)
   const rock = useMemo(() => makeDrifter(ROCK_MAX * 0.5, ROCK_MAX, ROCK_TIME_MIN, ROCK_TIME_MAX), [])
 
   // Side tilt (motion access is asked for in the card tap and Start/Restart).
@@ -163,9 +166,18 @@ export default function MorphJ({ palette, shipStateRef, planePosRef, livePalette
     const g = groupRef.current
     if (!g) return
 
-    if (ship.seq !== s.seq) { s.seq = ship.seq; s.x = 0; s.vx.v = 0; s.bank = 0 }
-    const tx = ship.steer ? THREE.MathUtils.clamp(gammaRef.current / SIDE_TILT_FULL_DEG, -1, 1) * SIDE_RANGE : 0
-    s.x = smoothDamp(s.x, tx, s.vx, SIDE_TIME, dt)
+    if (ship.seq !== s.seq) { s.seq = ship.seq; s.x = 0; s.vx.v = 0; s.bank = 0; s.exitV = 0 }
+    ship.gamma = gammaRef.current
+    if (ship.exitDir) {
+      // Flying off: accelerate toward that side (the bank follows the velocity).
+      s.exitV += ship.exitDir * EXIT_SIDE_ACCEL * dt
+      s.vx.v = s.exitV
+      s.x += s.exitV * dt
+    } else {
+      const tx = ship.steer ? THREE.MathUtils.clamp((gammaRef.current ?? 0) / SIDE_TILT_FULL_DEG, -1, 1) * SIDE_RANGE : 0
+      s.x = smoothDamp(s.x, tx, s.vx, SIDE_TIME, dt)
+      s.exitV = s.vx.v
+    }
     const bankTarget = -BANK_MAX * THREE.MathUtils.clamp(s.vx.v / BANK_FULL_SPEED, -1, 1)
     s.bank += (bankTarget - s.bank) * (1 - Math.exp(-dt / BANK_SMOOTH_S))
 

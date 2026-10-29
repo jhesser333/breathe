@@ -2227,7 +2227,7 @@ export default function App() {
           opacity: sceneRevealed ? 1 : 0, transition: `opacity ${SCENE_REVEAL_MS}ms ease`,
         }}>
           {isDiagonal
-            ? <SlidersDiagonal key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} drivenValue={drivenBreath} />
+            ? <SlidersDiagonal key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} drivenValue={drivenBreath} labelsOnly={shapeOption === 'j' && breathControl === 'blow'} />
             : <Sliders key={sliderResetKey} onLeft={setLeft} onRight={setRight} leftRawRef={leftRawRef} rightRawRef={rightRawRef} shiftUp={sliderShiftUp} disabledRef={slidersDisabledRef} />}
         </div>
         <div style={{ position: 'absolute', top: MODE_CAPTION_TOP, left: '50%', transform: 'translateX(-50%)' }}>
