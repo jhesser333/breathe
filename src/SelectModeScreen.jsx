@@ -41,7 +41,10 @@ function modeBtnStyle(selected, palette) {
   }
 }
 
-export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange, onAnyTap }) {
+// Space Ship (j) runs only in the Tutorial for now.
+const SPACE_SHIP_MODES = ['tutorial']
+
+export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayouts, palette, selectedMode, onSelectModeChange, onAnyTap, shapeOption }) {
   return (
     <div onPointerDown={onAnyTap} style={{
       position: 'fixed', inset: 0,
@@ -82,16 +85,19 @@ export default function SelectModeScreen({ onStart, onPersonalize, onSliderLayou
           MODES
         </h2>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          {OPTIONS.map(opt => (
-            <button
-              key={opt.id}
-              onClick={() => onSelectModeChange(opt.id)}
-              style={modeBtnStyle(selectedMode === opt.id, palette)}
-            >
-              <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{opt.desc}</div>
-            </button>
-          ))}
+          {OPTIONS.map(opt => {
+            const blocked = shapeOption === 'j' && !SPACE_SHIP_MODES.includes(opt.id)
+            return (
+              <button
+                key={opt.id}
+                onClick={blocked ? undefined : () => onSelectModeChange(opt.id)}
+                style={{ ...modeBtnStyle(selectedMode === opt.id, palette), ...(blocked ? { opacity: 0.4, cursor: 'default' } : null) }}
+              >
+                <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selectedMode === opt.id && '✓'}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>{blocked ? 'Not available with Space Ship yet.' : opt.desc}</div>
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

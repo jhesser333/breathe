@@ -11,6 +11,8 @@ import MorphF from './MorphF'
 import MorphG from './MorphG'
 import MorphH from './MorphH'
 import BalloonCourseH from './BalloonCourseH'
+import MorphJ from './MorphJ'
+import SpaceshipBayJ from './SpaceshipBayJ'
 import GatesF from './GatesF'
 import GatesBoxBreathingF from './GatesBoxBreathingF'
 import GatesG from './GatesG'
@@ -134,6 +136,7 @@ const CAMERA_BY_SHAPE = {
   f: { position: [0, 0, 12], rotation: [0, 0, 0], fov: 135 },  // Sphere Morph's (d) placement, wider fov
   g: { position: [0, 7, 10], fov: 50 },   // the cube's (b) look-at-origin angle, twice as far back
   h: { position: [0, 7, 10], fov: 50 },   // the Paper Airplane's camera
+  j: { position: [0, 3.5, 5], fov: 50 },  // the Morphing Cube's camera
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
@@ -144,7 +147,7 @@ const usesCubeFlow = (shape) => shape === 'b' || shape === 'f'
 // counted from the pace) and their ambient copy. The Paper Airplane (g) has
 // cloud obstacles but no count, so it follows this flow.
 // Input Test (i) has no art at all, so it takes the no-targets paths too.
-const isAmbientArt = (shape) => shape === 'd' || shape === 'e' || shape === 'g' || shape === 'h' || shape === 'i'
+const isAmbientArt = (shape) => shape === 'd' || shape === 'e' || shape === 'g' || shape === 'h' || shape === 'i' || shape === 'j'
 
 // Breath-count palette cycle (see MorphC.jsx / breathCyclePalettes.js):
 // MorphC decides WHEN to cycle (breath 1's inhale of a new group) and calls
@@ -327,7 +330,9 @@ export default function App() {
     // Rotating Rings (e) is hidden from Art Options; move anyone who last
     // picked it to the default so they aren't stuck on a shape with no card.
     if (saved === 'e') saved = 'd'
-    return ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].includes(saved) ? saved : 'a'
+    // Space Ship (j) only works with Blow on the Mic.
+    if (saved === 'j' && localStorage.getItem('sliderLayout') !== 'blow') saved = 'd'
+    return ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].includes(saved) ? saved : 'a'
   })
   // Control Options (sliderLayout key kept): 'diagonal' = Double Sliders,
   // 'single' / 'touch' / 'tilt' / 'blow' drive the Diagonal sliders' thumbs
@@ -351,6 +356,8 @@ export default function App() {
   const [selectedMode, setSelectedModeState] = useState(() => {
     // Own Pace ('basic') is hidden from the picker: move anyone on it to Tutorial.
     const saved = localStorage.getItem('selectedMode') || 'tutorial'
+    // Space Ship (j) runs only in the Tutorial for now.
+    if (localStorage.getItem('shapeOption') === 'j' && localStorage.getItem('sliderLayout') === 'blow') return 'tutorial'
     return ['tutorial', 'timed', 'slowing', 'box'].includes(saved) ? saved : 'tutorial'
   })
 
@@ -416,6 +423,10 @@ export default function App() {
   // labels and captions.
   const balloonStateRef = useRef({ mode: 'follow', travelP: 0, bounceStart: -Infinity, bottom: 0 })
   const balloonPaceRef = useRef({ paced: false, phase: null, bellSeq: 0, inhaleDur: 1 })
+  // Space Ship (j): the ship's frame (written by SpaceshipBayJ, drawn by
+  // MorphJ) and its pace phase, which the bells/labels follow.
+  const shipStateRef = useRef({ y: 0, z: 0, alpha: 0, rev: 0, rock: 0, emit: 0, steer: false, seq: 0 })
+  const shipPaceRef = useRef({ paced: false, phase: 'idle', inhaleDur: 1 })
   const balloonCaptionRef = useRef({ phase: null, cycles: 0 })
   shapeRef.current = shapeOption
 
@@ -863,9 +874,15 @@ export default function App() {
     return breathPhaseRef.current === 'inhale' || breathPhaseRef.current === 'exhale' ? breathPhaseRef.current : null
   }, [])
 
-  // Balloon (h): its course owns the pace (the user's exhale starts each
-  // trip), so the bells/labels/holds follow its phase instead of the clocks.
+  // Balloon (h) and Space Ship (j): the course owns the pace (the user's
+  // exhale starts each trip), so the bells/labels/holds follow its phase
+  // instead of the clocks. The ship's phases map to 'inhale' / 'exhale'.
   const balloonPhaseNow = useCallback(() => {
+    if (shapeRef.current === 'j') {
+      const p = shipPaceRef.current
+      if (!p.paced || p.phase === 'idle') return null
+      return p.phase === 'inhale' ? 'inhale' : 'exhale'
+    }
     if (shapeRef.current !== 'h') return undefined
     const p = balloonPaceRef.current
     return p.paced ? p.phase : null
@@ -899,7 +916,7 @@ export default function App() {
   // automatic). null = no pace yet.
   const getQuietRate = useCallback(() => {
     const bp = balloonPhaseNow()
-    if (bp !== undefined && mode !== 'basic') return bp === null ? null : 1 / Math.max(0.05, balloonPaceRef.current.inhaleDur)
+    if (bp !== undefined && mode !== 'basic') return bp === null ? null : 1 / Math.max(0.05, (shapeRef.current === 'j' ? shipPaceRef : balloonPaceRef).current.inhaleDur)
     if (mode === 'box') {
       if (boxPhaseNow() === null) return null
       return 1 / Math.max(0.05, spawnIntervalRef.current)
@@ -925,6 +942,7 @@ export default function App() {
       if (bp === 'inhale') return 'inhale'
       if (bp === 'hold-in') return 'hold'
       if (bp === 'hold-out') return 'hold-out'
+      if (shapeRef.current === 'j') return 'exhale'
       return `exhale:${balloonPaceRef.current.bellSeq}`
     }
     if (mode === 'box') {
@@ -1772,7 +1790,7 @@ export default function App() {
     // (Failures are cleared first, so a stale one doesn't skip the mic check.)
     if (tiltControl) { setTiltFailed(false); requestTiltPermission().then((ok) => setTiltFailed(!ok)) }
     // Paper Airplane / Balloon steer by side tilt, Input Test reads tilt: ask in this tap too.
-    if ((shapeRef.current === 'g' || shapeRef.current === 'h' || shapeRef.current === 'i') && !tiltControl) requestTiltPermission()
+    if ((shapeRef.current === 'g' || shapeRef.current === 'h' || shapeRef.current === 'i' || shapeRef.current === 'j') && !tiltControl) requestTiltPermission()
     audioRef.current.unlock()
     audioRef.current.start(0)
     // Blow on the Mic: open the mic inside this tap, after the app's sound has
@@ -1793,6 +1811,8 @@ export default function App() {
     boxCaptionsStartedRef.current = false
     balloonStateRef.current = { mode: 'follow', travelP: 0, bounceStart: -Infinity, bottom: 0 }
     balloonPaceRef.current = { paced: false, phase: null, bellSeq: 0, inhaleDur: 1 }
+    shipStateRef.current = { y: 0, z: 0, alpha: 0, rev: 0, rock: 0, emit: 0, steer: false, seq: 0 }
+    shipPaceRef.current = { paced: false, phase: 'idle', inhaleDur: 1 }
     balloonCaptionRef.current = { phase: null, cycles: 0 }
     pacedWaitForBottomRef.current = false
     pacedCueStageRef.current = 'off'
@@ -1887,7 +1907,15 @@ export default function App() {
     clearTimeout(introTimerRef.current)
     const intro = MODE_INTRO[m]
     const openMode = () => {
-    if (m === 'tutorial') {
+    if (m === 'tutorial' && shapeRef.current === 'j') {
+      // Space Ship: no Part 1/2 practice (it has no 5-breath count). Open on
+      // Part 3 (Test Bell); its Continue runs the paced start.
+      introActiveRef.current = false
+      stageRef.current = 'done'
+      diagStageRef.current = 'done'
+      setTutorialArt('background')
+      showTutorialScreen('part3', TUTORIAL.part3)
+    } else if (m === 'tutorial') {
       // Tutorial: Part 1's text waits for Continue (handleTutorialContinue).
       introActiveRef.current = false
       stageRef.current = 'done'
@@ -2012,6 +2040,7 @@ export default function App() {
         palette={palette}
         selectedMode={selectedMode}
         onSelectModeChange={setSelectedMode}
+        shapeOption={shapeOption}
         onAnyTap={() => audioRef.current.startHome()}
       />
     )
@@ -2020,6 +2049,7 @@ export default function App() {
     return (
       <SliderLayoutsScreen
         selected={sliderLayout}
+        shapeOption={shapeOption}
         onSelect={(v) => {
           setSliderLayout(v)
           if (v === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
@@ -2039,9 +2069,11 @@ export default function App() {
     return (
       <PersonalizeScreen
         shapeOption={shapeOption}
+        sliderLayout={sliderLayout}
         onSelectShape={(v) => {
           setShapeOption(v)
-          if (v === 'g' || v === 'h' || v === 'i') requestTiltPermission()
+          if (v === 'j') setSelectedMode('tutorial')   // Space Ship: Tutorial only for now
+          if (v === 'g' || v === 'h' || v === 'i' || v === 'j') requestTiltPermission()
           if (v === 'i') requestMicAccess(false)
         }}
         onSelectMode={() => setScreen('selectMode')}
@@ -2077,7 +2109,7 @@ export default function App() {
   const tutorialScreenRegion = usesScreens(mode) && tutorialAtTop
     ? { top: MODE_CAPTION_TOP + modeLabelLines * MODE_CAPTION_LINE_PX, bottom: continueBottom + continueHeight }
     : null
-  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : shapeOption === 'g' ? MorphG : shapeOption === 'h' ? MorphH : shapeOption === 'i' ? null : MorphA
+  const MorphComponent = shapeOption === 'b' ? MorphB : shapeOption === 'c' || shapeOption === 'd' ? MorphC : shapeOption === 'e' ? MorphE : shapeOption === 'f' ? MorphF : shapeOption === 'g' ? MorphG : shapeOption === 'h' ? MorphH : shapeOption === 'j' ? MorphJ : shapeOption === 'i' ? null : MorphA
   const GatesComponent = shapeOption === 'f' ? GatesF : shapeOption === 'b' ? GatesB : shapeOption === 'c' ? GatesC : shapeOption === 'd' ? GatesHeadless : shapeOption === 'g' ? GatesG : shapeOption === 'e' ? GatesHeadlessE : GatesA
   const BoxGatesComponent = shapeOption === 'f' ? GatesBoxBreathingF : shapeOption === 'b' ? GatesBoxBreathingB : shapeOption === 'c' ? GatesBoxBreathingC : shapeOption === 'd' ? GatesBoxBreathingD : shapeOption === 'g' ? GatesBoxBreathingG : shapeOption === 'e' ? GatesBoxBreathingHeadlessE : GatesBoxBreathingA
   const targetPaceInfo = TARGET_PACES[targetPace] || TARGET_PACES[DEFAULT_TARGET_PACE]
@@ -2095,13 +2127,19 @@ export default function App() {
         <PaceAudioDriver audioRef={audioRef} getPaceProgress={getPaceProgress} getBellPhase={getBellPhase} />
         {shapeOption === 'd' && <CameraVerticalShift />}
         {shapeOption === 'f' && <CameraVerticalShift lowerWorldUnits={4} />}
-        {MorphComponent && <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} blowRef={blowRef} balloonStateRef={balloonStateRef} />}
+        {MorphComponent && <MorphComponent leftVal={breathRef} rightVal={rightVal} palette={palette} shapeOption={shapeOption} leftRawRef={breathRawRef} breathCountingEnabledRef={breathCountingEnabledRef} breathCountSourceRef={breathCountSourceRef} livePaletteRef={livePaletteRef} onBreathPaletteCycle={handleBreathPaletteCycle} onBreathCountEvent={handleBreathCountEvent} landscapeIndexRef={landscapeIndexRef} planePosRef={planePosRef} blowRef={blowRef} balloonStateRef={balloonStateRef} shipStateRef={shipStateRef} />}
         {showBackgroundArt && shapeOption === 'b' && <LandscapeB mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} landscapeIndexRef={landscapeIndexRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'h' && (
           <BalloonCourseH leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} isBox={mode === 'box'} spawnIntervalRef={spawnIntervalRef}
             inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} breathPhaseRef={breathPhaseRef}
             balloonStateRef={balloonStateRef} balloonPaceRef={balloonPaceRef} planePosRef={planePosRef}
             palette={palette} livePaletteRef={livePaletteRef} onRetryText={handleBalloonRetryText} />
+        )}
+        {showBackgroundArt && shapeOption === 'j' && (
+          <SpaceshipBayJ leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef}
+            inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} blowRef={blowRef} micFailed={micFailed}
+            shipStateRef={shipStateRef} shipPaceRef={shipPaceRef} planePosRef={planePosRef}
+            palette={palette} livePaletteRef={livePaletteRef} />
         )}
         {showBackgroundArt && shapeOption === 'g' && <GroundTiesG mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}
@@ -2114,7 +2152,7 @@ export default function App() {
         <EffectComposer>
           <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} intensity={1.5} />
         </EffectComposer>
-        {hasGates && mode !== 'box' && shapeOption !== 'h' && shapeOption !== 'i' && (
+        {hasGates && mode !== 'box' && shapeOption !== 'h' && shapeOption !== 'i' && shapeOption !== 'j' && (
           <GatesComponent
             palette={palette}
             rightVal={rightVal}
@@ -2131,7 +2169,7 @@ export default function App() {
             startOnInhale={mode === 'slowing' || mode === 'tutorial'}
           />
         )}
-        {mode === 'box' && hasGates && shapeOption !== 'h' && shapeOption !== 'i' && (
+        {mode === 'box' && hasGates && shapeOption !== 'h' && shapeOption !== 'i' && shapeOption !== 'j' && (
           <BoxGatesComponent
             palette={palette}
             rightVal={rightVal}

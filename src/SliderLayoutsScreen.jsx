@@ -22,7 +22,7 @@ const OPTIONS = [
   { id: 'blow', label: 'Blow on the Mic', desc: 'When you exhale, blow gently through pursed lips toward your phone. When you inhale, stay quiet. To hold your breath, touch the screen.' },
 ]
 
-export default function SliderLayoutsScreen({ selected, onSelect, onHome, onStart, onArtOptions, modeLabel, palette, tiltFailed = false, micFailed = false }) {
+export default function SliderLayoutsScreen({ selected, shapeOption, onSelect, onHome, onStart, onArtOptions, modeLabel, palette, tiltFailed = false, micFailed = false }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -35,8 +35,13 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, onStar
       <h1 style={{ color: palette.primaryColor, fontSize: 24, fontWeight: 300, letterSpacing: '0.1em', margin: '0 0 16px' }}>
         CONTROL OPTIONS
       </h1>
-      {OPTIONS.map(opt => (
-        <button key={opt.id} style={optionBtn(selected === opt.id, palette)} onClick={() => onSelect(opt.id)}>
+      {OPTIONS.map(opt => {
+        // Space Ship (j) only works with Blow on the Mic: the others are blocked.
+        const blocked = shapeOption === 'j' && opt.id !== 'blow'
+        return (
+        <button key={opt.id}
+          style={{ ...optionBtn(selected === opt.id, palette), ...(blocked ? { opacity: 0.4, cursor: 'default' } : null) }}
+          onClick={blocked ? undefined : () => onSelect(opt.id)}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>{opt.label} {selected === opt.id && '✓'}</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{opt.desc}</div>
           {opt.id === 'tilt' && tiltFailed && (
@@ -45,8 +50,12 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, onStar
           {opt.id === 'blow' && micFailed && (
             <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>Microphone access is off, so Double Sliders will be used.</div>
           )}
+          {blocked && (
+            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>Space Ship only works with Blow on the Mic. Choose a different art to use this control.</div>
+          )}
         </button>
-      ))}
+        )
+      })}
 
       <OptionsNav
         onHome={onHome}

@@ -12,7 +12,10 @@ function optionBtn(selected, palette) {
   }
 }
 
-export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelectMode, onStart, onControlOptions, modeLabel, palette }) {
+// Space Ship (j) only works with Blow on the Mic: grayed out otherwise.
+const DISABLED_STYLE = { opacity: 0.4, cursor: 'default' }
+
+export default function PersonalizeScreen({ shapeOption, sliderLayout, onSelectShape, onSelectMode, onStart, onControlOptions, modeLabel, palette }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -45,6 +48,15 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         </button>
         <button style={optionBtn(shapeOption === 'h', palette)} onClick={() => onSelectShape('h')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Balloon (in-progress) {shapeOption === 'h' && '✓'}</div>
+        </button>
+        <button
+          style={{ ...optionBtn(shapeOption === 'j', palette), ...(sliderLayout === 'blow' ? null : DISABLED_STYLE) }}
+          onClick={sliderLayout === 'blow' ? () => onSelectShape('j') : undefined}
+        >
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Space Ship (in-progress) {shapeOption === 'j' && '✓'}</div>
+          {sliderLayout !== 'blow' && (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Select Blow on the Mic in Control Options to use this art.</div>
+          )}
         </button>
         <button style={optionBtn(shapeOption === 'i', palette)} onClick={() => onSelectShape('i')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Input Test {shapeOption === 'i' && '✓'}</div>
