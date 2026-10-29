@@ -7,7 +7,7 @@ import { createPlaneGateMaterial, ringPulseEmissive, GATE_EMISSIVE } from './pla
 import { createCubeMorphMaterial, gateLookT, applyGateLook } from './cubeMaterialB'
 import { computePhaseDurations } from './BackgroundRingsD'
 import {
-  shipLimits, makeCourse, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
+  shipLimits, makeCourse, EXIT_TURN_S, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
   COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE,
 } from './spaceshipJ'
@@ -48,10 +48,15 @@ const SHIP_SPEED = 2.5          // units/s
 const STOP_GRACE_S = 0.3        // blow-off this long counts as the exhale stopping
 const SLOW_S = 1
 const SLOW_FACTOR = 0.25
-const EXIT_DOWN_ACCEL = 5       // units/s² down while it flies off (sideways is in MorphJ)
+// Exit: forward speed eases from the slow-down speed up to EXIT_FORWARD_SPEED
+// while the down and sideways pulls (sideways is in MorphJ) ramp in over
+// EXIT_TURN_S, so the ship curves gently off its line rather than snapping.
+const EXIT_FORWARD_SPEED = 1.5
+const EXIT_DOWN_ACCEL = 2.5     // units/s², at full ramp
+const EXIT_FADE_START_S = 1.8   // fades out from here to EXIT_MAX_S (or pops once off the screen)
 const EXIT_TILT_DEADZONE_DEG = 3 // phone roll under this = level: random exit side
 const EXIT_OFFSCREEN_NDC = 1.15  // pops out once past this far off the screen
-const EXIT_MAX_S = 4             // ...or after this long
+const EXIT_MAX_S = 2.8           // ...or after this long
 const FLOOR_SCREEN_PX = 80       // floor front edge above the screen's bottom
 const CUBE_FADE_S = 1
 const COLUMN_SINK_S = 0.6
@@ -59,7 +64,7 @@ const SLIDER_BLOW_RATE = 0.08   // mic failed (Double Sliders): breath falling t
 const FLYING = { flying: true, slowing: true, exiting: true }
 
 // One cube's state on the current course.
-const makeCube = ({ x, z }) => ({ x, z, judged: false, missElapsed: null })
+const makeCube = ({ x, z, rotY }) => ({ x, z, rotY, judged: false, missElapsed: null })
 
 // Moves value toward target at 1/seconds per second.
 const approach = (value, target, seconds, dt) => {
@@ -157,6 +162,7 @@ export default function SpaceshipBayJ({
       const gamma = shipStateRef.current.gamma
       s.exitDir = gamma == null || Math.abs(gamma) < EXIT_TILT_DEADZONE_DEG ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(gamma)
       s.exitVy = 0
+      s.exitVz = SHIP_SPEED * SLOW_FACTOR
       s.exitDrop = 0
     }
 
@@ -181,8 +187,10 @@ export default function SpaceshipBayJ({
         else if (elapsed >= SLOW_S || s.z <= COURSE_END_Z) startExit()
         break
       case 'exiting': {
-        s.z -= SHIP_SPEED * SLOW_FACTOR * dt
-        s.exitVy += EXIT_DOWN_ACCEL * dt
+        const turn = THREE.MathUtils.smoothstep(elapsed / EXIT_TURN_S, 0, 1)
+        s.exitVz = THREE.MathUtils.lerp(SHIP_SPEED * SLOW_FACTOR, EXIT_FORWARD_SPEED, THREE.MathUtils.smoothstep(elapsed / 1, 0, 1))
+        s.z -= s.exitVz * dt
+        s.exitVy += EXIT_DOWN_ACCEL * turn * dt
         s.exitDrop += s.exitVy * dt
         const pos = planePosRef?.current
         let off = elapsed >= EXIT_MAX_S
@@ -208,6 +216,9 @@ export default function SpaceshipBayJ({
     ship.z = s.z
     ship.steer = !!FLYING[s.phase]
     ship.exitDir = s.phase === 'exiting' ? s.exitDir : 0
+    ship.exitT = s.phase === 'exiting' ? pe : 0
+    ship.exitVy = s.phase === 'exiting' ? s.exitVy : 0
+    ship.exitVz = s.phase === 'exiting' ? s.exitVz : 0
     if (s.phase === 'idle') {
       Object.assign(ship, { y: belowY, alpha: 0, rev: 0, rock: 0, emit: 0 })
     } else if (s.phase === 'inhale') {
@@ -220,7 +231,8 @@ export default function SpaceshipBayJ({
       Object.assign(ship, { y: limits.fullY, alpha: 1, rev: 1, rock: 1, emit: 1 })
     } else {
       const drop = s.phase === 'exiting' ? s.exitDrop : 0
-      Object.assign(ship, { y: limits.fullY - drop, alpha: 1, rev: 1, rock: 0, emit: s.phase === 'flying' ? 1 : 0.4 })
+      const alpha = s.phase === 'exiting' ? 1 - THREE.MathUtils.smoothstep((pe - EXIT_FADE_START_S) / (EXIT_MAX_S - EXIT_FADE_START_S), 0, 1) : 1
+      Object.assign(ship, { y: limits.fullY - drop, alpha, rev: 1, rock: 0, emit: s.phase === 'flying' ? 1 : 0.4 })
     }
 
     // Floor doors: apart while the ship rises, closed under it after.
@@ -297,6 +309,7 @@ export default function SpaceshipBayJ({
       applyGateLook(mats.cubes[n], gateLookT(rel), courseFade, ringPulseEmissive(rel) * (1 - missF), live)
       applyMissScale(mesh, missF)
       mesh.position.set(cube.x, limits.fullY, cube.z)
+      mesh.rotation.y = cube.rotY
       mesh.visible = courseFade > 0.001
     })
     gateBurst.tick(now, livePaletteRef)

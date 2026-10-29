@@ -34,17 +34,23 @@ export const COLUMN_MARGIN = 0.15    // column's outer edge inside the screen ed
 export const COLUMN_HEIGHT_FRAC = 0.75   // columns: this much of floor -> past the screen's top
 export const FULL_HEIGHT_FRAC = 0.5     // full-inhale height: this much of floor -> midway up the balloon's range
 
-// Cube targets: rows along -Z in one of three lanes.
-export const LANE_X = [-1, 0, 1]
+// Cube targets: one line of cubes snaking along the road (-Z), a cube's
+// length apart. x(z) = two sine waves with random wavelengths and phases,
+// easing in from x = 0 over SNAKE_EASE_IN so it starts in front of the bay.
 export const TARGET_SIZE = 0.5
-export const ROW_CUBES = 5
-export const ROW_GAP = 2             // last cube of a row -> first cube of the next
+export const SNAKE_MAX_X = 1         // the snake's widest swing
+const SNAKE_A = [0.75, 0.25]         // amplitude of each wave (sum = SNAKE_MAX_X)
+const SNAKE_WAVELENGTH = [[14, 22], [6, 9]]
+const SNAKE_EASE_IN = 6
 export const COURSE_START_Z = -3     // first cube's center
 export const COURSE_END_Z = -80      // the course (and a trip) ends here
 
 // Side tilt: phone roll that puts the ship at its side limit.
 export const SIDE_TILT_FULL_DEG = 25
-export const SIDE_RANGE = LANE_X[2] + 0.3
+export const SIDE_RANGE = SNAKE_MAX_X + 0.3
+
+// Exit: the down and sideways pulls ramp in over this long (SpaceshipBayJ, MorphJ).
+export const EXIT_TURN_S = 1.5
 
 // Where the camera ray through a screen point (NDC) meets z = 0.
 const _ray = new THREE.Vector3()
@@ -77,13 +83,21 @@ export function shipLimits(camera, size) {
   return { hoverY, floorTop, fullY, columnX, columnTop }
 }
 
-// A new course: one random lane per row. Returns [{ x, z }] cube centers.
+// A new course: the snake. Returns [{ x, z, rotY }] cube centers, each
+// turned to follow the snake's direction.
 export function makeCourse() {
+  const waves = SNAKE_A.map((a, i) => ({
+    a, k: (2 * Math.PI) / THREE.MathUtils.randFloat(...SNAKE_WAVELENGTH[i]), phase: Math.random() * 2 * Math.PI,
+  }))
+  const xAt = (d) => {   // d = distance down the road from the first cube
+    const ease = THREE.MathUtils.smoothstep(d / SNAKE_EASE_IN, 0, 1)
+    return ease * waves.reduce((sum, w) => sum + w.a * Math.sin(w.k * d + w.phase), 0)
+  }
   const cubes = []
-  const rowLen = ROW_CUBES * TARGET_SIZE * 2 - TARGET_SIZE
-  for (let z0 = COURSE_START_Z; z0 - rowLen > COURSE_END_Z; z0 -= rowLen + ROW_GAP) {
-    const x = LANE_X[Math.floor(Math.random() * LANE_X.length)]
-    for (let n = 0; n < ROW_CUBES; n++) cubes.push({ x, z: z0 - n * TARGET_SIZE * 2 })
+  for (let z = COURSE_START_Z; z > COURSE_END_Z; z -= TARGET_SIZE * 2) {
+    const d = COURSE_START_Z - z
+    const slope = (xAt(d + 0.05) - xAt(d - 0.05)) / 0.1   // dx per unit down the road
+    cubes.push({ x: xAt(d), z, rotY: Math.atan2(-slope, 1) })
   }
   return cubes
 }

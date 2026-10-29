@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { WINGSPAN, THICKNESS, LENGTH, ENGINE_R, ENGINE_LEN, ENGINE_X, SIDE_TILT_FULL_DEG, SIDE_RANGE } from './spaceshipJ'
+import { EXIT_TURN_S, WINGSPAN, THICKNESS, LENGTH, ENGINE_R, ENGINE_LEN, ENGINE_X, SIDE_TILT_FULL_DEG, SIDE_RANGE } from './spaceshipJ'
 
 // Shape J (Space Ship): the gray-box ship. SpaceshipBayJ runs the pace and
 // writes shipStateRef each frame: { y, z, alpha, rev 0-1, rock 0-1, steer,
@@ -19,7 +19,7 @@ const SIDE_TIME = 1.5           // seconds to (mostly) reach a new side position
 const BANK_MAX = 0.6            // radians at BANK_FULL_SPEED sideways
 const BANK_FULL_SPEED = 3
 const BANK_SMOOTH_S = 0.15
-const EXIT_SIDE_ACCEL = 5      // units/s² sideways while it flies off
+const EXIT_SIDE_ACCEL = 2.5    // units/s² sideways while it flies off, ramping in over EXIT_TURN_S
 
 // Rocking while it revs up: random-sized swings, scaled by rock.
 const ROCK_MAX = 0.12
@@ -170,7 +170,7 @@ export default function MorphJ({ palette, shipStateRef, planePosRef, livePalette
     ship.gamma = gammaRef.current
     if (ship.exitDir) {
       // Flying off: accelerate toward that side (the bank follows the velocity).
-      s.exitV += ship.exitDir * EXIT_SIDE_ACCEL * dt
+      s.exitV += ship.exitDir * EXIT_SIDE_ACCEL * THREE.MathUtils.smoothstep(ship.exitT / EXIT_TURN_S, 0, 1) * dt
       s.vx.v = s.exitV
       s.x += s.exitV * dt
     } else {
@@ -183,7 +183,17 @@ export default function MorphJ({ palette, shipStateRef, planePosRef, livePalette
 
     g.visible = ship.alpha > 0.001
     g.position.set(s.x, ship.y, ship.z)
-    g.rotation.set(REST_PITCH, 0, s.bank + rock(dt) * ship.rock)
+    // Flying off: nose along its velocity (yaw toward the side, pitch down
+    // with the dive). Otherwise level, with the rest pitch.
+    let yaw = 0
+    let pitch = REST_PITCH
+    if (ship.exitDir) {
+      const vf = Math.max(1e-3, ship.exitVz)
+      yaw = Math.atan2(-s.exitV, vf)
+      pitch = REST_PITCH - Math.atan2(ship.exitVy, Math.hypot(s.exitV, vf))
+    }
+    g.rotation.order = 'YXZ'
+    g.rotation.set(pitch, yaw, s.bank + rock(dt) * ship.rock)
 
     const live = livePaletteRef && livePaletteRef.current
     bodyMat.opacity = ship.alpha
