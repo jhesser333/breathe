@@ -53,6 +53,7 @@ import { createAudioEngine, BELL_INHALE_EXHALE, BELL_HOLD, BELL_INHALE_GAIN } fr
 import { UI_EDGE, UI_INTERIOR } from './uiColors'
 import { useBreathControl, requestTiltPermission, requestMicAccess } from './useBreathControl'
 import { useWakeLock } from './useWakeLock'
+import MicCheck from './MicCheck'
 
 const navPillStyle = {
   background: UI_INTERIOR,
@@ -404,6 +405,11 @@ export default function App() {
   const blowRef = useRef(0)
   // Input Test: { tilt, mic, blowing, v }, written by useBreathControl.
   const inputReadoutRef = useRef(null)
+  // Mic check at the start of sessions that use the mic (see MicCheck.jsx).
+  const [micCheckKey, setMicCheckKey] = useState(0)   // 0 = none
+  const micCheckSeqRef = useRef(0)
+  const micCheckStatusRef = useRef(null)
+  const afterMicCheckRef = useRef(null)   // the mode's opening, run when the check ends
   // Balloon (h): BalloonCourseH's overrides for MorphH (mode 'follow' /
   // 'travel' / 'deflate', trip progress, bounce time; MorphH writes bottom)
   // and its user-gated pace (phase, bellSeq, inhaleDur, paced) for the bells,
@@ -1711,7 +1717,25 @@ export default function App() {
     blowRef,
     allSensors: shapeOption === 'i',
     readoutRef: inputReadoutRef,
+    calibrateKey: micCheckKey,
+    calStatusRef: micCheckStatusRef,
+    onCalibrated: () => finishMicCheck(),
   })
+
+  // Mic check done or skipped: unmute and run the mode's opening.
+  const finishMicCheck = useCallback(() => {
+    setMicCheckKey(0)
+    const open = afterMicCheckRef.current
+    afterMicCheckRef.current = null
+    if (!open) return
+    audioRef.current.setMuted(false, 0.5)
+    open()
+  }, [])
+  // No mic, or the control fell back to Double Sliders: skip the check.
+  const micInUse = breathControl === 'blow' || shapeOption === 'i'
+  useEffect(() => {
+    if (micCheckKey && (micFailed || !micInUse)) finishMicCheck()
+  }, [micCheckKey, micFailed, micInUse, finishMicCheck])
 
   // Keep the screen awake for the whole session (every control).
   useWakeLock(!!mode)
@@ -1727,15 +1751,15 @@ export default function App() {
     // Tilt Your Phone: ask for motion access inside this tap (iOS).
     // (Blow on the Mic is tilt + blow, so it needs motion access too.)
     const tiltControl = sliderLayout === 'tilt' || sliderLayout === 'blow'
-    if (tiltControl) requestTiltPermission().then((ok) => setTiltFailed(!ok))
+    // (Failures are cleared first, so a stale one doesn't skip the mic check.)
+    if (tiltControl) { setTiltFailed(false); requestTiltPermission().then((ok) => setTiltFailed(!ok)) }
     // Paper Airplane / Balloon steer by side tilt, Input Test reads tilt: ask in this tap too.
     if ((shapeRef.current === 'g' || shapeRef.current === 'h' || shapeRef.current === 'i') && !tiltControl) requestTiltPermission()
     audioRef.current.unlock()
     audioRef.current.start(0)
     // Blow on the Mic: open the mic inside this tap, after the app's sound has
     // set up its own audio context (doing it first could leave the mic silent).
-    if (sliderLayout === 'blow') requestMicAccess().then((ok) => setMicFailed(!ok))
-    else if (shapeRef.current === 'i') requestMicAccess()
+    if (sliderLayout === 'blow' || shapeRef.current === 'i') { setMicFailed(false); requestMicAccess().then((ok) => setMicFailed(!ok)) }
     audioRef.current.setSlider(leftVal.current)
     gatesEnabledRef.current = false
     clearTimeout(gateEnableTimerRef.current)
@@ -1844,6 +1868,7 @@ export default function App() {
     // movement doesn't advance them.
     clearTimeout(introTimerRef.current)
     const intro = MODE_INTRO[m]
+    const openMode = () => {
     if (m === 'tutorial') {
       // Tutorial: Part 1's text waits for Continue (handleTutorialContinue).
       introActiveRef.current = false
@@ -1878,6 +1903,19 @@ export default function App() {
       introActiveRef.current = false
       beginTutorial()
     }
+    }
+    // Sessions that use the mic open with the mic check (MicCheck); the
+    // mode's own opening waits for it, with the app's sound muted.
+    afterMicCheckRef.current = null
+    if (sliderLayout === 'blow' || shapeRef.current === 'i') {
+      afterMicCheckRef.current = openMode
+      audioRef.current.setMuted(true, 0.3)
+      micCheckSeqRef.current += 1
+      setMicCheckKey(micCheckSeqRef.current)
+    } else {
+      setMicCheckKey(0)
+      openMode()
+    }
     if (m === 'timed') pendingGatesFnRef.current = showGatesText
 
     setMode(m)
@@ -1897,6 +1935,8 @@ export default function App() {
 
   const handleBackFromExperience = useCallback(() => {
     audioRef.current.stop()
+    afterMicCheckRef.current = null
+    setMicCheckKey(0)
     clearTimeout(introTimerRef.current)
     clearTutorialTimers()
     tutorialRef.current = newTutorialState()
@@ -2158,7 +2198,8 @@ export default function App() {
                     cursor: 'pointer', pointerEvents: 'auto',
                   }} />
         )}
-        {shapeOption === 'i' && <InputTestReadout readoutRef={inputReadoutRef} />}
+        {shapeOption === 'i' && !micCheckKey && <InputTestReadout readoutRef={inputReadoutRef} />}
+        {micCheckKey > 0 && <MicCheck statusRef={micCheckStatusRef} onSkip={finishMicCheck} />}
         <TutorialText region={tutorialScreenRegion} topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale || tutorialText === TEXTS.boxHold) ? TEXT_SIZE_CAPTION
