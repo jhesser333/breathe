@@ -19,7 +19,7 @@ const OPTIONS = [
   { id: 'single', label: 'Single Slider', desc: 'When you inhale, slide a finger up anywhere on the screen. Slide it down when you exhale.' },
   { id: 'touch', label: 'Touch the Screen', desc: 'Touch the screen when you inhale, and lift your finger when you exhale.' },
   { id: 'tilt', label: 'Tilt Your Phone', desc: 'When you inhale, tilt your phone up toward vertical. When you exhale, tilt it back toward flat.' },
-  { id: 'blow', label: 'Blow on the Mic', desc: 'When you exhale, tilt your phone toward flat while blowing gently through pursed lips toward it. When you inhale, tilt it back up toward vertical.' },
+  { id: 'blow', label: 'Blow on the Mic', desc: 'When you exhale, blow gently through pursed lips toward your phone. When you inhale, stay quiet. To hold your breath, touch the screen.' },
 ]
 
 export default function SliderLayoutsScreen({ selected, onSelect, onHome, onStart, onArtOptions, modeLabel, palette, tiltFailed = false, micFailed = false }) {
@@ -42,8 +42,8 @@ export default function SliderLayoutsScreen({ selected, onSelect, onHome, onStar
           {opt.id === 'tilt' && tiltFailed && (
             <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>Motion access is off, so Double Sliders will be used.</div>
           )}
-          {opt.id === 'blow' && (micFailed || tiltFailed) && (
-            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>{micFailed ? 'Microphone' : 'Motion'} access is off, so Double Sliders will be used.</div>
+          {opt.id === 'blow' && micFailed && (
+            <div style={{ fontSize: 13, color: palette.primaryColor, marginTop: 3 }}>Microphone access is off, so Double Sliders will be used.</div>
           )}
         </button>
       ))}

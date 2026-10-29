@@ -340,10 +340,10 @@ export default function App() {
   const isDiagonal = sliderLayout !== 'vertical'
   // Tilt denied or no sensor: fall back to Double Sliders.
   const [tiltFailed, setTiltFailed] = useState(false)
-  // Mic denied or missing (Blow on the Mic, which also needs tilt): same fallback.
+  // Mic denied or missing (Blow on the Mic): same fallback.
   const [micFailed, setMicFailed] = useState(false)
   const breathControl = ['single', 'touch', 'tilt', 'blow'].includes(sliderLayout)
-    && !(sliderLayout === 'tilt' && tiltFailed) && !(sliderLayout === 'blow' && (micFailed || tiltFailed)) ? sliderLayout : null
+    && !(sliderLayout === 'tilt' && tiltFailed) && !(sliderLayout === 'blow' && micFailed) ? sliderLayout : null
   const [targetPace, setTargetPaceState] = useState(() => {
     const saved = localStorage.getItem('targetPace') || DEFAULT_TARGET_PACE
     return Object.keys(TARGET_PACES).includes(saved) ? saved : DEFAULT_TARGET_PACE
@@ -893,6 +893,24 @@ export default function App() {
     const p = boxPhaseNow()
     return p === null ? null : p.index === 1 ? 'in' : p.index === 3 ? 'out' : null
   }, [mode, boxPhaseNow, balloonPhaseNow])
+
+  // Blow on the Mic: how fast quiet rises (v/s). Once a pace runs, quiet
+  // rises at the pace's inhale speed (holding is the user's touch, not
+  // automatic). null = no pace yet.
+  const getQuietRate = useCallback(() => {
+    const bp = balloonPhaseNow()
+    if (bp !== undefined && mode !== 'basic') return bp === null ? null : 1 / Math.max(0.05, balloonPaceRef.current.inhaleDur)
+    if (mode === 'box') {
+      if (boxPhaseNow() === null) return null
+      return 1 / Math.max(0.05, spawnIntervalRef.current)
+    }
+    if (mode === 'slowing' || mode === 'tutorial') {
+      if (slowingPhaseNow() === null) return null
+      const { inhaleDuration } = computePhaseDurations(spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef)
+      return 1 / Math.max(0.05, inhaleDuration)
+    }
+    return null
+  }, [mode, boxPhaseNow, slowingPhaseNow, balloonPhaseNow])
 
   // Which paced phase's bell should be ringing: Box 'inhale'/'hold'/'exhale'/
   // 'hold-out' from the caption clock; Slowing Down 'inhale'/'exhale', from the
@@ -1714,6 +1732,7 @@ export default function App() {
     },
     onTiltFail: () => setTiltFailed(true),
     onMicFail: () => setMicFailed(true),
+    getQuietRate,
     blowRef,
     allSensors: shapeOption === 'i',
     readoutRef: inputReadoutRef,
@@ -1749,8 +1768,7 @@ export default function App() {
     // Start/Restart taps: unlock and (re)start the breath audio.
     audioGroupIndexRef.current = 0
     // Tilt Your Phone: ask for motion access inside this tap (iOS).
-    // (Blow on the Mic is tilt + blow, so it needs motion access too.)
-    const tiltControl = sliderLayout === 'tilt' || sliderLayout === 'blow'
+    const tiltControl = sliderLayout === 'tilt'
     // (Failures are cleared first, so a stale one doesn't skip the mic check.)
     if (tiltControl) { setTiltFailed(false); requestTiltPermission().then((ok) => setTiltFailed(!ok)) }
     // Paper Airplane / Balloon steer by side tilt, Input Test reads tilt: ask in this tap too.
@@ -2004,7 +2022,7 @@ export default function App() {
         selected={sliderLayout}
         onSelect={(v) => {
           setSliderLayout(v)
-          if (v === 'tilt' || v === 'blow') requestTiltPermission().then((ok) => setTiltFailed(!ok))
+          if (v === 'tilt') requestTiltPermission().then((ok) => setTiltFailed(!ok))
           if (v === 'blow') requestMicAccess(false).then((ok) => setMicFailed(!ok))
         }}
         tiltFailed={tiltFailed}
