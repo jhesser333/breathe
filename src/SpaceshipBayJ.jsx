@@ -8,7 +8,7 @@ import { createCubeMorphMaterial, gateLookT, applyGateLook } from './cubeMateria
 import { computePhaseDurations } from './BackgroundRingsD'
 import { TEXTS } from './copy'
 import {
-  shipLimits, makeCourse, EXIT_TURN_S, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
+  shipLimits, makeCourse, EXIT_TURN_S, SHIP_SPEED, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
   COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE,
 } from './spaceshipJ'
@@ -45,7 +45,6 @@ const RISE_DELAY_S = 0.3        // the ship starts rising this long after the In
 const RISE_S = 1.2              // ...and reaches its hover height this long after that
 const SHIP_FADE_IN_S = 0.4
 const FRONT_DOOR_S = 0.5        // front door sinks/rises
-const SHIP_SPEED = 5            // units/s
 const STOP_GRACE_S = 0.3        // blow-off this long counts as the exhale stopping
 const SLOW_S = 1
 const SLOW_FACTOR = 0.25

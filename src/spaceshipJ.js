@@ -43,7 +43,9 @@ const SNAKE_A = [0.75, 0.25]         // amplitude of each wave (sum = SNAKE_MAX_
 const SNAKE_WAVELENGTH = [[14, 22], [6, 9]]
 const SNAKE_EASE_IN = 6
 export const COURSE_START_Z = -3     // first cube's center
-export const COURSE_END_Z = -80      // the course (and a trip) ends here
+export const SHIP_SPEED = 5          // flying speed, units/s
+export const MAX_EXHALE_S = 10       // the course is this many seconds of flying long
+export const COURSE_END_Z = -SHIP_SPEED * MAX_EXHALE_S   // the course (and a trip) ends here
 
 // Side tilt: phone roll that puts the ship at its side limit.
 export const SIDE_TILT_FULL_DEG = 25
