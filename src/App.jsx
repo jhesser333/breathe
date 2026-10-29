@@ -2265,7 +2265,9 @@ export default function App() {
                   }} />
         )}
         {shapeOption === 'i' && !micCheckKey && <InputTestReadout readoutRef={inputReadoutRef} />}
-        {micCheckKey > 0 && <MicCheck statusRef={micCheckStatusRef} onSkip={finishMicCheck} />}
+        {micCheckKey > 0 && <MicCheck statusRef={micCheckStatusRef} onSkip={finishMicCheck}
+          onBell={(kind) => audioRef.current.testBell(BELL_INHALE_EXHALE, kind === 'inhale' ? BELL_INHALE_GAIN : 1)}
+          onBellStop={() => audioRef.current.stopBell()} />}
         <TutorialText region={tutorialScreenRegion} topPx={tutorialAtTop ? MODE_CAPTION_TOP + ((MODE_LABELS[mode] || '').includes(': ') ? 4 : 3) * MODE_CAPTION_LINE_PX + INTRO_EXTRA_LINES * TEXT_SIZE_INTRO * 1.2 : null} text={tutorialText} visible={tutorialVisible} opacity={tutorialOpacity} fadeMs={tutorialFadeMs}
           size={tutorialAtTop ? TEXT_SIZE_INTRO
             : (tutorialText === TEXTS.boxInhale || tutorialText === TEXTS.boxExhale || tutorialText === TEXTS.boxHold) ? TEXT_SIZE_CAPTION

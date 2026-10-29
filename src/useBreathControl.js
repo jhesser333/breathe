@@ -63,11 +63,15 @@ const BLOW_MIN_RATE_PER_S = 1 / 6 // exhale speed, gentle -> hard blow
 const BLOW_MAX_RATE_PER_S = 1 / 2
 const BLOW_RELEASE_MS = 300       // pause this long before the inhale starts
 const BLOW_INHALE_RATE_PER_S = 1 / 4  // quiet: full inhale in 4 s
-// Mic check (every session that uses the mic): quiet, then CAL_BLOWS blows.
+// Mic check (every session that uses the mic): quiet, then CAL_BLOWS paced
+// breaths: an inhale (CAL_INHALE_S, MicCheck rings the Inhale bell and fills
+// its columns), then an exhale that waits for and records one blow (MicCheck
+// rings the Exhale bell, and cuts it once the blow starts).
 // The blows' average shape across the bands becomes the template, and the
 // thresholds (level, match, tone, strength range) are set from them.
 const CAL_QUIET_S = 2
 const CAL_BLOWS = 3
+const CAL_INHALE_S = 4
 const CAL_MIN_BLOW_S = 0.6        // shorter sounds aren't counted as a blow
 const CAL_SKIP_S = 0.15           // each blow's onset isn't recorded
 const CAL_MAX_BLOW_S = 6          // and nothing past this
@@ -367,7 +371,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       // Floor = each bin's lowest level over the window. Held while blowing, so
       // a blow never becomes the floor (but not forever, so it can't stick on).
       const calibrating = blow.calS < BLOW_CALIBRATE_S
-      const holding = blow.on || (cal.step === 'blow' && blow.raw)
+      const holding = blow.on || (cal.step === 'exhale' && blow.raw)
       blow.onS = holding ? blow.onS + dt : 0
       if (calibrating || !holding || blow.onS > FLOOR_FREEZE_MAX_S) {
         for (let i = 0; i < n; i++) blow.slotMin[i] = Math.min(blow.slotMin[i], blow.power[i])
@@ -430,7 +434,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       // Strict detector. With a mic check: the user's level, tone and shape.
       // Without: the old coverage/flatness rules plus a fixed tone limit.
       const prof = blowProfile && blowProfile.template.length === bands
-        && cal.step !== 'wait' && cal.step !== 'quiet' && cal.step !== 'blow' ? blowProfile : null
+        && cal.step !== 'wait' && cal.step !== 'quiet' && cal.step !== 'inhale' && cal.step !== 'exhale' ? blowProfile : null
       blow.match = prof ? shapeMatch(blow.rise, prof.template) : null
       const levelOff = prof ? prof.levelOff : BLOW_OFF_DB
       const toneMax = prof ? prof.toneMax : BLOW_MAX_TONE
@@ -474,9 +478,12 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         if (ready) { cal.step = 'quiet'; cal.t = 0 }
       } else if (cal.step === 'quiet') {
         if (ready) cal.quiet.push(blow.excess)
-        if (cal.t >= CAL_QUIET_S) { cal.step = 'blow'; cal.t = 0 }
-      } else if (cal.step === 'blow') {
-        if (blow.raw) {
+        if (cal.t >= CAL_QUIET_S) { cal.step = 'inhale'; cal.t = 0 }
+      } else if (cal.step === 'inhale') {
+        if (cal.t >= CAL_INHALE_S) { cal.step = 'exhale'; cal.t = 0; cal.noBlowT = 0 }
+      } else if (cal.step === 'exhale') {
+        // A blow starts only when it isn't tonal, so the Exhale bell doesn't count.
+        if (blow.raw && (cal.cur || blow.tone < BLOW_MAX_TONE)) {
           if (!cal.cur) cal.cur = { t: 0, frames: [], excesses: [], tones: [] }
           cal.cur.t += dt
           if (cal.cur.t > CAL_SKIP_S && cal.cur.t < CAL_MAX_BLOW_S) {
@@ -491,6 +498,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
             cal.tones.push(...cal.cur.tones)
             cal.blows++
             cal.noBlowT = 0
+            if (cal.blows < CAL_BLOWS) { cal.step = 'inhale'; cal.t = 0 }
           }
           cal.cur = null
         }
@@ -519,7 +527,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           blows: cal.blows,
           needed: CAL_BLOWS,
           blowing: !!cal.cur,
-          hint: cal.step === 'blow' && cal.noBlowT > CAL_HINT_S,
+          hint: cal.step === 'exhale' && cal.noBlowT > CAL_HINT_S,
+          inhaleP: cal.step === 'inhale' ? clamp(cal.t / CAL_INHALE_S, 0, 1) : cal.step === 'exhale' ? 1 : 0,
           level: clamp(blow.excess / 15, 0, 1),
         }
       }

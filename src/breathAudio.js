@@ -357,7 +357,7 @@ export function createAudioEngine() {
     // Test Bell (inside the tap; Tutorial Part 3 and the Box Breathing intro):
     // a bell at full level, restarting if it's still ringing. Skips the master gain, so
     // it plays while the Part screen has the rest of the audio muted.
-    testBell(file = BELL_INHALE_EXHALE) {
+    testBell(file = BELL_INHALE_EXHALE, gainMult = 1) {
       ensureRunning()
       if (!ctx) return
       cutBell()
@@ -367,7 +367,7 @@ export function createAudioEngine() {
         const src = ctx.createBufferSource()
         src.buffer = buf
         const gain = ctx.createGain()
-        gain.gain.value = BELL_GAIN * fileGain(file)
+        gain.gain.value = BELL_GAIN * fileGain(file) * gainMult
         src.connect(gain).connect(ctx.destination)
         src.start()
         const ringing = { src, gain }
