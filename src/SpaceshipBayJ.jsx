@@ -6,6 +6,7 @@ import { useGateBurstB, missFactor, applyMissScale } from './gateReactionsB'
 import { createPlaneGateMaterial, ringPulseEmissive, GATE_EMISSIVE } from './planeCloudsG'
 import { createCubeMorphMaterial, gateLookT, applyGateLook } from './cubeMaterialB'
 import { computePhaseDurations } from './BackgroundRingsD'
+import { TEXTS } from './copy'
 import {
   shipLimits, makeCourse, EXIT_TURN_S, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
@@ -60,6 +61,15 @@ const EXIT_MAX_S = 2.8           // ...or after this long
 const FLOOR_SCREEN_PX = 80       // floor front edge above the screen's bottom
 const CUBE_FADE_S = 1
 const COLUMN_SINK_S = 0.6
+// Coaching text (onShipText; App fades each in/out over TEXT_FADE_S):
+// each inhale alternates shipInhaleA / shipInhaleB, hidden INHALE_TEXT_S after
+// it has faded in; while waiting for a blow, shipBlow shows for
+// BLOW_PROMPT_S after fading in, then comes back BLOW_PROMPT_WAIT_S after
+// fading out, until the first blow.
+const TEXT_FADE_S = 1
+const INHALE_TEXT_S = 4
+const BLOW_PROMPT_S = 1
+const BLOW_PROMPT_WAIT_S = 3
 const SLIDER_BLOW_RATE = 0.08   // mic failed (Double Sliders): breath falling this fast (per s) = blowing
 const FLYING = { flying: true, slowing: true, exiting: true }
 
@@ -74,12 +84,12 @@ const approach = (value, target, seconds, dt) => {
 
 export default function SpaceshipBayJ({
   leftVal, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef,
-  blowRef, micFailed, shipStateRef, shipPaceRef, planePosRef, palette, livePaletteRef,
+  blowRef, micFailed, shipStateRef, shipPaceRef, planePosRef, palette, livePaletteRef, onShipText,
 }) {
   const st = useRef(null)
   if (st.current === null) {
     st.current = {
-      phase: 'idle', start: 0, lastBlow: -Infinity, z: 0, exitDir: 0, exitVy: 0, exitDrop: 0, seq: 0, doorOpen: 0, frontDoor: 1, columnH: 0,
+      phase: 'idle', start: 0, inhaleCount: 0, text: null, lastBlow: -Infinity, z: 0, exitDir: 0, exitVy: 0, exitDrop: 0, seq: 0, doorOpen: 0, frontDoor: 1, columnH: 0,
       courseFade: 0, cubes: makeCourse().map(makeCube), prevV: null, fallRate: 0,
     }
   }
@@ -153,6 +163,7 @@ export default function SpaceshipBayJ({
     const startInhale = () => {
       setPhase('inhale')
       s.seq++
+      s.inhaleCount++
       s.z = 0
       s.exitDir = 0
     }
@@ -307,12 +318,23 @@ export default function SpaceshipBayJ({
       const missF = missFactor(cube.missElapsed)
       const rel = cube.judged ? 0 : Math.min(cube.z - s.z, -1e-4)   // < 0 = still ahead of the ship
       applyGateLook(mats.cubes[n], gateLookT(rel), courseFade, ringPulseEmissive(rel) * (1 - missF), live)
+      mats.cubes[n].material.opacity = courseFade   // opaque, not the look's 50% approach
       applyMissScale(mesh, missF)
       mesh.position.set(cube.x, limits.fullY, cube.z)
       mesh.rotation.y = cube.rotY
       mesh.visible = courseFade > 0.001
     })
     gateBurst.tick(now, livePaletteRef)
+
+    // Coaching text.
+    let text = null
+    if (s.phase === 'inhale' && pe < TEXT_FADE_S + INHALE_TEXT_S) {
+      text = s.inhaleCount % 2 === 1 ? TEXTS.shipInhaleA : TEXTS.shipInhaleB
+    } else if (s.phase === 'ready') {
+      const cycle = TEXT_FADE_S + BLOW_PROMPT_S + TEXT_FADE_S + BLOW_PROMPT_WAIT_S
+      if (pe % cycle < TEXT_FADE_S + BLOW_PROMPT_S) text = TEXTS.shipBlow
+    }
+    if (text !== s.text) { s.text = text; onShipText?.(text) }
 
     const pace = shipPaceRef.current
     pace.paced = paced

@@ -72,4 +72,8 @@ export const TEXTS = {
   boxExhale:    'Exhale',
   // Balloon (Shape H): the door closed because no exhale came after the bell.
   balloonRetry: 'Try inhale again and exhale when the bell rings.',
+  // Space Ship (j): alternating inhale coaching, and the exhale prompt.
+  shipInhaleA: 'Slowly fill your lungs up.',
+  shipInhaleB: 'The slower and longer you exhale, the farther the ship will travel.',
+  shipBlow: 'Blow on the mic.',
 }

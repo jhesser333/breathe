@@ -140,6 +140,9 @@ const CAMERA_BY_SHAPE = {
 }
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
+// Space Ship (j): its coaching texts (handleShipText).
+const SHIP_TEXTS = [TEXTS.shipInhaleA, TEXTS.shipInhaleB, TEXTS.shipBlow]
+
 // Shapes that use the Morphing Cube's count/tutorial flow (the Hot Air
 // Balloon reuses the cube's 5-breath count and target timing).
 const usesCubeFlow = (shape) => shape === 'b' || shape === 'f'
@@ -1031,6 +1034,12 @@ export default function App() {
     else if (currentMainTextRef.current === TEXTS.balloonRetry) hideCountText()
   }, [fadeToText, hideCountText])
 
+  // Space Ship (j): its coaching text (SpaceshipBayJ decides when).
+  const handleShipText = useCallback((text) => {
+    if (text) fadeToText(text)
+    else if (SHIP_TEXTS.includes(currentMainTextRef.current)) hideCountText()
+  }, [fadeToText, hideCountText])
+
   // ---- Guided Breathing: Tutorial mode ----
   const tutorialLater = useCallback((fn, ms) => {
     tutorialTimersRef.current.push(setTimeout(fn, ms))
@@ -1244,7 +1253,8 @@ export default function App() {
         breathCountingEnabledRef.current = true
       })
     } else if (screenId === 'part3') {
-      startTutorialPaced()
+      // Space Ship: no closing text (its inhale coaching keeps going).
+      startTutorialPaced({ showDone: shapeRef.current !== 'j' })
     } else if (screenId === 'box') {
       // Box Breathing: countdown, then the paced art and captions.
       leaveTutorialScreen(() => {
@@ -2139,7 +2149,7 @@ export default function App() {
           <SpaceshipBayJ leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef}
             inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} blowRef={blowRef} micFailed={micFailed}
             shipStateRef={shipStateRef} shipPaceRef={shipPaceRef} planePosRef={planePosRef}
-            palette={palette} livePaletteRef={livePaletteRef} />
+            palette={palette} livePaletteRef={livePaletteRef} onShipText={handleShipText} />
         )}
         {showBackgroundArt && shapeOption === 'g' && <GroundTiesG mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}
