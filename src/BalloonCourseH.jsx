@@ -28,19 +28,17 @@ import {
 //   'door-open'-- Exhale bell, the door swings down. An exhale within
 //                 DOOR_WINDOW_S starts the trip if the balloon clears the
 //                 wall (else it bumps the wall); no exhale = a miss.
-//   'retry'    -- after a miss: door closed, balloon deflating (retry text
-//                 shown). Once the controls are back at full exhale the
-//                 balloon follows them again; the next inhale hides the
-//                 text, and reaching full inhale reopens the door.
+//   'retry'    -- after a miss: door closed, retry text shown. The balloon
+//                 keeps following the controls; the next inhale start hides
+//                 the text, and reaching full inhale after it reopens the door.
 //   'exhale'   -- the trip: the course moves one segment over the exhale time.
 //   'hold-out' -- Box only: the short barrier under the balloon pulses on
 //                 each count.
 const SLOTS = 4                 // segments cur-1 .. cur+2
 const DEADBAND = 0.05           // drop from a peak that counts as an exhale start
 const EDGE = 0.02               // controls at full exhale / inhale
-const DOOR_WINDOW_S = 1
+const DOOR_WINDOW_S = 3
 const DOOR_SWING_S = 0.5
-const DEFLATE_MIN_S = 1.2       // a miss deflates at least this long
 const BOUNCE_COOLDOWN_S = 1.15  // MorphH's whole bounce
 const FREE_EXHALE_S = 6         // trip time before the app's pace starts
 const TRAVEL_RAMP = 0.15        // trip speed eases up/down over this fraction
@@ -77,7 +75,7 @@ export default function BalloonCourseH({
   const refs = useRef(Array.from({ length: SLOTS }, () => ({ group: null, short: null, walls: [], doorPivot: null, door: null, rings: [] })))
   const st = useRef(null)
   if (st.current === null) {
-    st.current = { phase: 'inhale', start: 0, travel: 0, travelFrom: 0, cur: 0, doorTarget: 0, recovering: false, bellSeq: 0, wasPaced: false, showingRetry: false,
+    st.current = { phase: 'inhale', start: 0, travel: 0, travelFrom: 0, cur: 0, doorTarget: 0, bellSeq: 0, wasPaced: false, showingRetry: false,
       det: { dir: 'down', peak: 0, trough: 0 } }
   }
 
@@ -142,12 +140,12 @@ export default function BalloonCourseH({
       b.mode = 'travel'; b.travelP = 0; setBreathPhase('exhale')
     }
     const miss = () => {
-      setPhase('retry'); s.doorTarget = 0; s.recovering = true; b.mode = 'deflate'; showRetry(true); setBreathPhase('inhale')
+      setPhase('retry'); s.doorTarget = 0; s.retryArmed = false; showRetry(true); setBreathPhase('inhale')
     }
 
     // The pace starting (or the tutorial's paced part): begin on an Inhale.
     if (paced && !s.wasPaced && (s.phase === 'inhale' || s.phase === 'retry')) {
-      showRetry(false); s.recovering = false; startInhale()
+      showRetry(false); startInhale()
     }
     s.wasPaced = paced
 
@@ -168,13 +166,9 @@ export default function BalloonCourseH({
         else if (elapsed > DOOR_WINDOW_S) miss()
         break
       case 'retry':
-        if (s.recovering) {
-          if (elapsed >= DEFLATE_MIN_S && v <= EDGE) { s.recovering = false; b.mode = 'follow' }
-        } else {
-          if (inhaleStart) showRetry(false)
-          if (exhaleStart) bounce()
-          if (v >= 1 - EDGE) { showRetry(false); openDoor() }
-        }
+        if (inhaleStart) { showRetry(false); s.retryArmed = true }
+        if (exhaleStart) bounce()
+        if (s.retryArmed && v >= 1 - EDGE) openDoor()
         break
       case 'exhale': {
         const p = Math.min(1, elapsed / s.tripDur)

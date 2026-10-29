@@ -46,6 +46,9 @@ export default function PersonalizeScreen({ shapeOption, onSelectShape, onSelect
         <button style={optionBtn(shapeOption === 'h', palette)} onClick={() => onSelectShape('h')}>
           <div style={{ fontSize: 17, fontWeight: 500 }}>Balloon (in-progress) {shapeOption === 'h' && '✓'}</div>
         </button>
+        <button style={optionBtn(shapeOption === 'i', palette)} onClick={() => onSelectShape('i')}>
+          <div style={{ fontSize: 17, fontWeight: 500 }}>Input Test {shapeOption === 'i' && '✓'}</div>
+        </button>
       </div>
 
       <OptionsNav

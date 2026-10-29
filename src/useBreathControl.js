@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from 'react'
 //   'single' -- slide one finger up/down anywhere on the screen
 //   'touch'  -- any finger down = inhale, none = exhale
 //   'tilt'   -- tip the phone's top edge toward you (inhale) / away (exhale)
-//   'blow'   -- blow on the microphone = exhale, quiet = inhale,
-//               quiet with a finger on the screen = hold
+//   'blow'   -- tilt + blow: tipping the phone toward flat (exhale) moves
+//               the sliders only while the mic hears a breath, easing to
+//               the tilt; tipping back toward upright (inhale) follows the
+//               tilt and ignores the mic
 
 // Single Slider
 const SINGLE_TRAVEL_FRAC = 1 / 3  // finger travel (of screen height) for full Exhale -> Inhale
@@ -49,10 +51,7 @@ const FLOOR_FREEZE_MAX_S = 8
 const BLOW_CALIBRATE_S = 0.5      // first stretch of real audio sets the floor
 const BLOW_NO_DATA_DB = -110      // below this the analyser has no audio
 const MIC_SILENT_MS = 1000        // no audio this long = mic stale, next tap rebuilds it
-const BLOW_MIN_RATE_PER_S = 1 / 6 // exhale speed, gentle -> hard blow
-const BLOW_MAX_RATE_PER_S = 1 / 2
-const BLOW_RELEASE_MS = 300       // pause this long before the inhale starts
-const BLOW_INHALE_RATE_PER_S = 1 / 4  // quiet: full inhale in 4 s
+const BLOW_CATCHUP_S = 0.3        // blowing: v eases to the tilt over about this long
 
 // Must be called inside a tap (iOS asks for motion access). Resolves true
 // when tilt readings are allowed.
@@ -133,11 +132,12 @@ export function requestMicAccess(keep = true) {
 const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('button'))
 
 // control: 'single' | 'touch' | 'tilt' | 'blow' | null (off). onValue(v) is
-// called whenever v changes. blowRef (blow only) is set to 1 while the mic
-// hears a blow, else 0. getQuietRate() (blow only) gives the rise while
-// quiet: null = no pace (BLOW_INHALE_RATE_PER_S), else v/s.
-// Returns v for the thumbs (null when off).
-export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef }) {
+// called whenever v changes. blowRef (blow only) is set to 1 while the mic's
+// blow is driving an exhale, else 0. allSensors (Input Test) reads tilt and
+// mic whatever the control; readoutRef gets { tilt, mic, blowing } each frame
+// (tilt 0 flat/exhale -> 1 upright/inhale, mic = blow strength 0 -> 1; null =
+// no reading). Returns v for the thumbs (null when off).
+export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, blowRef, allSensors = false, readoutRef }) {
   const [shown, setShown] = useState(null)
   const onValueRef = useRef(onValue)
   onValueRef.current = onValue
@@ -145,8 +145,6 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
   onTiltFailRef.current = onTiltFail
   const onMicFailRef = useRef(onMicFail)
   onMicFailRef.current = onMicFail
-  const getQuietRateRef = useRef(getQuietRate)
-  getQuietRateRef.current = getQuietRate
   const vRef = useRef(0)
 
   useEffect(() => { vRef.current = 0 }, [resetKey])
@@ -156,6 +154,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     vRef.current = 0
     let lastSent = -1
     const disabled = () => !!disabledRef?.current
+    const useMic = control === 'blow' || allSensors
+    const useTilt = control === 'tilt' || control === 'blow' || allSensors
 
     // Pointers held down (not on buttons).
     const down = new Map()   // pointerId -> { y, t, lastMoveT }
@@ -168,7 +168,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     const blow = {
       gen: -1, bands: 0, power: null, floor: null, slots: null, slotMin: null, slotT: 0, slotI: 0,
       calS: 0, onS: 0, silentMs: 0,
-      on: false, strength: 0, lastOnT: -Infinity, excess: 0, coverage: 0, flatness: 0,
+      on: false, strength: 0, excess: 0, coverage: 0, flatness: 0,
     }
     const resetBlow = (bands) => {
       blow.gen = micGen
@@ -187,7 +187,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     }
     // ?micdebug in the URL shows the detector's numbers, for tuning on a phone.
     let debugEl = null
-    if (control === 'blow' && /[?&]micdebug/.test(window.location.search)) {
+    if (useMic && /[?&]micdebug/.test(window.location.search)) {
       debugEl = document.createElement('div')
       Object.assign(debugEl.style, {
         position: 'fixed', top: '40px', left: '8px', zIndex: 1000, pointerEvents: 'none',
@@ -227,7 +227,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     const onUp = (e) => {
       down.delete(e.pointerId)
       // The phone drops the mic when locked or backgrounded: any tap gets it back.
-      if (control === 'blow') requestMicAccess().then((ok) => { if (!ok) onMicFailRef.current?.() })
+      if (useMic) requestMicAccess().then((ok) => { if (!ok) onMicFailRef.current?.() })
       if (single && e.pointerId === single.id) {
         if (Math.abs(speed) > 0) glideDir = Math.sign(speed)
         single = null
@@ -245,8 +245,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     window.addEventListener('pointerup', onUp, opts)
     window.addEventListener('pointercancel', onUp, opts)
     let tiltTimer = null
-    if (control === 'tilt') {
-      window.addEventListener('deviceorientation', onTilt)
+    if (useTilt) window.addEventListener('deviceorientation', onTilt)
+    if (control === 'tilt' || control === 'blow') {
       tiltTimer = setTimeout(() => { if (!gotTilt) onTiltFailRef.current?.() }, TILT_NO_READING_MS)
     }
 
@@ -333,9 +333,17 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       const dt = Math.min(0.1, (now - prev) / 1000)
       prev = now
       let v = vRef.current
-      if (control === 'blow') {
-        readBlow(dt)   // keeps the noise floor current even while disabled
-        if (blowRef) blowRef.current = blow.on ? 1 : 0
+      if (useMic) readBlow(dt)   // keeps the noise floor current even while disabled
+      // Blow + tilt: the mic only counts while the tilt asks for an exhale.
+      const blowExhale = control === 'blow' && blow.on && tiltTarget !== null && tiltTarget < v
+      if (blowRef) blowRef.current = blowExhale ? 1 : 0
+      if (readoutRef) {
+        readoutRef.current = {
+          tilt: tiltTarget,
+          mic: useMic && micLive() && blow.calS >= BLOW_CALIBRATE_S ? blow.strength : null,
+          blowing: blow.on,
+          v,
+        }
       }
       if (debugEl) {
         const status = !micLive() ? 'mic off'
@@ -343,7 +351,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           : blow.calS < BLOW_CALIBRATE_S ? 'calibrating' : blow.on ? 'BLOWING' : 'quiet'
         debugEl.textContent = `mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}  silent ${Math.round(blow.silentMs)}ms\n`
           + `rise ${blow.excess.toFixed(1)}dB  bands ${Math.round(blow.coverage * 100)}%  flat ${blow.flatness.toFixed(2)}\n`
-          + `${status}  v ${v.toFixed(2)}`
+          + `${status}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}`
       }
       if (disabled()) {
         glideDir = 0
@@ -362,15 +370,13 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       } else if (control === 'tilt' && tiltTarget !== null) {
         v += (tiltTarget - v) * (1 - Math.exp(-dt / TILT_SMOOTH_S))
         if (Math.abs(tiltTarget - v) < 0.0005) v = tiltTarget
-      } else if (control === 'blow') {
-        if (blow.on) {
-          blow.lastOnT = now
-          const rate = BLOW_MIN_RATE_PER_S + (BLOW_MAX_RATE_PER_S - BLOW_MIN_RATE_PER_S) * blow.strength
-          v = Math.max(0, v - rate * dt)
-        } else if (down.size === 0 && now - blow.lastOnT > BLOW_RELEASE_MS) {
-          // A finger on the screen (not on a button) holds; blowing still exhales.
-          const rate = getQuietRateRef.current?.() ?? BLOW_INHALE_RATE_PER_S
-          v = Math.min(1, v + rate * dt)
+      } else if (control === 'blow' && tiltTarget !== null) {
+        // Toward upright (inhale): follow the tilt, mic ignored. Toward flat
+        // (exhale): only while blowing, easing to the tilt; quiet holds.
+        const ease = tiltTarget > v ? TILT_SMOOTH_S : blowExhale ? BLOW_CATCHUP_S : 0
+        if (ease > 0) {
+          v += (tiltTarget - v) * (1 - Math.exp(-dt / ease))
+          if (Math.abs(tiltTarget - v) < 0.0005) v = tiltTarget
         }
       }
       vRef.current = v
@@ -391,11 +397,12 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
       window.removeEventListener('deviceorientation', onTilt)
-      if (control === 'blow') releaseMic()
+      if (useMic) releaseMic()
       if (blowRef) blowRef.current = 0
+      if (readoutRef) readoutRef.current = null
       debugEl?.remove()
     }
-  }, [control, disabledRef])
+  }, [control, disabledRef, allSensors])
 
   return shown
 }
