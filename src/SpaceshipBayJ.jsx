@@ -525,13 +525,13 @@ export default function SpaceshipBayJ({
     if (debugRef.current) {
       const px = planePosRef?.current?.x ?? 0
       const side = Math.abs(px) <= SIDE_DEADZONE_X ? 'center' : px < 0 ? 'left' : 'right'
-      debugRef.current.textContent =
-        `ship ${s.phase}
-z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})
-` +
-        `x ${px.toFixed(2)} ${side}
-blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}
-last trip: ${s.lastEnd}`
+      debugRef.current.textContent = [
+        `ship ${s.phase}`,
+        `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
+        `x ${px.toFixed(2)} ${side}`,
+        `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
+        `last trip: ${s.lastEnd}`,
+      ].join('\n')
     }
   })
 
