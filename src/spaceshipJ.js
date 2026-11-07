@@ -58,18 +58,21 @@ export const COURSE_END_Z = SPHERE_Z  // a ship that missed the sphere(s) ends i
 
 // Cube targets, three cube lengths apart (CUBE_SPACING, center to center): a
 // straight line down the middle (x = 0, from FORK_Z) to the middle sphere,
-// and a branch to each side sphere that curves off it (smoothstep from x = 0
-// at FORK_Z to the sphere's x at BRANCH_END_Z, so it leaves the middle line
-// along it and arrives heading straight on). x and the Y turn are worked out
-// each frame (resolveCourse), since the side spheres' x follows the screen.
-// A branch cube that would sit on the middle line's cube (|x| under
-// MERGE_X) is hidden: the branch comes off the line after it. Following a
-// line is optional: docking only needs the ship lined up with a sphere.
+// and a path to each side sphere: it starts beside the middle line's second
+// cube (x = ±BRANCH_START_X, z BRANCH_START_Z), heading straight ahead, and
+// curves out in a circular arc through the side sphere's center, so it meets
+// the sphere a little toward the middle from its nearest point and the ship
+// following it enters there. x and the Y turn are worked out each frame
+// (resolveCourse), since the side spheres' x follows the screen; path cubes
+// inside the sphere (or touching it) are hidden. Following a path is
+// optional: docking only needs the ship to reach a sphere.
 export const TARGET_SIZE = 0.5
 export const CUBE_SPACING = TARGET_SIZE * 4
-export const FORK_Z = -3             // first middle cube; the branches curve off from here
-const BRANCH_END_Z = SPHERE_Z + SPHERE_R + 1   // last cubes, just before the spheres
-const MERGE_X = TARGET_SIZE * 1.5    // a branch cube closer than this to the middle line is hidden
+export const FORK_Z = -3             // first middle cube
+const MIDDLE_END_Z = SPHERE_Z + SPHERE_R + 1   // last middle cube, just before the middle sphere
+const BRANCH_START_Z = FORK_Z - CUBE_SPACING   // beside the middle line's second cube
+const BRANCH_START_X = TARGET_SIZE * 2         // ...one cube's gap from it
+const BRANCH_END_Z = SPHERE_Z        // side paths: rows down to the sphere's center (the ones inside are hidden)
 
 // Worlds: each sphere is one breath-cycle palette plus the slider audio group
 // with the same index (BREATH_CYCLE_PALETTES[k] <-> slider group k).
@@ -80,11 +83,11 @@ export const WORLD_COUNT = BREATH_CYCLE_PALETTES.length
 // same z share a row; as the ship passes a row, only its nearest cube is judged.
 function makeCubes() {
   const cubes = []
-  const span = FORK_Z - BRANCH_END_Z
   for (const side of SPHERE_SIDES) {
     let row = side === 0 ? 0 : 1
-    for (let z = side === 0 ? FORK_Z : FORK_Z - CUBE_SPACING; z >= BRANCH_END_Z - 1e-6; z -= CUBE_SPACING, row++) {
-      cubes.push({ z, u: (FORK_Z - z) / span, branch: side, row, x: 0, rotY: 0, hidden: false })
+    const end = side === 0 ? MIDDLE_END_Z : BRANCH_END_Z
+    for (let z = side === 0 ? FORK_Z : BRANCH_START_Z; z >= end - 1e-6; z -= CUBE_SPACING, row++) {
+      cubes.push({ z, branch: side, row, x: 0, rotY: 0, hidden: false })
     }
   }
   return cubes
@@ -122,14 +125,23 @@ export function halfWidthAt(camera, y, z) {
 export function resolveCourse(course, camera, y) {
   const sphereX = Math.max(0, halfWidthAt(camera, y, SPHERE_Z) - SPHERE_R - SPHERE_EDGE_MARGIN)
   for (const sp of course.spheres) sp.x = sp.side * sphereX
-  const span = FORK_Z - BRANCH_END_Z
-  const xAt = (z) => sphereX * THREE.MathUtils.smoothstep((FORK_Z - z) / span, 0, 1)   // a right branch's x
+  // A right path's x at z: the circle tangent to straight ahead at
+  // (BRANCH_START_X, BRANCH_START_Z) through the sphere's center (radius R,
+  // its center R to the right of the start).
+  const dx = sphereX - BRANCH_START_X
+  const dz = BRANCH_START_Z - SPHERE_Z
+  const R = dx > 1e-3 ? (dx * dx + dz * dz) / (2 * dx) : Infinity
+  const xAt = (z) => {
+    if (!Number.isFinite(R)) return BRANCH_START_X
+    const d = Math.min(BRANCH_START_Z - z, R)
+    return BRANCH_START_X + R - Math.sqrt(Math.max(0, R * R - d * d))
+  }
   for (const c of course.cubes) {
     if (c.branch === 0) { c.x = 0; c.rotY = 0; c.hidden = false; continue }
     c.x = c.branch * xAt(c.z)
     const slope = c.branch * (xAt(c.z - 0.05) - xAt(c.z + 0.05)) / 0.1   // dx per unit down the road
     c.rotY = Math.atan2(-slope, 1)
-    c.hidden = Math.abs(c.x) < MERGE_X
+    c.hidden = Math.hypot(c.x - c.branch * sphereX, c.z - SPHERE_Z) < SPHERE_R + TARGET_SIZE / 2
   }
 }
 

@@ -237,17 +237,23 @@ export default function SpaceshipBayJ({
       s.exitDir = 0
       s.passedFront = false
     }
-    // Reached the spheres' front edge: within SPHERE_R of a sphere's center
-    // (sideways) -> glide to its center and park. Otherwise a miss.
+    // Entered a sphere (seen from above, the ship's center inside its circle,
+    // from the front or a little from the side, as the curved side paths
+    // arrive) -> glide to its center and park. Past the spheres' centers
+    // without entering one: a miss.
     const checkArrival = (speed) => {
       const sp = s.course.spheres[0]
       if (s.passedFront || s.z > sp.z + SPHERE_R) return false
       const px = planePosRef?.current?.x ?? 0
+      const dist = (q) => Math.hypot(px - q.x, s.z - q.z)
       let idx = -1
       s.course.spheres.forEach((q, n) => {
-        if (Math.abs(px - q.x) < SPHERE_R && (idx < 0 || Math.abs(px - q.x) < Math.abs(px - s.course.spheres[idx].x))) idx = n
+        if (dist(q) < SPHERE_R && (idx < 0 || dist(q) < dist(s.course.spheres[idx]))) idx = n
       })
-      if (idx < 0) { s.passedFront = true; return false }
+      if (idx < 0) {
+        if (s.z <= sp.z) s.passedFront = true
+        return false
+      }
       const target = s.course.spheres[idx]
       setPhase('arriving')
       const zDur = Math.max(0.1, (2 * (s.z - target.z)) / Math.max(0.1, speed))
@@ -555,7 +561,7 @@ export default function SpaceshipBayJ({
     pace.inhaleDur = inhaleDur
     if (debugRef.current) {
       const px = planePosRef?.current?.x ?? 0
-      const inside = s.course.spheres.some((q) => Math.abs(px - q.x) < SPHERE_R)
+      const inside = s.course.spheres.some((q) => Math.abs(px - q.x) < SPHERE_R)   // lined up (from the front)
       debugRef.current.textContent = [
         `ship ${s.phase}`,
         `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
