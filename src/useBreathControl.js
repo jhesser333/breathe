@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  FFT_SIZE, BLOW_LOW_HZ, BLOW_HIGH_HZ, BLOW_MAX_TONE, BLOW_CALIBRATE_S,
+  createBlowState, resetBlowState, analyzeBlowFrame, buildProfile,
+} from './blowDetector'
 
 // Control Options other than the sliders: each one drives the breath value
 // v (0 exhale -> 1 inhale) from its own input, and the slider thumbs follow it.
@@ -21,42 +25,8 @@ const TILT_EXHALE_DEG = 25
 const TILT_INHALE_DEG = 65        // 25 degrees back from vertical
 const TILT_SMOOTH_S = 0.15
 const TILT_NO_READING_MS = 1000   // no reading this long after starting = no sensor
-// Blow on the Mic. Blowing on a mic is loud, noise-like and mostly low
-// frequency; a breath from arm's length is a quieter, higher hiss. Speech
-// and the app's own sounds are tonal. The band is split into narrow bands,
-// each with its own noise floor, so steady room noise (a fan, white noise)
-// cancels out and a blow shows as many bands rising at once.
-// On top of that: a breath must last (BLOW_HOLD_S, so taps and bumps don't
-// count), must not be pitched (tone: voices and the app's bells/music have
-// peaks at their harmonics, a breath is smooth), and, once the session's mic
-// check has recorded the user's blow, must match its shape across the bands.
-const FFT_SIZE = 2048             // ~23 Hz bins: fine enough to see a voice's harmonics
-const BLOW_LOW_HZ = 50            // band the blow is measured in
-const BLOW_HIGH_HZ = 3000
-const BINS_PER_BAND = 8           // FFT bins summed into each band (~190 Hz)
-const TONE_SPAN = 3               // tone compares each bin with its neighbours this far each side
-const TONE_SMOOTH_S = 0.15
-const BLOW_MAX_TONE = 0.75        // no mic check: above this the rise is pitched (0 smooth -> ~1+ tones)
-const BLOW_HOLD_S = 0.15          // a blow must hold this long to start...
-const BLOW_RELEASE_S = 0.15       // ...and stop this long to end
-const BLOW_MATCHED_COVERAGE = 0.2 // with a mic check, the shape match replaces most of the coverage rule
-const BAND_SMOOTH_S = 0.1         // each band's level is smoothed over this
-const BAND_ON_DB = 3              // a band this far above its floor has risen
-const BLOW_ON_COVERAGE = 0.35     // share of bands risen to start blowing...
-const BLOW_ON_DB = 3              // ...with the bands' average this far above the floor
-const BLOW_OFF_COVERAGE = 0.2     // blowing stops below either of these (hysteresis)
-const BLOW_OFF_DB = 1.5
-const BLOW_RANGE_DB = 12          // OFF + this average = full strength
-const BLOW_MIN_FLATNESS = 0.3     // flatness of the rise across bands needed to start (0 tone -> 1 even)
-// Noise floor: each band's lowest level over the last FLOOR_WINDOW_S (kept as
-// FLOOR_SLOTS sub-windows), so it follows a quieter or louder room within
-// about 2 s. Frozen while blowing, up to FLOOR_FREEZE_MAX_S.
-const FLOOR_WINDOW_S = 2
-const FLOOR_SLOTS = 8
-const FLOOR_SMOOTH_S = 0.2
-const FLOOR_BIAS_DB = 1.5         // the minimum sits below the average level; lift it back
-const FLOOR_FREEZE_MAX_S = 8
-const BLOW_CALIBRATE_S = 0.5      // first stretch of real audio sets the floor
+// Blow on the Mic: the detection itself (what counts as a blow, the noise
+// floor, the mic check's profile) is in blowDetector.js.
 const BLOW_NO_DATA_DB = -110      // below this the analyser has no audio
 const MIC_SILENT_MS = 1000        // no audio this long = mic stale, next tap rebuilds it
 const BLOW_MIN_RATE_PER_S = 1 / 6 // exhale speed, gentle -> hard blow
@@ -69,7 +39,8 @@ const BLOW_INHALE_RATE_PER_S = 1 / 4  // quiet: full inhale in 4 s
 // rings the Exhale bell, and cuts it once the blow starts; the columns drain
 // over CAL_EXHALE_S from the bell, suggesting a 6 s exhale).
 // The blows' average shape across the bands becomes the template, and the
-// thresholds (level, match, tone, strength range) are set from them.
+// thresholds (level, match, tone, steadiness, strength range) are set from
+// them (buildProfile).
 const CAL_QUIET_S = 2
 const CAL_BLOWS = 3
 const CAL_INHALE_S = 4
@@ -81,44 +52,9 @@ const CAL_HINT_S = 10             // no blow this long: suggest closer / harder
 const CAL_DONE_MS = 1200          // "Got it" shows this long
 
 // The last mic check's result, kept across sessions (Skip keeps it).
-let blowProfile = null   // { template, matchOn, matchOff, levelOn, levelOff, range, toneMax }
+let blowProfile = null   // { bands, template, matchOn, matchOff, levelOn, levelOff, range, toneMax, jitterMax }
 
-const percentile = (arr, p) => {
-  if (!arr.length) return 0
-  const s = [...arr].sort((a, b) => a - b)
-  return s[Math.min(s.length - 1, Math.max(0, Math.floor(p * (s.length - 1))))]
-}
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x))
-// Cosine similarity of the rise (dB per band) with a unit template.
-function shapeMatch(rise, template) {
-  let dot = 0, nn = 0
-  for (let b = 0; b < rise.length; b++) { dot += rise[b] * template[b]; nn += rise[b] * rise[b] }
-  return nn > 1e-9 ? dot / Math.sqrt(nn) : 0
-}
-
-function buildProfile(frames, excesses, tones, quietExcesses) {
-  const bands = frames[0].length
-  const template = new Float32Array(bands)
-  for (const f of frames) for (let b = 0; b < bands; b++) template[b] += f[b]
-  let norm = 0
-  for (let b = 0; b < bands; b++) norm += template[b] * template[b]
-  norm = Math.sqrt(norm) || 1
-  for (let b = 0; b < bands; b++) template[b] /= norm
-  const matches = frames.map((f) => shapeMatch(f, template))
-  const matchOn = clamp(percentile(matches, 0.2) - 0.05, 0.5, 0.92)
-  const quietTop = percentile(quietExcesses, 0.95)
-  const levelOn = clamp(Math.max(quietTop + 1.5, 0.35 * percentile(excesses, 0.5)), BLOW_ON_DB, 12)
-  const levelOff = Math.max(BLOW_OFF_DB, levelOn * 0.5)
-  return {
-    template,
-    matchOn,
-    matchOff: matchOn - 0.1,
-    levelOn,
-    levelOff,
-    range: Math.max(4, percentile(excesses, 0.9) - levelOff),
-    toneMax: clamp(percentile(tones, 0.8) * 1.25 + 0.05, 0.35, 1.2),
-  }
-}
 
 // Must be called inside a tap (iOS asks for motion access). Resolves true
 // when tilt readings are allowed.
@@ -201,10 +137,10 @@ const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('but
 // control: 'single' | 'touch' | 'tilt' | 'blow' | null (off). onValue(v) is
 // called whenever v changes. blowRef (blow only) is set to 1 while the mic
 // hears a blow, else 0. blowDetailRef (blow only, optional) gets
-// { raw, start, tone } each frame: raw = the loose detector, start = the mic
-// check's blow-start rule (strict on, or loose with a breath-like tone, so a
-// ringing bell doesn't block it); the Space Ship starts its flight on start
-// and keeps flying on raw. getQuietRate() (blow only) gives the rise while
+// { candidate, strict, tone, why } each frame: candidate = a blow that lasts,
+// is steady and has the user's shape but may still be under a ringing bell
+// (looser tone limit), strict = blowRef's detector, why = the first strict
+// rule failing; the Space Ship flies on either. getQuietRate() (blow only) gives the rise while
 // quiet: null = no pace (BLOW_INHALE_RATE_PER_S), else v/s. allSensors (Input Test) reads tilt and
 // mic whatever the control; readoutRef gets { tilt, mic, blowing } each frame
 // (tilt 0 flat/exhale -> 1 upright/inhale, mic = blow strength 0 -> 1; null =
@@ -245,37 +181,15 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     let glideDir = 0         // +1 / -1 while gliding to an end
     let tiltTarget = null
     let gotTilt = false
-    // Blow on the Mic: per-bin smoothed power and noise floor, per-band rise,
-    // blowing state. raw = the loose detector (loud and broad, nothing else),
-    // used by the mic check to find the user's blows.
-    const blow = {
-      gen: -1, n: 0, bands: 0, power: null, floor: null, slots: null, slotMin: null, slotT: 0, slotI: 0,
-      rise: null, extra: null,
-      calS: 0, onS: 0, silentMs: 0, holdS: 0, releaseS: 0,
-      on: false, raw: false, lastOnT: -Infinity, strength: 0, excess: 0, coverage: 0, flatness: 0, tone: 0, match: null,
-    }
-    const resetBlow = (n) => {
-      const bands = n / BINS_PER_BAND
-      blow.gen = micGen
-      blow.n = n
-      blow.bands = bands
-      blow.power = new Float32Array(n)
-      blow.floor = new Float32Array(n)
-      blow.slots = Array.from({ length: FLOOR_SLOTS }, () => new Float32Array(n).fill(Infinity))
-      blow.slotMin = new Float32Array(n).fill(Infinity)
-      blow.rise = new Float32Array(bands)
-      blow.extra = new Float32Array(n)
-      blow.slotT = 0
-      blow.slotI = 0
-      blow.calS = 0
-      blow.onS = blow.holdS = blow.releaseS = 0
-      blow.on = blow.raw = false
-      blow.strength = 0
-      blow.excess = blow.coverage = blow.flatness = blow.tone = 0
-      blow.match = null
-    }
+    // Blow on the Mic: the detector's state (blowDetector.js). raw = the
+    // loose detector (loud and broad, nothing else), used by the mic check to
+    // find the user's blows; candidate / on = see analyzeBlowFrame.
+    const blow = createBlowState()
+    let blowGen = -1
+    let silentMs = 0
+    let lastOnT = -Infinity
     // Mic check state (see CAL_*).
-    const cal = { key: 0, step: 'idle', t: 0, quiet: [], frames: [], excesses: [], tones: [], cur: null, blows: 0, noBlowT: 0 }
+    const cal = { key: 0, step: 'idle', t: 0, quiet: [], frames: [], excesses: [], tones: [], jitters: [], cur: null, blows: 0, noBlowT: 0 }
     // ?micdebug in the URL shows the detector's numbers, for tuning on a phone.
     let debugEl = null
     if (useMic && /[?&]micdebug/.test(window.location.search)) {
@@ -341,17 +255,17 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       tiltTimer = setTimeout(() => { if (!gotTilt) onTiltFailRef.current?.() }, TILT_NO_READING_MS)
     }
 
-    // Reads the mic into blow.on / blow.strength (0-1).
+    const blowOff = () => { blow.on = blow.raw = blow.candidate = false }
+    // Reads the mic into blow.on / blow.candidate / blow.strength (0-1).
     const readBlow = (dt) => {
-      if (!micLive()) { blow.on = blow.raw = false; blow.silentMs = 0; return }
+      if (!micLive()) { blowOff(); silentMs = 0; return }
       const { analyser, bins } = mic
       analyser.getFloatFrequencyData(bins)
       const hz = micCtx.sampleRate / FFT_SIZE
       const lo = Math.max(1, Math.round(BLOW_LOW_HZ / hz))
       const hi = Math.min(bins.length - 1, Math.round(BLOW_HIGH_HZ / hz))
-      const n = Math.max(1, Math.floor((hi - lo + 1) / BINS_PER_BAND)) * BINS_PER_BAND
-      if (blow.gen !== micGen || blow.n !== n) resetBlow(n)
-      const bands = blow.bands
+      const n = Math.max(1, hi - lo + 1)
+      if (blowGen !== micGen) { blowGen = micGen; resetBlowState(blow, lo, n, hz) }
 
       // No audio (context not running, or a silent stream): after a while, mark
       // the mic stale so the next tap rebuilds it.
@@ -359,109 +273,17 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       for (let i = 0; i < n; i++) total += Math.pow(10, bins[lo + i] / 10)
       const level = 10 * Math.log10(total / n + 1e-30)
       if (level < BLOW_NO_DATA_DB || micCtx.state !== 'running') {
-        blow.silentMs += dt * 1000
-        if (blow.silentMs > MIC_SILENT_MS) micStale = true
-        blow.on = blow.raw = false
+        silentMs += dt * 1000
+        if (silentMs > MIC_SILENT_MS) micStale = true
+        blowOff()
         return
       }
-      blow.silentMs = 0
+      silentMs = 0
 
-      // Each bin's power, smoothed.
-      const kp = 1 - Math.exp(-dt / BAND_SMOOTH_S)
-      const first = blow.calS === 0
-      for (let i = 0; i < n; i++) {
-        const p = Math.pow(10, bins[lo + i] / 10)
-        blow.power[i] = first ? p : blow.power[i] + (p - blow.power[i]) * kp
-      }
-
-      // Floor = each bin's lowest level over the window. Held while blowing
-      // (either detector), so a blow never becomes the floor -- if only the
-      // strict one held it, every flicker of it mid-blow fed the blow into the
-      // floor until the blow vanished. Not held forever, so it can't stick on.
-      const calibrating = blow.calS < BLOW_CALIBRATE_S
-      const holding = blow.on || blow.raw
-      blow.onS = holding ? blow.onS + dt : 0
-      if (calibrating || !holding || blow.onS > FLOOR_FREEZE_MAX_S) {
-        for (let i = 0; i < n; i++) blow.slotMin[i] = Math.min(blow.slotMin[i], blow.power[i])
-        blow.slotT += dt
-        if (blow.slotT >= FLOOR_WINDOW_S / FLOOR_SLOTS) {
-          blow.slots[blow.slotI].set(blow.slotMin)
-          blow.slotI = (blow.slotI + 1) % FLOOR_SLOTS
-          blow.slotMin.fill(Infinity)
-          blow.slotT = 0
-        }
-      }
-      const kf = 1 - Math.exp(-dt / FLOOR_SMOOTH_S)
-      const bias = Math.pow(10, FLOOR_BIAS_DB / 10)
-      for (let i = 0; i < n; i++) {
-        let m = blow.slotMin[i]
-        for (let s = 0; s < FLOOR_SLOTS; s++) m = Math.min(m, blow.slots[s][i])
-        m *= bias
-        blow.floor[i] = calibrating ? m : blow.floor[i] + (m - blow.floor[i]) * kf
-      }
-      if (calibrating) { blow.calS += dt; blow.on = blow.raw = false; return }
-
-      // Rise over the floor per band: average dB, share of bands risen, and how
-      // evenly the rise is spread (a tone lifts a few bands, a breath lifts them all).
-      let dbSum = 0, risen = 0, ratioSum = 0, logRatioSum = 0
-      for (let b = 0; b < bands; b++) {
-        let p = 0, f = 0
-        for (let j = 0; j < BINS_PER_BAND; j++) { p += blow.power[b * BINS_PER_BAND + j]; f += blow.floor[b * BINS_PER_BAND + j] }
-        const ratio = Math.max(1, p / Math.max(f, 1e-30))
-        const db = 10 * Math.log10(ratio)
-        blow.rise[b] = db
-        dbSum += db
-        if (db > BAND_ON_DB) risen++
-        ratioSum += ratio
-        logRatioSum += Math.log(ratio)
-      }
-      blow.excess = dbSum / bands
-      blow.coverage = risen / bands
-      blow.flatness = Math.exp(logRatioSum / bands) / (ratioSum / bands)
-
-      // Tone: how peaky the added sound is from bin to bin. Each bin's extra
-      // power over its floor vs the average of its neighbours: a breath's
-      // extra is smooth, harmonics stand out from the bins between them.
-      let extraSum = 0, devSum = 0
-      for (let i = 0; i < n; i++) blow.extra[i] = Math.max(0, blow.power[i] - blow.floor[i])
-      for (let i = 0; i < n; i++) {
-        const a = Math.max(0, i - TONE_SPAN), z = Math.min(n - 1, i + TONE_SPAN)
-        let s = 0
-        for (let j = a; j <= z; j++) s += blow.extra[j]
-        const mean = s / (z - a + 1)
-        devSum += Math.abs(blow.extra[i] - mean)
-        extraSum += mean
-      }
-      const toneNow = extraSum > 0 ? devSum / extraSum : 0
-      blow.tone += (toneNow - blow.tone) * (1 - Math.exp(-dt / TONE_SMOOTH_S))
-
-      // Loose detector: loud and broad (the mic check uses it to find blows).
-      if (!blow.raw && blow.coverage > BLOW_ON_COVERAGE && blow.excess > BLOW_ON_DB) blow.raw = true
-      else if (blow.raw && (blow.coverage < BLOW_OFF_COVERAGE || blow.excess < BLOW_OFF_DB)) blow.raw = false
-
-      // Strict detector. With a mic check: the user's level, tone and shape.
-      // Without: the old coverage/flatness rules plus a fixed tone limit.
-      const prof = blowProfile && blowProfile.template.length === bands
+      // The mic check's profile applies once it's done (not while it records).
+      const prof = blowProfile && blowProfile.bands === blow.bands
         && cal.step !== 'wait' && cal.step !== 'quiet' && cal.step !== 'inhale' && cal.step !== 'exhale' ? blowProfile : null
-      blow.match = prof ? shapeMatch(blow.rise, prof.template) : null
-      const levelOff = prof ? prof.levelOff : BLOW_OFF_DB
-      const toneMax = prof ? prof.toneMax : BLOW_MAX_TONE
-      const wantOn = blow.excess > (prof ? prof.levelOn : BLOW_ON_DB)
-        && blow.tone < toneMax
-        && (prof
-          ? blow.coverage > BLOW_MATCHED_COVERAGE && blow.match > prof.matchOn
-          : blow.coverage > BLOW_ON_COVERAGE && blow.flatness > BLOW_MIN_FLATNESS)
-      const wantOff = blow.excess < levelOff
-        || blow.tone > toneMax * 1.2
-        || (prof ? blow.match < prof.matchOff : blow.coverage < BLOW_OFF_COVERAGE)
-      if (!blow.on) {
-        blow.holdS = wantOn ? blow.holdS + dt : 0
-        if (blow.holdS >= BLOW_HOLD_S) { blow.on = true; blow.releaseS = 0 }
-      } else {
-        blow.releaseS = wantOff ? blow.releaseS + dt : 0
-        if (blow.releaseS >= BLOW_RELEASE_S) { blow.on = false; blow.holdS = 0 }
-      }
-      blow.strength = clamp((blow.excess - levelOff) / (prof ? prof.range : BLOW_RANGE_DB), 0, 1)
+      analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof, calExhale: cal.step === 'exhale' })
     }
 
     // Mic check, run each frame after readBlow while a calibrateKey is set.
@@ -475,12 +297,13 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         cal.frames = []
         cal.excesses = []
         cal.tones = []
+        cal.jitters = []
         cal.cur = null
         cal.blows = 0
         cal.noBlowT = 0
       }
       if (cal.step === 'idle') return
-      const ready = micLive() && blow.calS >= BLOW_CALIBRATE_S && blow.silentMs === 0
+      const ready = micLive() && blow.calS >= BLOW_CALIBRATE_S && silentMs === 0
       cal.t += dt
       if (cal.step === 'wait') {
         if (ready) { cal.step = 'quiet'; cal.t = 0 }
@@ -492,18 +315,20 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       } else if (cal.step === 'exhale') {
         // A blow starts only when it isn't tonal, so the Exhale bell doesn't count.
         if (blow.raw && (cal.cur || blow.tone < BLOW_MAX_TONE)) {
-          if (!cal.cur) cal.cur = { t: 0, frames: [], excesses: [], tones: [] }
+          if (!cal.cur) cal.cur = { t: 0, frames: [], excesses: [], tones: [], jitters: [] }
           cal.cur.t += dt
           if (cal.cur.t > CAL_SKIP_S && cal.cur.t < CAL_MAX_BLOW_S) {
             cal.cur.frames.push(Float32Array.from(blow.rise))
             cal.cur.excesses.push(blow.excess)
             cal.cur.tones.push(blow.tone)
+            cal.cur.jitters.push(blow.jitter)
           }
         } else if (cal.cur) {
           if (cal.cur.t >= CAL_MIN_BLOW_S && cal.cur.frames.length) {
             cal.frames.push(...cal.cur.frames)
             cal.excesses.push(...cal.cur.excesses)
             cal.tones.push(...cal.cur.tones)
+            cal.jitters.push(...cal.cur.jitters)
             cal.blows++
             cal.noBlowT = 0
             if (cal.blows < CAL_BLOWS) { cal.step = 'inhale'; cal.t = 0 }
@@ -512,7 +337,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         }
         if (!cal.cur) cal.noBlowT += dt
         if (cal.blows >= CAL_BLOWS) {
-          blowProfile = buildProfile(cal.frames, cal.excesses, cal.tones, cal.quiet)
+          blowProfile = buildProfile(cal.frames, cal.excesses, cal.tones, cal.jitters, cal.quiet)
           cal.step = 'done'
           cal.t = 0
         }
@@ -545,10 +370,10 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       if (blowDetailRef && blowDetailRef.current) {
         const d = blowDetailRef.current
         const isBlow = control === 'blow'
-        d.raw = isBlow && blow.raw
-        d.start = isBlow && (blow.on || (blow.raw && blow.tone < BLOW_MAX_TONE))
-        d.tone = isBlow ? blow.tone : 0
+        d.candidate = isBlow && blow.candidate
         d.strict = isBlow && blow.on
+        d.tone = isBlow ? blow.tone : 0
+        d.why = isBlow ? blow.why : ''
       }
       if (readoutRef) {
         readoutRef.current = {
@@ -562,12 +387,16 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       }
       if (debugEl) {
         const status = !micLive() ? 'mic off'
-          : blow.silentMs > 0 ? (micStale ? 'no audio - tap to restart mic' : 'no audio')
-          : blow.calS < BLOW_CALIBRATE_S ? 'calibrating' : blow.on ? 'BLOWING' : 'quiet'
-        debugEl.textContent = `mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}  silent ${Math.round(blow.silentMs)}ms\n`
-          + `rise ${blow.excess.toFixed(1)}dB  bands ${Math.round(blow.coverage * 100)}%  flat ${blow.flatness.toFixed(2)}\n`
-          + `tone ${blow.tone.toFixed(2)}  match ${blow.match === null ? '--' : blow.match.toFixed(2)}  raw ${blow.raw ? 'on' : 'off'}  check ${cal.step}\n`
-          + (blowProfile ? `profile: level ${blowProfile.levelOn.toFixed(1)}dB  match ${blowProfile.matchOn.toFixed(2)}  tone ${blowProfile.toneMax.toFixed(2)}\n` : 'profile: none\n')
+          : silentMs > 0 ? (micStale ? 'no audio - tap to restart mic' : 'no audio')
+          : blow.calS < BLOW_CALIBRATE_S ? 'calibrating' : blow.on ? 'BLOWING'
+          : blow.why === 'level' ? 'quiet' : `blocked by ${blow.why}`
+        debugEl.textContent = `mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}  silent ${Math.round(silentMs)}ms\n`
+          + `rise ${blow.excess.toFixed(1)}dB (frame ${blow.frameExcess.toFixed(1)})  bands ${Math.round(blow.coverage * 100)}%\n`
+          + `sustain ${Math.round(blow.sustain * 100)}%  jitter ${blow.jitter.toFixed(1)}dB  tone ${blow.tone.toFixed(2)}  match ${blow.match === null ? '--' : blow.match.toFixed(2)}\n`
+          + `raw ${blow.raw ? 'on' : 'off'}  cand ${blow.candidate ? 'on' : 'off'}  check ${cal.step}\n`
+          + (blowProfile
+            ? `profile: level ${blowProfile.levelOn.toFixed(1)}dB  match ${blowProfile.template ? blowProfile.matchOn.toFixed(2) : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
+            : 'profile: none\n')
           + `${status}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}`
       }
       if (disabled()) {
@@ -589,10 +418,10 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         if (Math.abs(tiltTarget - v) < 0.0005) v = tiltTarget
       } else if (control === 'blow') {
         if (blow.on) {
-          blow.lastOnT = now
+          lastOnT = now
           const rate = BLOW_MIN_RATE_PER_S + (BLOW_MAX_RATE_PER_S - BLOW_MIN_RATE_PER_S) * blow.strength
           v = Math.max(0, v - rate * dt)
-        } else if (down.size === 0 && now - blow.lastOnT > BLOW_RELEASE_MS) {
+        } else if (down.size === 0 && now - lastOnT > BLOW_RELEASE_MS) {
           // A finger on the screen (not on a button) holds; blowing still exhales.
           const rate = getQuietRateRef.current?.() ?? BLOW_INHALE_RATE_PER_S
           v = Math.min(1, v + rate * dt)
@@ -618,7 +447,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('deviceorientation', onTilt)
       if (useMic) releaseMic()
       if (blowRef) blowRef.current = 0
-      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { raw: false, start: false, strict: false, tone: 0 })
+      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { candidate: false, strict: false, tone: 0, why: '' })
       if (readoutRef) readoutRef.current = null
       if (calStatusRef) calStatusRef.current = null
       debugEl?.remove()

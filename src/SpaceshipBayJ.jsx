@@ -209,14 +209,13 @@ export default function SpaceshipBayJ({
     const v = THREE.MathUtils.clamp(leftVal.current, 0, 1)
     if (s.prevV !== null && dt > 0) s.fallRate += ((s.prevV - v) / dt - s.fallRate) * (1 - Math.exp(-dt / 0.15))
     s.prevV = v
-    // Two rules on the mic (as in the mic check): a flight starts on the strict
-    // detector, or the loose one with a breath-like tone (so the ringing Exhale
-    // bell can't hold it back), and keeps going while either detector hears
-    // the blow (the app's music makes the strict one flicker mid-blow).
+    // On the mic: the strict detector, or the candidate (a blow that lasts, is
+    // steady and has the user's shape, with a looser tone limit so the ringing
+    // Exhale bell or a swell in the music can't hold it back). Taps, bumps
+    // and voices pass neither.
     const strict = !!(blowRef && blowRef.current > 0.5)
     const detail = blowDetailRef && blowDetailRef.current
-    const blowStart = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.start)
-    const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.raw)
+    const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.candidate)
     if (blowing) s.lastBlow = now
     if (blowing && (s.phase === 'flying' || s.phase === 'slowing')) s.blowS += dt
 
@@ -280,7 +279,7 @@ export default function SpaceshipBayJ({
         if (elapsed >= inhaleDur) setPhase('ready')
         break
       case 'ready':
-        if (blowStart) { setPhase('flying'); s.blowS = 0; onFlightStart?.() }
+        if (blowing) { setPhase('flying'); s.blowS = 0; onFlightStart?.() }
         break
       case 'flying':
         s.z -= SHIP_SPEED * dt
@@ -539,7 +538,7 @@ export default function SpaceshipBayJ({
         `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
         `x ${px.toFixed(2)} ${inside ? 'lined up' : 'off to the side'}`,
         `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
-        `strict ${strict ? 'on' : 'off'}  loose ${detail && detail.raw ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}`,
+        `strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
         `last trip: ${s.lastEnd}`,
       ].join('\n')
     }
