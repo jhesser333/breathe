@@ -92,9 +92,8 @@ const DOCK_CUBE_FADE_END = 0.4  // the old cubes are gone by here
 const DOCK_NEW_COURSE_AT = 0.75 // the new course starts fading in (over CUBE_FADE_S)
 // Spheres: inverted normals (BackSide), each in its world's palette.
 const SPHERE_EMISSIVE = 0.4
-// Arrival: the side the ship is on picks the sphere (tilt left = left one);
-// within this of the center it's a miss.
-const SIDE_DEADZONE_X = 0.25
+// Arrival: the nearest sphere whose center the ship is within SPHERE_R of
+// (sideways) when it reaches the front edge; otherwise a miss.
 const ARRIVE_SIDE_SPEED = 3   // the sideways glide onto the sphere's x takes at least |dx| / this
 const WORLD_COLORS = BREATH_CYCLE_PALETTES.map((p) => ({ base: new THREE.Color(p.tertiaryColor), glow: new THREE.Color(p.primaryColor) }))
 
@@ -115,7 +114,7 @@ const approach = (value, target, seconds, dt) => {
 export default function SpaceshipBayJ({
   leftVal, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef,
   blowRef, micFailed, shipStateRef, shipPaceRef, planePosRef, palette, livePaletteRef, onShipText,
-  currentWorldRef, onSphereAudio, onSpherePalette,
+  currentWorldRef, onSphereAudio, onSpherePalette, blowDetailRef, onFlightStart,
 }) {
   const currentWorld = () => (currentWorldRef ? currentWorldRef.current : 0) || 0
   const st = useRef(null)
@@ -210,7 +209,14 @@ export default function SpaceshipBayJ({
     const v = THREE.MathUtils.clamp(leftVal.current, 0, 1)
     if (s.prevV !== null && dt > 0) s.fallRate += ((s.prevV - v) / dt - s.fallRate) * (1 - Math.exp(-dt / 0.15))
     s.prevV = v
-    const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : !!(blowRef && blowRef.current > 0.5)
+    // Two rules on the mic (as in the mic check): a flight starts on the strict
+    // detector, or the loose one with a breath-like tone (so the ringing Exhale
+    // bell can't hold it back), and keeps going while either detector hears
+    // the blow (the app's music makes the strict one flicker mid-blow).
+    const strict = !!(blowRef && blowRef.current > 0.5)
+    const detail = blowDetailRef && blowDetailRef.current
+    const blowStart = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.start)
+    const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.raw)
     if (blowing) s.lastBlow = now
     if (blowing && (s.phase === 'flying' || s.phase === 'slowing')) s.blowS += dt
 
@@ -223,14 +229,16 @@ export default function SpaceshipBayJ({
       s.exitDir = 0
       s.passedFront = false
     }
-    // Reached the spheres' front edge: the side the ship is on picks the
-    // sphere, and it glides into its center. Dead center = a miss.
+    // Reached the spheres' front edge: within SPHERE_R of a sphere's center
+    // (sideways) -> glide to its center and park. Otherwise a miss.
     const checkArrival = (speed) => {
       const sp = s.course.spheres[0]
       if (s.passedFront || s.z > sp.z + SPHERE_R) return false
       const px = planePosRef?.current?.x ?? 0
-      if (Math.abs(px) <= SIDE_DEADZONE_X) { s.passedFront = true; return false }
-      const idx = s.course.spheres.findIndex((q) => Math.sign(q.x) === Math.sign(px))
+      let idx = -1
+      s.course.spheres.forEach((q, n) => {
+        if (Math.abs(px - q.x) < SPHERE_R && (idx < 0 || Math.abs(px - q.x) < Math.abs(px - s.course.spheres[idx].x))) idx = n
+      })
       if (idx < 0) { s.passedFront = true; return false }
       const target = s.course.spheres[idx]
       setPhase('arriving')
@@ -256,7 +264,7 @@ export default function SpaceshipBayJ({
     // Exit side: the way the phone is tipped, or random when it's level.
     const startExit = () => {
       setPhase('exiting')
-      s.lastEnd = s.passedFront ? 'center (level phone)' : 'short (exhale ended)'
+      s.lastEnd = s.passedFront ? 'missed the sphere (off to the side)' : 'short (exhale ended)'
       const gamma = shipStateRef.current.gamma
       s.exitDir = gamma == null || Math.abs(gamma) < EXIT_TILT_DEADZONE_DEG ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(gamma)
       s.exitVy = 0
@@ -272,7 +280,7 @@ export default function SpaceshipBayJ({
         if (elapsed >= inhaleDur) setPhase('ready')
         break
       case 'ready':
-        if (blowing) { setPhase('flying'); s.blowS = 0 }
+        if (blowStart) { setPhase('flying'); s.blowS = 0; onFlightStart?.() }
         break
       case 'flying':
         s.z -= SHIP_SPEED * dt
@@ -491,6 +499,7 @@ export default function SpaceshipBayJ({
     }
     for (let n = 0; n < 2; n++) {
       const sp = s.course.spheres[n]
+      if (!sp) { placeSphere(n, null, 0, 0, 1, 0); continue }
       placeSphere(n, sp, sp.x, sp.z, 1, pulling ? 0 : courseFade)
     }
     for (let n = 0; n < 2; n++) {
@@ -524,12 +533,13 @@ export default function SpaceshipBayJ({
     pace.inhaleDur = inhaleDur
     if (debugRef.current) {
       const px = planePosRef?.current?.x ?? 0
-      const side = Math.abs(px) <= SIDE_DEADZONE_X ? 'center' : px < 0 ? 'left' : 'right'
+      const inside = s.course.spheres.some((q) => Math.abs(px - q.x) < SPHERE_R)
       debugRef.current.textContent = [
         `ship ${s.phase}`,
         `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
-        `x ${px.toFixed(2)} ${side}`,
+        `x ${px.toFixed(2)} ${inside ? 'lined up' : 'off to the side'}`,
         `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
+        `strict ${strict ? 'on' : 'off'}  loose ${detail && detail.raw ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}`,
         `last trip: ${s.lastEnd}`,
       ].join('\n')
     }

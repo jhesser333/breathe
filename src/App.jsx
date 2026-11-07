@@ -413,6 +413,9 @@ export default function App() {
   // Blow on the Mic: 1 while the mic hears a blow (useBreathControl), read by
   // the Paper Airplane to glow brighter.
   const blowRef = useRef(0)
+  // Blow on the Mic, more detail (useBreathControl): { raw, start, strict,
+  // tone }. The Space Ship starts its flight on start and keeps flying on raw.
+  const blowDetailRef = useRef({ raw: false, start: false, strict: false, tone: 0 })
   // Input Test: { tilt, mic, blowing, v }, written by useBreathControl.
   const inputReadoutRef = useRef(null)
   // Mic check at the start of sessions that use the mic (see MicCheck.jsx).
@@ -525,6 +528,11 @@ export default function App() {
   const handleSpherePalette = useCallback((world, fadeS, now) => {
     startPaletteLerpTo(world, now, fadeS)
   }, [startPaletteLerpTo])
+  // The ship leaves: cut the Exhale bell, like the mic check does once a blow
+  // starts (a ringing bell is tonal and muddies the blow detection).
+  const handleShipFlightStart = useCallback(() => {
+    audioRef.current?.stopBell()
+  }, [])
 
   // Slowing Down breath-tracking state, lifted here so it survives
   // SlowingDownController unmounting/remounting (e.g. when visiting Personalize)
@@ -1776,6 +1784,7 @@ export default function App() {
     onMicFail: () => setMicFailed(true),
     getQuietRate,
     blowRef,
+    blowDetailRef,
     allSensors: shapeOption === 'i',
     readoutRef: inputReadoutRef,
     calibrateKey: micCheckKey,
@@ -2164,7 +2173,8 @@ export default function App() {
             inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} blowRef={blowRef} micFailed={micFailed}
             shipStateRef={shipStateRef} shipPaceRef={shipPaceRef} planePosRef={planePosRef}
             palette={palette} livePaletteRef={livePaletteRef} onShipText={handleShipText}
-            currentWorldRef={paletteCycleIndexRef} onSphereAudio={handleSphereAudio} onSpherePalette={handleSpherePalette} />
+            currentWorldRef={paletteCycleIndexRef} onSphereAudio={handleSphereAudio} onSpherePalette={handleSpherePalette}
+            blowDetailRef={blowDetailRef} onFlightStart={handleShipFlightStart} />
         )}
         {showBackgroundArt && shapeOption === 'g' && <GroundTiesG mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}

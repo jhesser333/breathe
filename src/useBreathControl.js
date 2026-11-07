@@ -200,7 +200,11 @@ const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('but
 
 // control: 'single' | 'touch' | 'tilt' | 'blow' | null (off). onValue(v) is
 // called whenever v changes. blowRef (blow only) is set to 1 while the mic
-// hears a blow, else 0. getQuietRate() (blow only) gives the rise while
+// hears a blow, else 0. blowDetailRef (blow only, optional) gets
+// { raw, start, tone } each frame: raw = the loose detector, start = the mic
+// check's blow-start rule (strict on, or loose with a breath-like tone, so a
+// ringing bell doesn't block it); the Space Ship starts its flight on start
+// and keeps flying on raw. getQuietRate() (blow only) gives the rise while
 // quiet: null = no pace (BLOW_INHALE_RATE_PER_S), else v/s. allSensors (Input Test) reads tilt and
 // mic whatever the control; readoutRef gets { tilt, mic, blowing } each frame
 // (tilt 0 flat/exhale -> 1 upright/inhale, mic = blow strength 0 -> 1; null =
@@ -208,7 +212,7 @@ const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('but
 // Mic check: a new non-zero calibrateKey starts one (0 = none); calStatusRef
 // gets { step, blows, needed, hint, level } each frame for the overlay, and
 // onCalibrated() is called when it's done.
-export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef, allSensors = false, readoutRef, calibrateKey = 0, calStatusRef, onCalibrated }) {
+export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef, blowDetailRef, allSensors = false, readoutRef, calibrateKey = 0, calStatusRef, onCalibrated }) {
   const [shown, setShown] = useState(null)
   const onValueRef = useRef(onValue)
   onValueRef.current = onValue
@@ -370,10 +374,12 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         blow.power[i] = first ? p : blow.power[i] + (p - blow.power[i]) * kp
       }
 
-      // Floor = each bin's lowest level over the window. Held while blowing, so
-      // a blow never becomes the floor (but not forever, so it can't stick on).
+      // Floor = each bin's lowest level over the window. Held while blowing
+      // (either detector), so a blow never becomes the floor -- if only the
+      // strict one held it, every flicker of it mid-blow fed the blow into the
+      // floor until the blow vanished. Not held forever, so it can't stick on.
       const calibrating = blow.calS < BLOW_CALIBRATE_S
-      const holding = blow.on || (cal.step === 'exhale' && blow.raw)
+      const holding = blow.on || blow.raw
       blow.onS = holding ? blow.onS + dt : 0
       if (calibrating || !holding || blow.onS > FLOOR_FREEZE_MAX_S) {
         for (let i = 0; i < n; i++) blow.slotMin[i] = Math.min(blow.slotMin[i], blow.power[i])
@@ -536,6 +542,14 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         }
       }
       if (blowRef) blowRef.current = control === 'blow' && blow.on ? 1 : 0
+      if (blowDetailRef && blowDetailRef.current) {
+        const d = blowDetailRef.current
+        const isBlow = control === 'blow'
+        d.raw = isBlow && blow.raw
+        d.start = isBlow && (blow.on || (blow.raw && blow.tone < BLOW_MAX_TONE))
+        d.tone = isBlow ? blow.tone : 0
+        d.strict = isBlow && blow.on
+      }
       if (readoutRef) {
         readoutRef.current = {
           tilt: tiltTarget,
@@ -604,6 +618,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('deviceorientation', onTilt)
       if (useMic) releaseMic()
       if (blowRef) blowRef.current = 0
+      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { raw: false, start: false, strict: false, tone: 0 })
       if (readoutRef) readoutRef.current = null
       if (calStatusRef) calStatusRef.current = null
       debugEl?.remove()

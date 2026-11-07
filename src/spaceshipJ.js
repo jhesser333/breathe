@@ -35,21 +35,23 @@ export const COLUMN_MARGIN = 0.15    // column's outer edge inside the screen ed
 export const COLUMN_HEIGHT_FRAC = 0.75   // columns: this much of floor -> past the screen's top
 export const FULL_HEIGHT_FRAC = 0.5     // full-inhale height: this much of floor -> midway up the balloon's range
 
-// Destination spheres: one left, one right, at full height. Inverted normals
-// (BackSide), so the near half is invisible and you see inside the far half.
-// The ship reaches the front edge after TARGET_EXHALE_S - ARRIVE_S of
-// flying, then eases to a stop at the center over ARRIVE_S (an ease-out whose
-// starting speed matches SHIP_SPEED), so a ~6 s exhale docks it.
+// Destination spheres, at full height, one per SPHERES_X entry (now just one,
+// straight ahead; [-2.2, 2.2] brings back the left/right pair). Inverted
+// normals (BackSide), so the near half is invisible and you see inside the
+// far half. The ship reaches the front edge after TARGET_EXHALE_S - ARRIVE_S
+// of flying, then eases to a stop at the center over ARRIVE_S (an ease-out
+// whose starting speed matches SHIP_SPEED), so a ~6 s exhale docks it.
+export const SPHERES_X = [0]
 export const SHIP_SPEED = 5          // flying speed, units/s
 export const TARGET_EXHALE_S = 6
 export const SPHERE_R = 1.5
-export const SPHERE_X = 2.2
 export const ARRIVE_S = (2 * SPHERE_R) / SHIP_SPEED   // 0.6 s: front edge -> center
 export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S)) - SPHERE_R   // -28.5
-export const COURSE_END_Z = SPHERE_Z  // a ship that missed both spheres ends its trip here
+export const COURSE_END_Z = SPHERE_Z  // a ship that missed the sphere(s) ends its trip here
 
-// Cube targets: a stem straight out of the bay, forking into two branches
-// that ease out to each sphere's x, a cube's length apart.
+// Cube targets, a cube's length apart: a stem straight out of the bay, then
+// a branch easing out to each sphere's x (with one sphere at x = 0, a
+// single straight line).
 export const TARGET_SIZE = 0.5
 export const COURSE_START_Z = -3     // first cube's center
 export const FORK_Z = -8             // last stem cube
@@ -60,38 +62,39 @@ const BRANCH_END_Z = SPHERE_Z + SPHERE_R + 1   // last branch cube, just before 
 export const WORLD_COUNT = BREATH_CYCLE_PALETTES.length
 
 // Cube layout (fixed; only the spheres' worlds are random).
-// branch: 0 = stem, -1 = left, 1 = right.
+// branch: 0 = stem (or a sphere straight ahead), -1 = left, 1 = right.
 function makeCubes() {
   const cubes = []
   for (let z = COURSE_START_Z; z >= FORK_Z - 1e-6; z -= TARGET_SIZE * 2) cubes.push({ x: 0, z, rotY: 0, branch: 0 })
   const span = FORK_Z - BRANCH_END_Z
-  const xAt = (z) => SPHERE_X * THREE.MathUtils.smoothstep((FORK_Z - z) / span, 0, 1)
-  for (const side of [-1, 1]) {
+  for (const sx of SPHERES_X) {
+    const xAt = (z) => sx * THREE.MathUtils.smoothstep((FORK_Z - z) / span, 0, 1)
     for (let z = FORK_Z - TARGET_SIZE * 2; z >= BRANCH_END_Z - 1e-6; z -= TARGET_SIZE * 2) {
-      const slope = side * (xAt(z - 0.05) - xAt(z + 0.05)) / 0.1   // dx per unit down the road
-      cubes.push({ x: side * xAt(z), z, rotY: Math.atan2(-slope, 1), branch: side })
+      const slope = (xAt(z - 0.05) - xAt(z + 0.05)) / 0.1   // dx per unit down the road
+      cubes.push({ x: xAt(z), z, rotY: Math.atan2(-slope, 1), branch: Math.sign(sx) })
     }
   }
   return cubes
 }
 
-// A new course: the cubes, plus the two spheres, each one of the worlds that
-// isn't current (left/right at random).
+// A new course: the cubes, plus the sphere(s), each a world that isn't the
+// current one. One sphere: the next world, so each dock moves on through the
+// palettes and loops. Several: the other worlds in random order.
 export function makeCourse(currentWorld = 0) {
   const others = []
-  for (let k = 0; k < WORLD_COUNT; k++) if (k !== currentWorld) others.push(k)
-  while (others.length < 2) others.push(currentWorld)
-  if (Math.random() < 0.5) others.reverse()
+  for (let k = 1; k < WORLD_COUNT; k++) others.push((currentWorld + k) % WORLD_COUNT)
+  if (others.length === 0) others.push(currentWorld)
+  if (SPHERES_X.length > 1) others.sort(() => Math.random() - 0.5)
   return {
     cubes: makeCubes(),
-    spheres: [{ x: -SPHERE_X, z: SPHERE_Z, world: others[0] }, { x: SPHERE_X, z: SPHERE_Z, world: others[1] }],
+    spheres: SPHERES_X.map((x, i) => ({ x, z: SPHERE_Z, world: others[i % others.length] })),
   }
 }
 export const COURSE_SIZE = makeCubes().length
 
 // Side tilt: phone roll that puts the ship at its side limit.
 export const SIDE_TILT_FULL_DEG = 25
-export const SIDE_RANGE = SPHERE_X + 0.3
+export const SIDE_RANGE = Math.max(...SPHERES_X.map(Math.abs)) + 1.3
 
 // Exit: the down and sideways pulls ramp in over this long (SpaceshipBayJ, MorphJ).
 export const EXIT_TURN_S = 1.5
