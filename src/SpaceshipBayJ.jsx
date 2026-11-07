@@ -11,7 +11,7 @@ import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import {
   shipLimits, makeCourse, EXIT_TURN_S, SHIP_SPEED, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
-  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R, DOCK_TOLERANCE,
+  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R,
 } from './spaceshipJ'
 
 // Shape J (Space Ship): the docking bay, columns, front door, cube targets
@@ -92,6 +92,10 @@ const DOCK_CUBE_FADE_END = 0.4  // the old cubes are gone by here
 const DOCK_NEW_COURSE_AT = 0.75 // the new course starts fading in (over CUBE_FADE_S)
 // Spheres: inverted normals (BackSide), each in its world's palette.
 const SPHERE_EMISSIVE = 0.4
+// Arrival: the side the ship is on picks the sphere (tilt left = left one);
+// within this of the center it's a miss.
+const SIDE_DEADZONE_X = 0.25
+const ARRIVE_SIDE_SPEED = 3   // the sideways glide onto the sphere's x takes at least |dx| / this
 const WORLD_COLORS = BREATH_CYCLE_PALETTES.map((p) => ({ base: new THREE.Color(p.tertiaryColor), glow: new THREE.Color(p.primaryColor) }))
 
 // One cube's state on the current course. skipped = on the branch the ship
@@ -203,16 +207,20 @@ export default function SpaceshipBayJ({
       s.exitDir = 0
       s.passedFront = false
     }
-    // Reached the spheres' front edge: inside one -> ease to its center.
+    // Reached the spheres' front edge: the side the ship is on picks the
+    // sphere, and it glides into its center. Dead center = a miss.
     const checkArrival = (speed) => {
       const sp = s.course.spheres[0]
       if (s.passedFront || s.z > sp.z + SPHERE_R) return false
       const px = planePosRef?.current?.x ?? 0
-      const idx = s.course.spheres.findIndex((q) => Math.abs(px - q.x) < DOCK_TOLERANCE)
+      if (Math.abs(px) <= SIDE_DEADZONE_X) { s.passedFront = true; return false }
+      const idx = s.course.spheres.findIndex((q) => Math.sign(q.x) === Math.sign(px))
       if (idx < 0) { s.passedFront = true; return false }
       const target = s.course.spheres[idx]
       setPhase('arriving')
-      s.arrive = { idx, x0: px, z0: s.z, dur: Math.max(0.1, (2 * (s.z - target.z)) / Math.max(0.1, speed)) }
+      const zDur = Math.max(0.1, (2 * (s.z - target.z)) / Math.max(0.1, speed))
+      const xDur = Math.max(0.1, Math.abs(target.x - px) / ARRIVE_SIDE_SPEED)
+      s.arrive = { idx, x0: px, z0: s.z, zDur, xDur, dur: Math.max(zDur, xDur) }
       return true
     }
     // Docked: the inhale starts, and everything out there is pulled back to the bay.
@@ -262,10 +270,10 @@ export default function SpaceshipBayJ({
         break
       case 'arriving': {
         const a = s.arrive
-        const u = THREE.MathUtils.clamp(elapsed / a.dur, 0, 1)
+        const u = THREE.MathUtils.clamp(elapsed / a.zDur, 0, 1)
         const target = s.course.spheres[a.idx]
         s.z = a.z0 + (target.z - a.z0) * (1 - (1 - u) * (1 - u))   // ease-out from the flying speed
-        if (u >= 1) startDock()
+        if (elapsed >= a.dur) startDock()
         break
       }
       case 'docking': {
@@ -328,7 +336,7 @@ export default function SpaceshipBayJ({
     const offZ = s.dock ? -s.dock.fromZ * dockK : 0
     if (s.phase === 'arriving') {
       const a = s.arrive
-      ship.xOverride = THREE.MathUtils.lerp(a.x0, s.course.spheres[a.idx].x, THREE.MathUtils.smoothstep(pe / a.dur, 0, 1))
+      ship.xOverride = THREE.MathUtils.lerp(a.x0, s.course.spheres[a.idx].x, THREE.MathUtils.smoothstep(pe / a.xDur, 0, 1))
     } else if (s.phase === 'docking') {
       ship.xOverride = s.dock.fromX + offX
     } else ship.xOverride = null

@@ -46,7 +46,6 @@ export const SPHERE_R = 1.5
 export const SPHERE_X = 2.2
 export const ARRIVE_S = (2 * SPHERE_R) / SHIP_SPEED   // 0.6 s: front edge -> center
 export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S)) - SPHERE_R   // -28.5
-export const DOCK_TOLERANCE = SPHERE_R - WINGSPAN / 2   // ship center within this of the sphere's x = inside
 export const COURSE_END_Z = SPHERE_Z  // a ship that missed both spheres ends its trip here
 
 // Cube targets: a stem straight out of the bay, forking into two branches

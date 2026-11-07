@@ -245,10 +245,10 @@ Art Options card "Space Ship (in-progress)" (id `'j'`, after the Balloon), built
     - `STOP_GRACE_S` 0.3 without a blow → `slowing`.
   - `slowing`: × `SLOW_FACTOR` ¼ speed for `SLOW_S` 1 s; a blow → `flying`.
   - `arriving` (from `flying`/`slowing`):
-    - Triggers when the ship reaches the spheres' front edge (z = `SPHERE_Z` + `SPHERE_R`) with its x within `DOCK_TOLERANCE` (`SPHERE_R` − half wingspan = 0.8) of a sphere's x.
-    - The ship eases out to a stop at that sphere's center (z ease-out whose starting speed matches its current speed: `ARRIVE_S` 0.6 s at full speed). Its x eases onto the sphere's x via `xOverride`. Blowing is ignored.
+    - Triggers when the ship reaches the spheres' front edge (z = `SPHERE_Z` + `SPHERE_R`) on one side: x < −`SIDE_DEADZONE_X` 0.25 picks the left sphere, x > 0.25 the right (tilt left = left sphere). No collision; the side alone decides.
+    - The ship eases out to a stop at that sphere's center (z ease-out whose starting speed matches its current speed: `ARRIVE_S` 0.6 s at full speed). Its x eases (smoothstep) onto the sphere's x via `xOverride`, over at least |dx| / `ARRIVE_SIDE_SPEED` 3 s; docking starts when both eases finish. Blowing is ignored.
     - Timing: front edge after 5.4 s of full-speed flying + 0.6 s ease = a 6 s exhale (`TARGET_EXHALE_S`).
-    - Outside both spheres, the ship flies on to `COURSE_END_Z` (= `SPHERE_Z`) and exits.
+    - Within ±0.25 of center (phone level), the ship flies on to `COURSE_END_Z` (= `SPHERE_Z`) and exits.
   - `docking` (the next inhale, Inhale bell; App maps it to 'inhale'):
     - **Pull:** over the inhale time, `k = smoothstep(t)`. Ship, both spheres and the old cubes all shift by (−fromX·k, 0, −fromZ·k), so the ship goes from the sphere's center to (0, fullY, 0).
     - **Spheres:** the chosen one grows ×1 → ×`DOCK_GROW_SCALE` 4 by `DOCK_GROW_END` 70% and fades out from `DOCK_FADE_START` 40% to the end. The other is gone by `DOCK_OTHER_FADE_END` 20%, before the growing sphere could take it in.
