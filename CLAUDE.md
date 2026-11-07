@@ -242,8 +242,8 @@ Art Options card "Space Ship (in-progress)" (id `'j'`, after the Balloon), built
   - `ready` (Exhale bell): the front door sinks, and the ship waits for the first blow with no time limit.
   - `flying`:
     - Steady `SHIP_SPEED` 5 u/s whatever the blow strength, with Y fixed.
-    - `STOP_GRACE_S` 0.3 without a blow → `slowing`.
-  - `slowing`: × `SLOW_FACTOR` ¼ speed for `SLOW_S` 1 s; a blow → `flying`.
+    - `STOP_GRACE_S` 0.5 without a blow → `slowing` (rides out brief mic dropouts).
+  - `slowing`: × `SLOW_FACTOR` ¼ speed for `SLOW_S` 1.5 s; a blow → `flying`.
   - `arriving` (from `flying`/`slowing`):
     - Triggers when the ship reaches the spheres' front edge (z = `SPHERE_Z` + `SPHERE_R`) on one side: x < −`SIDE_DEADZONE_X` 0.25 picks the left sphere, x > 0.25 the right (tilt left = left sphere). No collision; the side alone decides.
     - The ship eases out to a stop at that sphere's center (z ease-out whose starting speed matches its current speed: `ARRIVE_S` 0.6 s at full speed). Its x eases (smoothstep) onto the sphere's x via `xOverride`, over at least |dx| / `ARRIVE_SIDE_SPEED` 3 s; docking starts when both eases finish. Blowing is ignored.
@@ -254,13 +254,14 @@ Art Options card "Space Ship (in-progress)" (id `'j'`, after the Balloon), built
     - **Spheres:** the chosen one grows ×1 → ×`DOCK_GROW_SCALE` 4 by `DOCK_GROW_END` 70% and fades out from `DOCK_FADE_START` 40% to the end. The other is gone by `DOCK_OTHER_FADE_END` 20%, before the growing sphere could take it in.
     - **Cubes:** the old ones fade out by `DOCK_CUBE_FADE_END` 40%. At `DOCK_NEW_COURSE_AT` 75%, the new course (made at dock start from the chosen world) swaps in and fades in over `CUBE_FADE_S`.
     - **Audio and palette:** `onSphereAudio(world, inhaleDur)` fires at dock start; App sets `audioGroupIndexRef` and calls `setCycle(world, inhaleDur)`, a crossfade over the whole inhale. `onSpherePalette(world, 60% of inhaleDur, now)` fires at 40%; App's `startPaletteLerpTo` lerps the live palette over the chosen sphere's fade.
-    - **Bay:** the glow columns sink (≤ `COLUMN_SINK_S`) and regrow over the rest of the inhale. The front door stays down and the floor doors stay closed.
+    - **Bay:** the glow columns sink (≤ `COLUMN_SINK_S`) and regrow over the rest of the inhale. The front door stays down. The floor doors open as the pull starts and slide closed over the last `DOOR_SLIDE_S` 0.6 s, so they meet under the ship as it reaches x = 0 (the bay seems to travel out to the ship).
     - Then `ready`.
   - `exiting`:
     - The side comes from the phone's roll, random under `EXIT_TILT_DEADZONE_DEG` 3° or with no reading.
     - Forward speed eases from ¼ speed to `EXIT_FORWARD_SPEED` 1.5 over 1 s, while the dive (`EXIT_DOWN_ACCEL` 2.5 u/s²) and the side pull ramp in over `EXIT_TURN_S`, so it curves gently off its line.
     - It fades out from `EXIT_FADE_START_S` 1.8 s to `EXIT_MAX_S` 2.8 s, or pops once it projects past `EXIT_OFFSCREEN_NDC` 1.15 off the screen. Cubes and spheres fade, columns sink.
     - Then a new course in the same world and the next `inhale` (a new ship rises from the floor). The palette and audio don't change.
+  - `?shipdebug` in the URL shows a readout: phase, ship z (vs the spheres' front at −27), x and the side it would pick, seconds of blow this trip, and how the last trip ended (docked / short / center).
   - Blowing = `blowRef`; if the mic failed (Double Sliders fallback), the breath value falling faster than `SLIDER_BLOW_RATE` 0.08/s.
 - **Coaching text** (`onShipText` → App's `handleShipText`, `fadeToText` / `hideCountText`, 1 s fades; copy `TEXTS.shipInhaleA/B`, `shipBlow`): each Inhale bell (rising or docking) rotates "Slowly fill your lungs up." → "Exhale for about six seconds to reach a sphere." → "Tilt your phone to choose a sphere." (`shipInhaleA`, `shipInhaleB`, `shipChoose`), hidden `INHALE_TEXT_S` 4 s after fading in. While `ready`, "Blow on the mic." shows `BLOW_PROMPT_S` 1 s after fading in, then comes back `BLOW_PROMPT_WAIT_S` 3 s after fading out, until the first blow. The Tutorial's closing "Good job!" text is skipped for `'j'`.
 - **App wiring:** `balloonPhaseNow` also covers `'j'` (`inhale`/`docking` → 'inhale', `ready`/`flying`/`slowing`/`arriving`/`exiting` → 'exhale', `idle` → null), so bells, lit labels and `getQuietRate` (1 / inhale time) follow the ship. No captions or count; the Tutorial's closing text still shows. `shipStateRef`/`shipPaceRef` reset on Start/Restart; motion access asked in the card tap and Start/Restart.

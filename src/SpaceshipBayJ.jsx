@@ -11,7 +11,7 @@ import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import {
   shipLimits, makeCourse, EXIT_TURN_S, SHIP_SPEED, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
-  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R,
+  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R, SPHERE_Z,
 } from './spaceshipJ'
 
 // Shape J (Space Ship): the docking bay, columns, front door, cube targets
@@ -57,8 +57,8 @@ const RISE_DELAY_S = 0.3        // the ship starts rising this long after the In
 const RISE_S = 1.2              // ...and reaches its hover height this long after that
 const SHIP_FADE_IN_S = 0.4
 const FRONT_DOOR_S = 0.5        // front door sinks/rises
-const STOP_GRACE_S = 0.3        // blow-off this long counts as the exhale stopping
-const SLOW_S = 1
+const STOP_GRACE_S = 0.5        // blow-off this long counts as the exhale stopping (rides out brief mic dropouts)
+const SLOW_S = 1.5
 const SLOW_FACTOR = 0.25
 // Exit: forward speed eases from the slow-down speed up to EXIT_FORWARD_SPEED
 // while the down and sideways pulls (sideways is in MorphJ) ramp in over
@@ -123,7 +123,7 @@ export default function SpaceshipBayJ({
     st.current = {
       phase: 'idle', start: 0, inhaleCount: 0, text: null, lastBlow: -Infinity, z: 0, exitDir: 0, exitVy: 0, exitDrop: 0, seq: 0, doorOpen: 0, frontDoor: 1, columnH: 0,
       courseFade: 0, course: makeCourseState(currentWorld()), prevV: null, fallRate: 0,
-      passedFront: false, arrive: null, dock: null,
+      passedFront: false, arrive: null, dock: null, blowS: 0, lastEnd: '-',
     }
   }
   const refs = useRef({ panels: [], columns: [], glows: [], frontDoor: null, cubes: [], spheres: [] })
@@ -163,6 +163,21 @@ export default function SpaceshipBayJ({
   useEffect(() => () => { camera.clearViewOffset(); camera.updateProjectionMatrix() }, [camera])
   const _v = useMemo(() => new THREE.Vector3(), [])
 
+  // ?shipdebug in the URL: a readout of the trip (phase, z, x, blow time,
+  // how the last trip ended), for checking docking on a phone.
+  const debugRef = useRef(null)
+  useEffect(() => {
+    if (!/[?&]shipdebug/.test(window.location.search)) return undefined
+    const el = document.createElement('div')
+    Object.assign(el.style, {
+      position: 'fixed', top: '200px', left: '8px', zIndex: 1000, pointerEvents: 'none',
+      font: '12px monospace', color: '#fff', background: 'rgba(0,0,0,0.6)', padding: '4px 6px', whiteSpace: 'pre',
+    })
+    document.body.appendChild(el)
+    debugRef.current = el
+    return () => { el.remove(); debugRef.current = null }
+  }, [])
+
   useFrame((state, delta) => {
     const now = state.clock.elapsedTime
     const dt = Math.min(delta, 0.05)
@@ -197,6 +212,7 @@ export default function SpaceshipBayJ({
     s.prevV = v
     const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : !!(blowRef && blowRef.current > 0.5)
     if (blowing) s.lastBlow = now
+    if (blowing && (s.phase === 'flying' || s.phase === 'slowing')) s.blowS += dt
 
     const setPhase = (p) => { s.phase = p; s.start = now }
     const startInhale = () => {
@@ -228,6 +244,7 @@ export default function SpaceshipBayJ({
       const idx = s.arrive.idx
       const sphere = s.course.spheres[idx]
       setPhase('docking')
+      s.lastEnd = 'docked'
       s.inhaleCount++
       s.dock = {
         idx, fromX: sphere.x, fromZ: sphere.z, world: sphere.world, spheres: s.course.spheres,
@@ -239,6 +256,7 @@ export default function SpaceshipBayJ({
     // Exit side: the way the phone is tipped, or random when it's level.
     const startExit = () => {
       setPhase('exiting')
+      s.lastEnd = s.passedFront ? 'center (level phone)' : 'short (exhale ended)'
       const gamma = shipStateRef.current.gamma
       s.exitDir = gamma == null || Math.abs(gamma) < EXIT_TILT_DEADZONE_DEG ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(gamma)
       s.exitVy = 0
@@ -254,7 +272,7 @@ export default function SpaceshipBayJ({
         if (elapsed >= inhaleDur) setPhase('ready')
         break
       case 'ready':
-        if (blowing) setPhase('flying')
+        if (blowing) { setPhase('flying'); s.blowS = 0 }
         break
       case 'flying':
         s.z -= SHIP_SPEED * dt
@@ -361,7 +379,8 @@ export default function SpaceshipBayJ({
     }
 
     // Floor doors: apart while the ship rises, closed under it after.
-    const doorsOpen = s.phase === 'inhale' && pe < riseEnd
+    // Docking: open as the pull starts, slide closed under the ship as it arrives.
+    const doorsOpen = (s.phase === 'inhale' && pe < riseEnd) || (s.phase === 'docking' && pe < inhaleDur - DOOR_SLIDE_S)
     s.doorOpen = approach(s.doorOpen, doorsOpen ? 1 : 0, DOOR_SLIDE_S, dt)
     const slide = THREE.MathUtils.smoothstep(s.doorOpen, 0, 1) * PANEL_W
     refs.current.panels.forEach((p, n) => {
@@ -503,6 +522,17 @@ export default function SpaceshipBayJ({
     pace.paced = paced
     pace.phase = s.phase
     pace.inhaleDur = inhaleDur
+    if (debugRef.current) {
+      const px = planePosRef?.current?.x ?? 0
+      const side = Math.abs(px) <= SIDE_DEADZONE_X ? 'center' : px < 0 ? 'left' : 'right'
+      debugRef.current.textContent =
+        `ship ${s.phase}
+z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})
+` +
+        `x ${px.toFixed(2)} ${side}
+blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}
+last trip: ${s.lastEnd}`
+    }
   })
 
   return (
