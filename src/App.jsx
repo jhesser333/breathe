@@ -415,7 +415,7 @@ export default function App() {
   const blowRef = useRef(0)
   // Blow on the Mic, more detail (useBreathControl): { candidate, strict,
   // tone, why }. The Space Ship flies on candidate or strict.
-  const blowDetailRef = useRef({ candidate: false, strict: false, tone: 0, why: '' })
+  const blowDetailRef = useRef({ candidate: false, strict: false, tone: 0, why: '', rise: 0, offWhy: '', offRise: 0 })
   // Input Test: { tilt, mic, blowing, v }, written by useBreathControl.
   const inputReadoutRef = useRef(null)
   // Mic check at the start of sessions that use the mic (see MicCheck.jsx).

@@ -79,7 +79,7 @@ export function createBlowState() {
     rise: null, extra: null,
     histT: new Float64Array(HIST_LEN), histX: new Float32Array(HIST_LEN), histI: 0, histN: 0, histStart: 0,
     clock: 0, lastOnClock: -Infinity, calS: 0, onS: 0, releaseS: 0,
-    on: false, raw: false, candidate: false, why: 'calibrating',
+    on: false, raw: false, candidate: false, why: 'calibrating', offWhy: '', offRise: 0, offClock: -Infinity,
     strength: 0, excess: 0, frameExcess: 0, coverage: 0, tone: 0, match: null, sustain: 0, jitter: 0,
   }
 }
@@ -107,7 +107,7 @@ export function resetBlowState(blow, lo, n, hz) {
     extra: new Float32Array(n),
     histI: 0, histN: 0, histStart: 0,
     clock: 0, lastOnClock: -Infinity, calS: 0, onS: 0, releaseS: 0,
-    on: false, raw: false, candidate: false, why: 'calibrating',
+    on: false, raw: false, candidate: false, why: 'calibrating', offWhy: '', offRise: 0, offClock: -Infinity,
     strength: 0, excess: 0, frameExcess: 0, coverage: 0, tone: 0, match: null, sustain: 0, jitter: 0,
   })
 }
@@ -249,7 +249,13 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
     if (!why) { blow.on = true; blow.releaseS = 0 }
   } else {
     blow.releaseS = wantOff ? blow.releaseS + dt : 0
-    if (blow.releaseS >= BLOW_RELEASE_S) blow.on = false
+    if (blow.releaseS >= BLOW_RELEASE_S) {
+      blow.on = false
+      // Which off rule ended it, and the rise then (kept for the debug readouts).
+      blow.offWhy = blow.excess < levelOff ? 'level' : blow.tone > toneMax * 1.2 ? 'tone' : shape ? 'shape' : 'coverage'
+      blow.offRise = blow.excess
+      blow.offClock = blow.clock
+    }
   }
   if (blow.on) { blow.lastOnClock = blow.clock; why = '' }
   blow.why = why

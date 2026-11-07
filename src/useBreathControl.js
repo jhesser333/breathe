@@ -194,6 +194,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     const cal = { key: 0, step: 'idle', t: 0, quiet: [], frames: [], excesses: [], tones: [], jitters: [], cur: null, blows: 0, noBlowT: 0 }
     // ?micdebug in the URL shows the detector's numbers, for tuning on a phone.
     let debugEl = null
+    let lastBlock = null
     if (useMic && /[?&]micdebug/.test(window.location.search)) {
       debugEl = document.createElement('div')
       Object.assign(debugEl.style, {
@@ -391,6 +392,9 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         d.strict = isBlow && blow.on
         d.tone = isBlow ? blow.tone : 0
         d.why = isBlow ? blow.why : ''
+        d.rise = isBlow ? blow.excess : 0
+        d.offWhy = isBlow ? blow.offWhy : ''
+        d.offRise = isBlow ? blow.offRise : 0
       }
       if (readoutRef) {
         readoutRef.current = {
@@ -407,14 +411,20 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           : silentMs > 0 ? (micStale ? 'no audio - tap to restart mic' : 'no audio')
           : blow.calS < BLOW_CALIBRATE_S ? 'calibrating' : blow.on ? 'BLOWING'
           : blow.why === 'level' ? 'quiet' : `blocked by ${blow.why}`
-        debugEl.textContent = `mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}  silent ${Math.round(silentMs)}ms\n`
+        // The last block and the last stop stay on screen (they only flash by live).
+        if (status.startsWith('blocked')) lastBlock = { why: blow.why, rise: blow.excess, clock: blow.clock }
+        const ago = (c) => `${Math.max(0, blow.clock - c).toFixed(1)}s ago`
+        const levelOffNow = blowProfile ? blowProfile.levelOff : null
+        debugEl.textContent =`mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}  silent ${Math.round(silentMs)}ms\n`
           + `rise ${blow.excess.toFixed(1)}dB (frame ${blow.frameExcess.toFixed(1)})  bands ${Math.round(blow.coverage * 100)}%\n`
           + `sustain ${Math.round(blow.sustain * 100)}%  jitter ${blow.jitter.toFixed(1)}dB  tone ${blow.tone.toFixed(2)}  match ${blow.match === null ? '--' : blow.match.toFixed(2)}\n`
           + `raw ${blow.raw ? 'on' : 'off'}  cand ${blow.candidate ? 'on' : 'off'}  check ${cal.step}\n`
           + (blowProfile
             ? `profile: level ${blowProfile.levelOn.toFixed(1)}/${blowProfile.levelOff.toFixed(1)}dB  match ${blowProfile.template ? `${blowProfile.matchOn.toFixed(2)}/${blowProfile.matchOff.toFixed(2)}` : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
             : 'profile: none\n')
-          + `${status}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}`
+          + `${status}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}\n`
+          + `last block: ${lastBlock ? `${lastBlock.why} (rise ${lastBlock.rise.toFixed(1)}dB) ${ago(lastBlock.clock)}` : '--'}\n`
+          + `last stop: ${blow.offWhy ? `${blow.offWhy} (rise ${blow.offRise.toFixed(1)}dB${levelOffNow === null ? '' : `, stop level ${levelOffNow.toFixed(1)}`}) ${ago(blow.offClock)}` : '--'}`
       }
       if (disabled()) {
         glideDir = 0
@@ -464,7 +474,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('deviceorientation', onTilt)
       if (useMic) releaseMic()
       if (blowRef) blowRef.current = 0
-      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { candidate: false, strict: false, tone: 0, why: '' })
+      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { candidate: false, strict: false, tone: 0, why: '', rise: 0, offWhy: '', offRise: 0 })
       if (readoutRef) readoutRef.current = null
       if (calStatusRef) calStatusRef.current = null
       debugEl?.remove()

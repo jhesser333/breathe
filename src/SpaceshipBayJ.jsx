@@ -217,6 +217,11 @@ export default function SpaceshipBayJ({
     const detail = blowDetailRef && blowDetailRef.current
     const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.candidate)
     if (blowing) s.lastBlow = now
+    // ?shipdebug: why the mic stopped hearing the blow mid-flight (it only flashes by live).
+    if (!blowing && s.wasBlowing && (s.phase === 'flying' || s.phase === 'slowing') && detail) {
+      s.lostBlow = `after ${s.blowS.toFixed(1)} s: strict off by ${detail.offWhy || '--'} (rise ${detail.offRise.toFixed(1)}dB), cand blocked by ${detail.why || '--'} (rise ${detail.rise.toFixed(1)}dB)`
+    }
+    s.wasBlowing = blowing
     if (blowing && (s.phase === 'flying' || s.phase === 'slowing')) s.blowS += dt
 
     const setPhase = (p) => { s.phase = p; s.start = now }
@@ -540,6 +545,7 @@ export default function SpaceshipBayJ({
         `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
         `strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
         `last trip: ${s.lastEnd}`,
+        `blow lost: ${s.lostBlow || '--'}`,
       ].join('\n')
     }
   })
