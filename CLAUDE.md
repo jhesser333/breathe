@@ -223,8 +223,8 @@ Art Options card "Space Ship (in-progress)" (id `'j'`, after the Balloon), built
   - Floor: two door panels the size of the balloon's short barrier (3 × 0.2 × 1.6), `DOOR_GAP` 0.02 apart at x = 0, no emissive. They slide one panel width apart (`DOOR_SLIDE_S` 0.6) while the ship rises, and close under it.
   - Columns: tertiary, no emissive, at ±`columnX` (`COLUMN_R` 0.12). Glowing pair ×1.15 wider, emissive tertiary ×3, grows up from the floor over the pace's inhale so it covers the plain pair at the Exhale bell; stays up through the exhale and sinks (`COLUMN_SINK_S` 0.6) as the ship fades.
   - Front door: the balloon door look (live primary, `GATE_EMISSIVE`), at `FRONT_DOOR_Z` −1.4, top `FRONT_DOOR_CLEAR` 0.3 above the ship at full height. Sinks into the floor at the Exhale bell (`FRONT_DOOR_S` 0.5), rises with the next ship.
-  - Cube targets: the Morphing Cube's target look (`createCubeMorphMaterial` + `applyGateLook`, pulse window measured from the ship) but fully opaque (opacity = the course fade only), edge `TARGET_SIZE` 0.5, at `fullY`, a cube's length apart (`makeCourse` in `spaceshipJ.js`; the layout is fixed and `COURSE_SIZE` comes from it):
-    - A stem at x = 0 runs from z −3 to `FORK_Z` −8.
+  - Cube targets: the Morphing Cube's target look (`createCubeMorphMaterial` + `applyGateLook`, pulse window measured from the ship) but fully opaque (opacity = the course fade only), edge `TARGET_SIZE` 0.5, at `fullY`, `CUBE_SPACING` 2 apart center to center, so three cube lengths of space between them (`makeCourse` in `spaceshipJ.js`; the layout is fixed and `COURSE_SIZE` comes from it):
+    - A stem at x = 0 runs from z −3 to `FORK_Z` −8 (cubes at −3, −5, −7).
     - Then one branch per sphere, easing (smoothstep) from x = 0 to that sphere's x between `FORK_Z` and 1 unit before the sphere's front edge. With the one sphere at x = 0, it's a single straight line.
     - Each cube is turned (Y) to follow its branch.
     - The ship passing a cube judges it: hit (|x| within half wingspan + half cube) → pulse to ×2 + the cube burst (`useGateBurstB`); miss → glow to 0, shrink to 0.25.

@@ -52,12 +52,13 @@ export const ARRIVE_S = (2 * SPHERE_R) / SHIP_SPEED   // 0.6 s: front edge -> ce
 export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S - START_LAG_S)) - SPHERE_R   // -27
 export const COURSE_END_Z = SPHERE_Z  // a ship that missed the sphere(s) ends its trip here
 
-// Cube targets, a cube's length apart: a stem straight out of the bay, then
-// a branch easing out to each sphere's x (with one sphere at x = 0, a
-// single straight line).
+// Cube targets, three cube lengths apart (CUBE_SPACING, center to center):
+// a stem straight out of the bay, then a branch easing out to each sphere's
+// x (with one sphere at x = 0, a single straight line).
 export const TARGET_SIZE = 0.5
+export const CUBE_SPACING = TARGET_SIZE * 4
 export const COURSE_START_Z = -3     // first cube's center
-export const FORK_Z = -8             // last stem cube
+export const FORK_Z = -8             // the stem ends here; the branches ease out from it
 const BRANCH_END_Z = SPHERE_Z + SPHERE_R + 1   // last branch cube, just before the sphere
 
 // Worlds: each sphere is one breath-cycle palette plus the slider audio group
@@ -68,11 +69,13 @@ export const WORLD_COUNT = BREATH_CYCLE_PALETTES.length
 // branch: 0 = stem (or a sphere straight ahead), -1 = left, 1 = right.
 function makeCubes() {
   const cubes = []
-  for (let z = COURSE_START_Z; z >= FORK_Z - 1e-6; z -= TARGET_SIZE * 2) cubes.push({ x: 0, z, rotY: 0, branch: 0 })
+  let z = COURSE_START_Z
+  for (; z >= FORK_Z - 1e-6; z -= CUBE_SPACING) cubes.push({ x: 0, z, rotY: 0, branch: 0 })
+  const branchStart = z
   const span = FORK_Z - BRANCH_END_Z
   for (const sx of SPHERES_X) {
     const xAt = (z) => sx * THREE.MathUtils.smoothstep((FORK_Z - z) / span, 0, 1)
-    for (let z = FORK_Z - TARGET_SIZE * 2; z >= BRANCH_END_Z - 1e-6; z -= TARGET_SIZE * 2) {
+    for (let z = branchStart; z >= BRANCH_END_Z - 1e-6; z -= CUBE_SPACING) {
       const slope = (xAt(z - 0.05) - xAt(z + 0.05)) / 0.1   // dx per unit down the road
       cubes.push({ x: xAt(z), z, rotY: Math.atan2(-slope, 1), branch: Math.sign(sx) })
     }
