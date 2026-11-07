@@ -66,12 +66,14 @@ const BLOW_INHALE_RATE_PER_S = 1 / 4  // quiet: full inhale in 4 s
 // Mic check (every session that uses the mic): quiet, then CAL_BLOWS paced
 // breaths: an inhale (CAL_INHALE_S, MicCheck rings the Inhale bell and fills
 // its columns), then an exhale that waits for and records one blow (MicCheck
-// rings the Exhale bell, and cuts it once the blow starts).
+// rings the Exhale bell, and cuts it once the blow starts; the columns drain
+// over CAL_EXHALE_S from the bell, suggesting a 6 s exhale).
 // The blows' average shape across the bands becomes the template, and the
 // thresholds (level, match, tone, strength range) are set from them.
 const CAL_QUIET_S = 2
 const CAL_BLOWS = 3
 const CAL_INHALE_S = 4
+const CAL_EXHALE_S = 6          // the columns drain over this, from the Exhale bell
 const CAL_MIN_BLOW_S = 0.6        // shorter sounds aren't counted as a blow
 const CAL_SKIP_S = 0.15           // each blow's onset isn't recorded
 const CAL_MAX_BLOW_S = 6          // and nothing past this
@@ -528,7 +530,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           needed: CAL_BLOWS,
           blowing: !!cal.cur,
           hint: cal.step === 'exhale' && cal.noBlowT > CAL_HINT_S,
-          inhaleP: cal.step === 'inhale' ? clamp(cal.t / CAL_INHALE_S, 0, 1) : cal.step === 'exhale' ? 1 : 0,
+          inhaleP: cal.step === 'inhale' ? clamp(cal.t / CAL_INHALE_S, 0, 1)
+            : cal.step === 'exhale' ? 1 - clamp(cal.t / CAL_EXHALE_S, 0, 1) : 0,
           level: clamp(blow.excess / 15, 0, 1),
         }
       }

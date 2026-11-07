@@ -6,7 +6,8 @@ import { useEffect, useRef } from 'react'
 // A rAF loop copies it into the DOM without React re-renders. Each paced
 // breath is paced like the Space Ship: an Inhale bell and glowing side
 // columns that fill over the inhale (inhaleP), then an Exhale bell that's cut
-// as soon as the blow starts, so it doesn't spill into the recording.
+// as soon as the blow starts, so it doesn't spill into the recording, while
+// the columns drain over the 6 s exhale.
 const TEXT = {
   wait: 'Getting the mic ready…',
   quiet: 'Hold your phone the way you will use it, and stay quiet for a moment.',
