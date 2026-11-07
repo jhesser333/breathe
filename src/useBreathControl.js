@@ -361,8 +361,10 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           needed: CAL_BLOWS,
           blowing: !!cal.cur,
           hint: cal.step === 'exhale' && cal.noBlowT > CAL_HINT_S,
-          inhaleP: cal.step === 'inhale' ? clamp(cal.t / CAL_INHALE_S, 0, 1)
-            : cal.step === 'exhale' ? 1 - clamp(cal.t / CAL_EXHALE_S, 0, 1) : 0,
+          // Like a ball thrown up: the fill slows to a stop at the top (ease-out),
+          // then the drain starts slowly and speeds up (ease-in), so there's no bounce.
+          inhaleP: cal.step === 'inhale' ? Math.sin(clamp(cal.t / CAL_INHALE_S, 0, 1) * Math.PI / 2)
+            : cal.step === 'exhale' ? Math.cos(clamp(cal.t / CAL_EXHALE_S, 0, 1) * Math.PI / 2) : 0,
           level: clamp(blow.excess / 15, 0, 1),
         }
       }

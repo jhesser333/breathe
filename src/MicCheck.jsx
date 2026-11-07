@@ -22,7 +22,8 @@ const COLUMN_TOP = '14%'
 const COLUMN_BOTTOM = 140
 const COLUMN_W = 12
 const GLOW_W = 16
-const TERTIARY = 'var(--live-tertiary-color, #276d8c)'
+const GLOW_SMOOTH_S = 0.35   // the glow's spring-follow time
+const TERTIARY ='var(--live-tertiary-color, #276d8c)'
 
 export default function MicCheck({ statusRef, onSkip, onBell, onBellStop }) {
   const textRef = useRef(null)
@@ -39,6 +40,9 @@ export default function MicCheck({ statusRef, onSkip, onBell, onBellStop }) {
     let raf = 0
     let lastStep = null
     let lastBlowing = false
+    let lastT = performance.now()
+    let glowH = 0
+    let glowV = 0
     const tick = () => {
       const s = statusRef.current
       const step = s ? s.step : 'wait'
@@ -64,8 +68,21 @@ export default function MicCheck({ statusRef, onSkip, onBell, onBellStop }) {
         barRef.current.style.width = `${Math.round((s ? s.level : 0) * 100)}%`
         barRef.current.style.opacity = blowing ? 1 : 0.5
       }
-      const p = s && s.inhaleP ? s.inhaleP : 0
-      glowRefs.current.forEach((el) => { if (el) el.style.height = `${p * 100}%` })
+      // inhaleP is already eased (useBreathControl). Follow it with a critically
+      // damped spring so jumps (a blow ending early restarts the fill from 0)
+      // and the turn at the bottom glide instead of snapping.
+      const now = performance.now()
+      const dt = Math.min(0.1, (now - lastT) / 1000)
+      lastT = now
+      const target = s && s.inhaleP ? s.inhaleP : 0
+      const w = 2 / GLOW_SMOOTH_S
+      const x = w * dt
+      const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
+      const diff = glowH - target
+      const tmp = (glowV + w * diff) * dt
+      glowV = (glowV - w * tmp) * decay
+      glowH = Math.min(1, Math.max(0, target + (diff + tmp) * decay))
+      glowRefs.current.forEach((el) => { if (el) el.style.height = `${glowH * 100}%` })
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
