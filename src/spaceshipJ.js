@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { planeLimits } from './planeCloudsG'
 import { balloonLimits, WALL_H, SHORT_H, SHORT_D } from './balloonH'
+import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 
 // Shape J (Space Ship): sizes and heights shared by MorphJ (the ship) and
 // SpaceshipBayJ (the bay, columns, front door, cube targets and pace).
@@ -34,22 +35,64 @@ export const COLUMN_MARGIN = 0.15    // column's outer edge inside the screen ed
 export const COLUMN_HEIGHT_FRAC = 0.75   // columns: this much of floor -> past the screen's top
 export const FULL_HEIGHT_FRAC = 0.5     // full-inhale height: this much of floor -> midway up the balloon's range
 
-// Cube targets: one line of cubes snaking along the road (-Z), a cube's
-// length apart. x(z) = two sine waves with random wavelengths and phases,
-// easing in from x = 0 over SNAKE_EASE_IN so it starts in front of the bay.
-export const TARGET_SIZE = 0.5
-export const SNAKE_MAX_X = 1         // the snake's widest swing
-const SNAKE_A = [0.75, 0.25]         // amplitude of each wave (sum = SNAKE_MAX_X)
-const SNAKE_WAVELENGTH = [[14, 22], [6, 9]]
-const SNAKE_EASE_IN = 6
-export const COURSE_START_Z = -3     // first cube's center
+// Destination spheres: one left, one right, at full height. Inverted normals
+// (BackSide), so the near half is invisible and you see inside the far half.
+// The ship reaches the front edge after TARGET_EXHALE_S - ARRIVE_S of
+// flying, then eases to a stop at the center over ARRIVE_S (an ease-out whose
+// starting speed matches SHIP_SPEED), so a ~6 s exhale docks it.
 export const SHIP_SPEED = 5          // flying speed, units/s
-export const MAX_EXHALE_S = 10       // the course is this many seconds of flying long
-export const COURSE_END_Z = -SHIP_SPEED * MAX_EXHALE_S   // the course (and a trip) ends here
+export const TARGET_EXHALE_S = 6
+export const SPHERE_R = 1.5
+export const SPHERE_X = 2.2
+export const ARRIVE_S = (2 * SPHERE_R) / SHIP_SPEED   // 0.6 s: front edge -> center
+export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S)) - SPHERE_R   // -28.5
+export const DOCK_TOLERANCE = SPHERE_R - WINGSPAN / 2   // ship center within this of the sphere's x = inside
+export const COURSE_END_Z = SPHERE_Z  // a ship that missed both spheres ends its trip here
+
+// Cube targets: a stem straight out of the bay, forking into two branches
+// that ease out to each sphere's x, a cube's length apart.
+export const TARGET_SIZE = 0.5
+export const COURSE_START_Z = -3     // first cube's center
+export const FORK_Z = -8             // last stem cube
+const BRANCH_END_Z = SPHERE_Z + SPHERE_R + 1   // last branch cube, just before the sphere
+
+// Worlds: each sphere is one breath-cycle palette plus the slider audio group
+// with the same index (BREATH_CYCLE_PALETTES[k] <-> slider group k).
+export const WORLD_COUNT = BREATH_CYCLE_PALETTES.length
+
+// Cube layout (fixed; only the spheres' worlds are random).
+// branch: 0 = stem, -1 = left, 1 = right.
+function makeCubes() {
+  const cubes = []
+  for (let z = COURSE_START_Z; z >= FORK_Z - 1e-6; z -= TARGET_SIZE * 2) cubes.push({ x: 0, z, rotY: 0, branch: 0 })
+  const span = FORK_Z - BRANCH_END_Z
+  const xAt = (z) => SPHERE_X * THREE.MathUtils.smoothstep((FORK_Z - z) / span, 0, 1)
+  for (const side of [-1, 1]) {
+    for (let z = FORK_Z - TARGET_SIZE * 2; z >= BRANCH_END_Z - 1e-6; z -= TARGET_SIZE * 2) {
+      const slope = side * (xAt(z - 0.05) - xAt(z + 0.05)) / 0.1   // dx per unit down the road
+      cubes.push({ x: side * xAt(z), z, rotY: Math.atan2(-slope, 1), branch: side })
+    }
+  }
+  return cubes
+}
+
+// A new course: the cubes, plus the two spheres, each one of the worlds that
+// isn't current (left/right at random).
+export function makeCourse(currentWorld = 0) {
+  const others = []
+  for (let k = 0; k < WORLD_COUNT; k++) if (k !== currentWorld) others.push(k)
+  while (others.length < 2) others.push(currentWorld)
+  if (Math.random() < 0.5) others.reverse()
+  return {
+    cubes: makeCubes(),
+    spheres: [{ x: -SPHERE_X, z: SPHERE_Z, world: others[0] }, { x: SPHERE_X, z: SPHERE_Z, world: others[1] }],
+  }
+}
+export const COURSE_SIZE = makeCubes().length
 
 // Side tilt: phone roll that puts the ship at its side limit.
 export const SIDE_TILT_FULL_DEG = 25
-export const SIDE_RANGE = SNAKE_MAX_X + 0.3
+export const SIDE_RANGE = SPHERE_X + 0.3
 
 // Exit: the down and sideways pulls ramp in over this long (SpaceshipBayJ, MorphJ).
 export const EXIT_TURN_S = 1.5
@@ -84,23 +127,3 @@ export function shipLimits(camera, size) {
   const columnTop = floorTop + COLUMN_HEIGHT_FRAC * ((top ? top.y : midY + 3) + 1 - floorTop)
   return { hoverY, floorTop, fullY, columnX, columnTop }
 }
-
-// A new course: the snake. Returns [{ x, z, rotY }] cube centers, each
-// turned to follow the snake's direction.
-export function makeCourse() {
-  const waves = SNAKE_A.map((a, i) => ({
-    a, k: (2 * Math.PI) / THREE.MathUtils.randFloat(...SNAKE_WAVELENGTH[i]), phase: Math.random() * 2 * Math.PI,
-  }))
-  const xAt = (d) => {   // d = distance down the road from the first cube
-    const ease = THREE.MathUtils.smoothstep(d / SNAKE_EASE_IN, 0, 1)
-    return ease * waves.reduce((sum, w) => sum + w.a * Math.sin(w.k * d + w.phase), 0)
-  }
-  const cubes = []
-  for (let z = COURSE_START_Z; z > COURSE_END_Z; z -= TARGET_SIZE * 2) {
-    const d = COURSE_START_Z - z
-    const slope = (xAt(d + 0.05) - xAt(d - 0.05)) / 0.1   // dx per unit down the road
-    cubes.push({ x: xAt(d), z, rotY: Math.atan2(-slope, 1) })
-  }
-  return cubes
-}
-export const COURSE_SIZE = makeCourse().length

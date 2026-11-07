@@ -74,6 +74,7 @@ export const TEXTS = {
   balloonRetry: 'Try inhale again and exhale when the bell rings.',
   // Space Ship (j): alternating inhale coaching, and the exhale prompt.
   shipInhaleA: 'Slowly fill your lungs up.',
-  shipInhaleB: 'The slower and longer you exhale, the farther the ship will travel.',
+  shipInhaleB: 'Exhale for about six seconds to reach a sphere.',
+  shipChoose: 'Tilt your phone to choose a sphere.',
   shipBlow: 'Blow on the mic.',
 }

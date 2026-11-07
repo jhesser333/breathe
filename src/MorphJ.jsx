@@ -8,7 +8,9 @@ import { EXIT_TURN_S, WINGSPAN, THICKNESS, LENGTH, ENGINE_R, ENGINE_LEN, ENGINE_
 // emit 0-1, seq }. This draws it there: rev brightens the engines, rock sets
 // how much it rocks side to side, emit sets the engine particle rate, steer
 // lets phone side tilt move it left/right (only while it flies), exitDir
-// (-1/1, 0 = none) sends it accelerating off that side. Its rendered position
+// (-1/1, 0 = none) sends it accelerating off that side, and xOverride (a
+// number, null = none) pins its x while it arrives at / docks in a
+// destination sphere. Its rendered position
 // goes to planePosRef for the cube targets' hit checks, and the live phone
 // roll to shipStateRef.gamma (null = no reading) for choosing the exit side.
 
@@ -168,7 +170,12 @@ export default function MorphJ({ palette, shipStateRef, planePosRef, livePalette
 
     if (ship.seq !== s.seq) { s.seq = ship.seq; s.x = 0; s.vx.v = 0; s.bank = 0; s.exitV = 0 }
     ship.gamma = gammaRef.current
-    if (ship.exitDir) {
+    if (ship.xOverride != null) {
+      // Arriving at / docking in a sphere: the bay places it.
+      s.vx.v = dt > 0 ? (ship.xOverride - s.x) / dt : 0
+      s.x = ship.xOverride
+      s.exitV = 0
+    } else if (ship.exitDir) {
       // Flying off: accelerate toward that side (the bank follows the velocity).
       s.exitV += ship.exitDir * EXIT_SIDE_ACCEL * THREE.MathUtils.smoothstep(ship.exitT / EXIT_TURN_S, 0, 1) * dt
       s.vx.v = s.exitV

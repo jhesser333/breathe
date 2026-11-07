@@ -141,7 +141,7 @@ const CAMERA_BY_SHAPE = {
 const DEFAULT_CAMERA = CAMERA_BY_SHAPE.a
 
 // Space Ship (j): its coaching texts (handleShipText).
-const SHIP_TEXTS = [TEXTS.shipInhaleA, TEXTS.shipInhaleB, TEXTS.shipBlow]
+const SHIP_TEXTS = [TEXTS.shipInhaleA, TEXTS.shipInhaleB, TEXTS.shipChoose, TEXTS.shipBlow]
 
 // Shapes that use the Morphing Cube's count/tutorial flow (the Hot Air
 // Balloon reuses the cube's 5-breath count and target timing).
@@ -170,9 +170,9 @@ function PaletteLerpDriver({ livePaletteRef, paletteLerpRef, paletteCycleIndexRe
   const holdPRef = useRef({ in: 0, out: 0 })
   useFrame((state, delta) => {
     if (paletteLerpRef.current) {
-      const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime } = paletteLerpRef.current
+      const { fromTertiary, fromPrimary, fromSecondary, fromBackground, fromText, toIndex, startTime, duration } = paletteLerpRef.current
       const now = state.clock.elapsedTime
-      const t = THREE.MathUtils.clamp((now - startTime) / PALETTE_LERP_DURATION, 0, 1)
+      const t = THREE.MathUtils.clamp((now - startTime) / Math.max(0.01, duration ?? PALETTE_LERP_DURATION), 0, 1)
       const to = BREATH_CYCLE_PALETTES[toIndex]
       const live = livePaletteRef.current
       live.tertiary.copy(fromTertiary).lerp(new THREE.Color(to.tertiaryColor), t)
@@ -496,11 +496,8 @@ export default function App() {
     background: new THREE.Color(PALETTES.teal.background),
     text: new THREE.Color(PALETTES.teal.textColor),
   })
-  const handleBreathPaletteCycle = useCallback((now) => {
-    // Audio moves to its next group with the palette (breathAudio.js).
-    audioGroupIndexRef.current += 1
-    audioRef.current.setCycle(audioGroupIndexRef.current)
-    const toIndex = (paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length
+  // Lerp the live palette from wherever it is now to BREATH_CYCLE_PALETTES[toIndex].
+  const startPaletteLerpTo = useCallback((toIndex, now, duration = PALETTE_LERP_DURATION) => {
     const live = livePaletteRef.current
     paletteLerpRef.current = {
       fromTertiary: live.tertiary.clone(),
@@ -510,8 +507,24 @@ export default function App() {
       fromText: live.text.clone(),
       toIndex,
       startTime: now,
+      duration,
     }
   }, [])
+  const handleBreathPaletteCycle = useCallback((now) => {
+    // Audio moves to its next group with the palette (breathAudio.js).
+    audioGroupIndexRef.current += 1
+    audioRef.current.setCycle(audioGroupIndexRef.current)
+    startPaletteLerpTo((paletteCycleIndexRef.current + 1) % BREATH_CYCLE_PALETTES.length, now)
+  }, [startPaletteLerpTo])
+  // Space Ship (j): docking in a sphere moves to that sphere's world --
+  // palette k and slider audio group k (SpaceshipBayJ decides when).
+  const handleSphereAudio = useCallback((world, fadeS) => {
+    audioGroupIndexRef.current = world
+    audioRef.current.setCycle(world, fadeS)
+  }, [])
+  const handleSpherePalette = useCallback((world, fadeS, now) => {
+    startPaletteLerpTo(world, now, fadeS)
+  }, [startPaletteLerpTo])
 
   // Slowing Down breath-tracking state, lifted here so it survives
   // SlowingDownController unmounting/remounting (e.g. when visiting Personalize)
@@ -884,7 +897,7 @@ export default function App() {
     if (shapeRef.current === 'j') {
       const p = shipPaceRef.current
       if (!p.paced || p.phase === 'idle') return null
-      return p.phase === 'inhale' ? 'inhale' : 'exhale'
+      return p.phase === 'inhale' || p.phase === 'docking' ? 'inhale' : 'exhale'
     }
     if (shapeRef.current !== 'h') return undefined
     const p = balloonPaceRef.current
@@ -1185,7 +1198,8 @@ export default function App() {
   // first paced Inhale starts (gates enabled, first bell). showDone false
   // (Skip Tutorial) leaves out the closing "Good job!" text.
   const startTutorialPaced = useCallback(({ showDone = true } = {}) => {
-    const pace = TARGET_PACES['6-6']
+    // The Space Ship breathes 4 in / 6 out (its 6 s exhale reaches a sphere).
+    const pace = TARGET_PACES[shapeRef.current === 'j' ? '4-6' : '6-6']
     spawnIntervalRef.current = pace.inhale + pace.exhale
     inhaleSecondsRef.current = pace.inhale
     exhaleSecondsRef.current = pace.exhale
@@ -2149,7 +2163,8 @@ export default function App() {
           <SpaceshipBayJ leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} spawnIntervalRef={spawnIntervalRef}
             inhaleSecondsRef={inhaleSecondsRef} exhaleSecondsRef={exhaleSecondsRef} blowRef={blowRef} micFailed={micFailed}
             shipStateRef={shipStateRef} shipPaceRef={shipPaceRef} planePosRef={planePosRef}
-            palette={palette} livePaletteRef={livePaletteRef} onShipText={handleShipText} />
+            palette={palette} livePaletteRef={livePaletteRef} onShipText={handleShipText}
+            currentWorldRef={paletteCycleIndexRef} onSphereAudio={handleSphereAudio} onSpherePalette={handleSpherePalette} />
         )}
         {showBackgroundArt && shapeOption === 'g' && <GroundTiesG mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} livePaletteRef={livePaletteRef} palette={palette} />}
         {showBackgroundArt && shapeOption === 'f' && <SideCloudsF mode={landscapeMode} spawnIntervalRef={spawnIntervalRef} leftVal={breathRef} gatesEnabledRef={gatesEnabledRef} livePaletteRef={livePaletteRef} palette={palette} />}

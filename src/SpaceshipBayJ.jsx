@@ -7,15 +7,18 @@ import { createPlaneGateMaterial, ringPulseEmissive, GATE_EMISSIVE } from './pla
 import { createCubeMorphMaterial, gateLookT, applyGateLook } from './cubeMaterialB'
 import { computePhaseDurations } from './BackgroundRingsD'
 import { TEXTS } from './copy'
+import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import {
   shipLimits, makeCourse, EXIT_TURN_S, SHIP_SPEED, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
-  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE,
+  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R, DOCK_TOLERANCE,
 } from './spaceshipJ'
 
-// Shape J (Space Ship): the docking bay, columns, front door and cube
-// targets, plus the pace. Nothing here moves along Z; the ship flies away.
-// The app paces the inhale; the user decides when the exhale ends.
+// Shape J (Space Ship): the docking bay, columns, front door, cube targets
+// and the two destination spheres, plus the pace. The bay never moves; the
+// ship flies away, and after docking in a sphere everything out there is
+// pulled back to the bay (which reads as the bay moving up to the ship).
+// The app paces the inhale; the user's exhale flies the ship.
 //
 // Phases (shipPaceRef.phase; nothing runs until gatesEnabledRef turns on):
 //   'idle'    -- before the pace: the ship waits under the closed floor.
@@ -29,7 +32,16 @@ import {
 //   'flying'  -- the ship flies away at a steady SHIP_SPEED (blow strength
 //                doesn't matter), steered by phone side tilt, judging each
 //                cube it passes. STOP_GRACE_S without a blow -> 'slowing'.
+//                Reaching a sphere's front edge inside it -> 'arriving';
+//                outside both, it flies on to COURSE_END_Z and exits.
 //   'slowing' -- SLOW_FACTOR speed for SLOW_S; a blow goes back to 'flying'.
+//   'arriving'-- the ship eases to a stop at the sphere's center (the ease's
+//                starting speed matches its speed). Blowing is ignored.
+//   'docking' -- the next inhale (Inhale bell). Over the inhale time the
+//                ship, both spheres and the cubes are pulled back to the bay
+//                (smoothstep), the chosen sphere grows and fades, the other
+//                fades first, the palette and audio lerp to the chosen
+//                sphere's world, and a new course fades in. Then 'ready'.
 //   'exiting' -- the ship dives down and off the side the phone is tipped
 //                toward (random when it's level), the cubes fade out and the
 //                glowing columns sink. Once it's off the screen it pops out,
@@ -71,9 +83,24 @@ const BLOW_PROMPT_S = 1
 const BLOW_PROMPT_WAIT_S = 3
 const SLIDER_BLOW_RATE = 0.08   // mic failed (Double Sliders): breath falling this fast (per s) = blowing
 const FLYING = { flying: true, slowing: true, exiting: true }
+// Docking, as fractions of the inhale time:
+const DOCK_GROW_END = 0.7       // chosen sphere grows x1 -> xDOCK_GROW_SCALE by here
+const DOCK_GROW_SCALE = 4
+const DOCK_FADE_START = 0.4     // ...and fades out from here to the end (the palette lerps over the same window)
+const DOCK_OTHER_FADE_END = 0.2 // the other sphere is gone by here
+const DOCK_CUBE_FADE_END = 0.4  // the old cubes are gone by here
+const DOCK_NEW_COURSE_AT = 0.75 // the new course starts fading in (over CUBE_FADE_S)
+// Spheres: inverted normals (BackSide), each in its world's palette.
+const SPHERE_EMISSIVE = 0.4
+const WORLD_COLORS = BREATH_CYCLE_PALETTES.map((p) => ({ base: new THREE.Color(p.tertiaryColor), glow: new THREE.Color(p.primaryColor) }))
 
-// One cube's state on the current course.
-const makeCube = ({ x, z, rotY }) => ({ x, z, rotY, judged: false, missElapsed: null })
+// One cube's state on the current course. skipped = on the branch the ship
+// didn't take: never judged, keeps its approach look.
+const makeCube = ({ x, z, rotY, branch }) => ({ x, z, rotY, branch, judged: false, skipped: false, missElapsed: null })
+const makeCourseState = (world) => {
+  const c = makeCourse(world)
+  return { cubes: c.cubes.map(makeCube), spheres: c.spheres }
+}
 
 // Moves value toward target at 1/seconds per second.
 const approach = (value, target, seconds, dt) => {
@@ -84,23 +111,27 @@ const approach = (value, target, seconds, dt) => {
 export default function SpaceshipBayJ({
   leftVal, gatesEnabledRef, spawnIntervalRef, inhaleSecondsRef, exhaleSecondsRef,
   blowRef, micFailed, shipStateRef, shipPaceRef, planePosRef, palette, livePaletteRef, onShipText,
+  currentWorldRef, onSphereAudio, onSpherePalette,
 }) {
+  const currentWorld = () => (currentWorldRef ? currentWorldRef.current : 0) || 0
   const st = useRef(null)
   if (st.current === null) {
     st.current = {
       phase: 'idle', start: 0, inhaleCount: 0, text: null, lastBlow: -Infinity, z: 0, exitDir: 0, exitVy: 0, exitDrop: 0, seq: 0, doorOpen: 0, frontDoor: 1, columnH: 0,
-      courseFade: 0, cubes: makeCourse().map(makeCube), prevV: null, fallRate: 0,
+      courseFade: 0, course: makeCourseState(currentWorld()), prevV: null, fallRate: 0,
+      passedFront: false, arrive: null, dock: null,
     }
   }
-  const refs = useRef({ panels: [], columns: [], glows: [], frontDoor: null, cubes: [] })
+  const refs = useRef({ panels: [], columns: [], glows: [], frontDoor: null, cubes: [], spheres: [] })
 
   const panelGeometry = useMemo(() => new RoundedBoxGeometry(PANEL_W, PANEL_H, PANEL_D, 2, 0.05), [])
   const frontDoorGeometry = useMemo(() => new RoundedBoxGeometry(PANEL_W, 1, FRONT_DOOR_T, 2, 0.04), [])
   const columnGeometry = useMemo(() => new THREE.CylinderGeometry(COLUMN_R, COLUMN_R, 1, 24), [])
   const glowGeometry = useMemo(() => new THREE.CylinderGeometry(COLUMN_R * GLOW_COLUMN_SCALE, COLUMN_R * GLOW_COLUMN_SCALE, 1, 24), [])
   const cubeGeometry = useMemo(() => new RoundedBoxGeometry(TARGET_SIZE, TARGET_SIZE, TARGET_SIZE, 2, 0.08), [])
-  useEffect(() => () => [panelGeometry, frontDoorGeometry, columnGeometry, glowGeometry, cubeGeometry].forEach((g) => g.dispose()),
-    [panelGeometry, frontDoorGeometry, columnGeometry, glowGeometry, cubeGeometry])
+  const sphereGeometry = useMemo(() => new THREE.SphereGeometry(SPHERE_R, 48, 32), [])
+  useEffect(() => () => [panelGeometry, frontDoorGeometry, columnGeometry, glowGeometry, cubeGeometry, sphereGeometry].forEach((g) => g.dispose()),
+    [panelGeometry, frontDoorGeometry, columnGeometry, glowGeometry, cubeGeometry, sphereGeometry])
 
   const mats = useMemo(() => ({
     panel: createPlaneGateMaterial(palette),
@@ -108,10 +139,15 @@ export default function SpaceshipBayJ({
     column: new THREE.MeshStandardMaterial({ color: palette.tertiaryColor, roughness: 0.5 }),
     glow: new THREE.MeshStandardMaterial({ color: palette.tertiaryColor, emissive: palette.tertiaryColor, emissiveIntensity: 3, roughness: 0.5 }),
     cubes: Array.from({ length: COURSE_SIZE }, () => createCubeMorphMaterial(palette.secondaryColor, palette.primaryColor)),
+    // Slots 0-1: the current course's spheres. 2-3: the docking pair.
+    spheres: Array.from({ length: 4 }, () => new THREE.MeshStandardMaterial({
+      side: THREE.BackSide, transparent: true, depthWrite: false, roughness: 0.5, emissiveIntensity: SPHERE_EMISSIVE,
+    })),
   }), [palette])
   useEffect(() => () => {
     mats.panel.dispose(); mats.frontDoor.dispose(); mats.column.dispose(); mats.glow.dispose()
     mats.cubes.forEach((c) => c.material.dispose())
+    mats.spheres.forEach((m) => m.dispose())
   }, [mats])
 
   const gateBurst = useGateBurstB(palette.primaryColor)
@@ -165,6 +201,32 @@ export default function SpaceshipBayJ({
       s.inhaleCount++
       s.z = 0
       s.exitDir = 0
+      s.passedFront = false
+    }
+    // Reached the spheres' front edge: inside one -> ease to its center.
+    const checkArrival = (speed) => {
+      const sp = s.course.spheres[0]
+      if (s.passedFront || s.z > sp.z + SPHERE_R) return false
+      const px = planePosRef?.current?.x ?? 0
+      const idx = s.course.spheres.findIndex((q) => Math.abs(px - q.x) < DOCK_TOLERANCE)
+      if (idx < 0) { s.passedFront = true; return false }
+      const target = s.course.spheres[idx]
+      setPhase('arriving')
+      s.arrive = { idx, x0: px, z0: s.z, dur: Math.max(0.1, (2 * (s.z - target.z)) / Math.max(0.1, speed)) }
+      return true
+    }
+    // Docked: the inhale starts, and everything out there is pulled back to the bay.
+    const startDock = () => {
+      const idx = s.arrive.idx
+      const sphere = s.course.spheres[idx]
+      setPhase('docking')
+      s.inhaleCount++
+      s.dock = {
+        idx, fromX: sphere.x, fromZ: sphere.z, world: sphere.world, spheres: s.course.spheres,
+        fade0: s.courseFade, paletteSent: false, swapped: false, next: makeCourseState(sphere.world),
+      }
+      s.arrive = null
+      onSphereAudio?.(sphere.world, inhaleDur)
     }
     // Exit side: the way the phone is tipped, or random when it's level.
     const startExit = () => {
@@ -188,14 +250,45 @@ export default function SpaceshipBayJ({
         break
       case 'flying':
         s.z -= SHIP_SPEED * dt
+        if (checkArrival(SHIP_SPEED)) break
         if (now - s.lastBlow > STOP_GRACE_S) setPhase('slowing')
         if (s.z <= COURSE_END_Z) startExit()
         break
       case 'slowing':
         s.z -= SHIP_SPEED * SLOW_FACTOR * dt
+        if (checkArrival(SHIP_SPEED * SLOW_FACTOR)) break
         if (blowing) setPhase('flying')
         else if (elapsed >= SLOW_S || s.z <= COURSE_END_Z) startExit()
         break
+      case 'arriving': {
+        const a = s.arrive
+        const u = THREE.MathUtils.clamp(elapsed / a.dur, 0, 1)
+        const target = s.course.spheres[a.idx]
+        s.z = a.z0 + (target.z - a.z0) * (1 - (1 - u) * (1 - u))   // ease-out from the flying speed
+        if (u >= 1) startDock()
+        break
+      }
+      case 'docking': {
+        const d = s.dock
+        const t = elapsed / inhaleDur
+        s.z = d.fromZ * (1 - THREE.MathUtils.smoothstep(t, 0, 1))
+        if (!d.paletteSent && t >= DOCK_FADE_START) {
+          d.paletteSent = true
+          onSpherePalette?.(d.world, (1 - DOCK_FADE_START) * inhaleDur, now)
+        }
+        if (!d.swapped && t >= DOCK_NEW_COURSE_AT) {
+          d.swapped = true
+          s.course = d.next
+          s.courseFade = 0
+          s.passedFront = false
+        }
+        if (t >= 1) {
+          s.z = 0
+          s.dock = null
+          setPhase('ready')
+        }
+        break
+      }
       case 'exiting': {
         const turn = THREE.MathUtils.smoothstep(elapsed / EXIT_TURN_S, 0, 1)
         s.exitVz = THREE.MathUtils.lerp(SHIP_SPEED * SLOW_FACTOR, EXIT_FORWARD_SPEED, THREE.MathUtils.smoothstep(elapsed / 1, 0, 1))
@@ -209,7 +302,7 @@ export default function SpaceshipBayJ({
           off = Math.abs(_v.x) > EXIT_OFFSCREEN_NDC || _v.y < -EXIT_OFFSCREEN_NDC
         }
         if (off) {
-          s.cubes = makeCourse().map(makeCube)
+          s.course = makeCourseState(currentWorld())
           s.courseFade = 0
           startInhale()
         }
@@ -229,6 +322,16 @@ export default function SpaceshipBayJ({
     ship.exitT = s.phase === 'exiting' ? pe : 0
     ship.exitVy = s.phase === 'exiting' ? s.exitVy : 0
     ship.exitVz = s.phase === 'exiting' ? s.exitVz : 0
+    // Docking: everything out there shares this pull back toward the bay.
+    const dockK = s.dock ? THREE.MathUtils.smoothstep(pe / inhaleDur, 0, 1) : 0
+    const offX = s.dock ? -s.dock.fromX * dockK : 0
+    const offZ = s.dock ? -s.dock.fromZ * dockK : 0
+    if (s.phase === 'arriving') {
+      const a = s.arrive
+      ship.xOverride = THREE.MathUtils.lerp(a.x0, s.course.spheres[a.idx].x, THREE.MathUtils.smoothstep(pe / a.dur, 0, 1))
+    } else if (s.phase === 'docking') {
+      ship.xOverride = s.dock.fromX + offX
+    } else ship.xOverride = null
     if (s.phase === 'idle') {
       Object.assign(ship, { y: belowY, alpha: 0, rev: 0, rock: 0, emit: 0 })
     } else if (s.phase === 'inhale') {
@@ -239,6 +342,10 @@ export default function SpaceshipBayJ({
       Object.assign(ship, { y, alpha: THREE.MathUtils.smoothstep((pe - RISE_DELAY_S) / SHIP_FADE_IN_S, 0, 1), rev, rock: rev, emit: rev })
     } else if (s.phase === 'ready') {
       Object.assign(ship, { y: limits.fullY, alpha: 1, rev: 1, rock: 1, emit: 1 })
+    } else if (s.phase === 'arriving') {
+      Object.assign(ship, { y: limits.fullY, alpha: 1, rev: 1, rock: 0, emit: 0.4 })
+    } else if (s.phase === 'docking') {
+      Object.assign(ship, { y: limits.fullY, alpha: 1, rev: 1, rock: dockK, emit: 0.4 })
     } else {
       const drop = s.phase === 'exiting' ? s.exitDrop : 0
       const alpha = s.phase === 'exiting' ? 1 - THREE.MathUtils.smoothstep((pe - EXIT_FADE_START_S) / (EXIT_MAX_S - EXIT_FADE_START_S), 0, 1) : 1
@@ -259,7 +366,11 @@ export default function SpaceshipBayJ({
     // over the inhale, reaching the top at the Exhale bell.
     const colH = limits.columnTop - limits.floorTop
     if (s.phase === 'inhale') s.columnH = THREE.MathUtils.clamp(pe / inhaleDur, 0, 1)
-    else if (s.phase === 'idle') s.columnH = 0
+    else if (s.phase === 'docking') {
+      // Sink, then grow back over the rest of the inhale.
+      const sink = Math.min(COLUMN_SINK_S, inhaleDur / 3)
+      s.columnH = pe < sink ? approach(s.columnH, 0, sink, dt) : THREE.MathUtils.clamp((pe - sink) / (inhaleDur - sink), 0, 1)
+    } else if (s.phase === 'idle') s.columnH = 0
     else if (s.phase === 'exiting') s.columnH = approach(s.columnH, 0, COLUMN_SINK_S, dt)
     else s.columnH = 1
     for (let n = 0; n < 2; n++) {
@@ -294,16 +405,28 @@ export default function SpaceshipBayJ({
     }
     if (live) { mats.column.color.copy(live.tertiary); mats.glow.color.copy(live.tertiary); mats.glow.emissive.copy(live.tertiary) }
 
-    // Cube targets: fade out with the ship, fade in with a new course.
+    // Cube targets: fade out with the ship, fade in with a new course. While
+    // docking (until the new course swaps in) the old ones ride the pull and fade.
     s.courseFade = s.phase === 'exiting'
       ? Math.min(s.courseFade, 1 - THREE.MathUtils.smoothstep(pe / CUBE_FADE_S, 0, 1))
       : approach(s.courseFade, 1, CUBE_FADE_S, dt)
-    const courseFade = THREE.MathUtils.smoothstep(s.courseFade, 0, 1)
+    const pulling = !!s.dock && !s.dock.swapped
+    const courseFade = pulling
+      ? THREE.MathUtils.smoothstep(s.dock.fade0, 0, 1) * (1 - THREE.MathUtils.smoothstep(pe / (DOCK_CUBE_FADE_END * inhaleDur), 0, 1))
+      : THREE.MathUtils.smoothstep(s.courseFade, 0, 1)
+    const cubeOffX = pulling ? offX : 0
+    const cubeOffZ = pulling ? offZ : 0
     const px = planePosRef?.current?.x ?? 0
-    s.cubes.forEach((cube, n) => {
+    const judging = FLYING[s.phase] || s.phase === 'arriving'
+    s.course.cubes.forEach((cube, n) => {
       const mesh = refs.current.cubes[n]
       if (!mesh) return
-      if (!cube.judged && FLYING[s.phase] && s.z <= cube.z) {
+      if (!cube.judged && !cube.skipped && judging && s.z <= cube.z) {
+        const hit = Math.abs(px - cube.x) < WINGSPAN / 2 + TARGET_SIZE / 2
+        // The branch the ship didn't take isn't judged.
+        if (!hit && cube.branch !== 0 && Math.sign(px) !== cube.branch) cube.skipped = true
+      }
+      if (!cube.judged && !cube.skipped && judging && s.z <= cube.z) {
         cube.judged = true
         if (Math.abs(px - cube.x) < WINGSPAN / 2 + TARGET_SIZE / 2) {
           gateBurst.burstFrom(() => {
@@ -315,20 +438,53 @@ export default function SpaceshipBayJ({
       }
       if (cube.missElapsed != null) cube.missElapsed += dt
       const missF = missFactor(cube.missElapsed)
-      const rel = cube.judged ? 0 : Math.min(cube.z - s.z, -1e-4)   // < 0 = still ahead of the ship
+      const rel = cube.judged ? 0 : cube.skipped ? -10 : Math.min(cube.z - s.z, -1e-4)   // < 0 = still ahead of the ship
       applyGateLook(mats.cubes[n], gateLookT(rel), courseFade, ringPulseEmissive(rel) * (1 - missF), live)
       mats.cubes[n].material.opacity = courseFade   // opaque, not the look's 50% approach
       applyMissScale(mesh, missF)
-      mesh.position.set(cube.x, limits.fullY, cube.z)
+      mesh.position.set(cube.x + cubeOffX, limits.fullY, cube.z + cubeOffZ)
       mesh.rotation.y = cube.rotY
       mesh.visible = courseFade > 0.001
     })
     gateBurst.tick(now, livePaletteRef)
 
+    // Spheres. Slots 0-1: the current course's pair at rest (hidden while
+    // that same pair is being pulled in). Slots 2-3: the docking pair.
+    const placeSphere = (slot, sphere, x, z, scale, opacity) => {
+      const mesh = refs.current.spheres[slot]
+      if (!mesh) return
+      const mat = mats.spheres[slot]
+      const c = WORLD_COLORS[sphere ? sphere.world % WORLD_COLORS.length : 0]
+      mat.color.copy(c.base)
+      mat.emissive.copy(c.glow)
+      mat.opacity = opacity
+      mesh.visible = !!sphere && opacity > 0.001
+      mesh.position.set(x, limits.fullY, z)
+      mesh.scale.setScalar(scale)
+    }
+    for (let n = 0; n < 2; n++) {
+      const sp = s.course.spheres[n]
+      placeSphere(n, sp, sp.x, sp.z, 1, pulling ? 0 : courseFade)
+    }
+    for (let n = 0; n < 2; n++) {
+      const d = s.dock
+      const sp = d ? d.spheres[n] : null
+      if (!sp) { placeSphere(2 + n, null, 0, 0, 1, 0); continue }
+      const t = pe / inhaleDur
+      const fade0 = THREE.MathUtils.smoothstep(d.fade0, 0, 1)
+      const chosen = n === d.idx
+      const scale = chosen ? 1 + (DOCK_GROW_SCALE - 1) * THREE.MathUtils.smoothstep(t / DOCK_GROW_END, 0, 1) : 1
+      const opacity = fade0 * (chosen
+        ? 1 - THREE.MathUtils.smoothstep((t - DOCK_FADE_START) / (1 - DOCK_FADE_START), 0, 1)
+        : 1 - THREE.MathUtils.smoothstep(t / DOCK_OTHER_FADE_END, 0, 1))
+      placeSphere(2 + n, sp, sp.x + offX, sp.z + offZ, scale, opacity)
+    }
+
     // Coaching text.
     let text = null
-    if (s.phase === 'inhale' && pe < TEXT_FADE_S + INHALE_TEXT_S) {
-      text = s.inhaleCount % 2 === 1 ? TEXTS.shipInhaleA : TEXTS.shipInhaleB
+    if ((s.phase === 'inhale' || s.phase === 'docking') && pe < TEXT_FADE_S + INHALE_TEXT_S) {
+      // Rotates: fill your lungs (1st), six seconds (2nd), tilt to choose (3rd), ...
+      text = [TEXTS.shipChoose, TEXTS.shipInhaleA, TEXTS.shipInhaleB][s.inhaleCount % 3]
     } else if (s.phase === 'ready') {
       const cycle = TEXT_FADE_S + BLOW_PROMPT_S + TEXT_FADE_S + BLOW_PROMPT_WAIT_S
       if (pe % cycle < TEXT_FADE_S + BLOW_PROMPT_S) text = TEXTS.shipBlow
@@ -356,6 +512,9 @@ export default function SpaceshipBayJ({
       <mesh ref={(el) => { refs.current.frontDoor = el }} geometry={frontDoorGeometry} material={mats.frontDoor} />
       {Array.from({ length: COURSE_SIZE }, (_, n) => (
         <mesh key={`t${n}`} ref={(el) => { refs.current.cubes[n] = el }} geometry={cubeGeometry} material={mats.cubes[n].material} />
+      ))}
+      {mats.spheres.map((m, n) => (
+        <mesh key={`s${n}`} ref={(el) => { refs.current.spheres[n] = el }} geometry={sphereGeometry} material={m} visible={false} />
       ))}
     </>
   )

@@ -391,7 +391,8 @@ export function createAudioEngine() {
     },
 
     // Next 5-breath cycle: move each pair to its group for this cycle.
-    setCycle(cycleIndex) {
+    // fadeS: crossfade length (the Space Ship passes its inhale time).
+    setCycle(cycleIndex, fadeS = GROUP_FADE_S) {
       if (!running) return
       lastCycleIndex = cycleIndex
       for (const pair of ['slider', 'pace']) {
@@ -399,8 +400,8 @@ export function createAudioEngine() {
         if (!list.length || !current[pair]) continue
         const entry = list[cycleIndex % list.length]
         if (entry.group === current[pair].group) continue
-        retire(current[pair], GROUP_FADE_S)
-        current[pair] = makeVoices(pair, cycleIndex, GROUP_FADE_S, pair === 'pace' && !paceOn ? 0 : 1)
+        retire(current[pair], fadeS)
+        current[pair] = makeVoices(pair, cycleIndex, fadeS, pair === 'pace' && !paceOn ? 0 : 1)
       }
     },
   }
