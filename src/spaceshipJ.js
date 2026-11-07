@@ -42,14 +42,14 @@ export const FULL_HEIGHT_FRAC = 0.5     // full-inhale height: this much of floo
 // (blowDetector's start window), then the ship reaches the front edge after
 // TARGET_EXHALE_S - ARRIVE_S - START_LAG_S of flying and eases to a stop at
 // the center over ARRIVE_S (an ease-out whose starting speed matches
-// SHIP_SPEED), so a ~6 s exhale, counted from its real start, docks it.
+// SHIP_SPEED), so a ~5 s exhale, counted from its real start, docks it.
 export const SPHERES_X = [0]
 export const SHIP_SPEED = 5          // flying speed, units/s
-export const TARGET_EXHALE_S = 6
+export const TARGET_EXHALE_S = 5
 export const START_LAG_S = 0.3
 export const SPHERE_R = 1.5
 export const ARRIVE_S = (2 * SPHERE_R) / SHIP_SPEED   // 0.6 s: front edge -> center
-export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S - START_LAG_S)) - SPHERE_R   // -27
+export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S - START_LAG_S)) - SPHERE_R   // -22
 export const COURSE_END_Z = SPHERE_Z  // a ship that missed the sphere(s) ends its trip here
 
 // Cube targets, three cube lengths apart (CUBE_SPACING, center to center):

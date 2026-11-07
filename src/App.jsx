@@ -1206,8 +1206,8 @@ export default function App() {
   // first paced Inhale starts (gates enabled, first bell). showDone false
   // (Skip Tutorial) leaves out the closing "Good job!" text.
   const startTutorialPaced = useCallback(({ showDone = true } = {}) => {
-    // The Space Ship breathes 4 in / 6 out (its 6 s exhale reaches a sphere).
-    const pace = TARGET_PACES[shapeRef.current === 'j' ? '4-6' : '6-6']
+    // The Space Ship breathes 5 in / 5 out (its 5 s exhale reaches a sphere).
+    const pace = TARGET_PACES[shapeRef.current === 'j' ? '5-5' : '6-6']
     spawnIntervalRef.current = pace.inhale + pace.exhale
     inhaleSecondsRef.current = pace.inhale
     exhaleSecondsRef.current = pace.exhale

@@ -258,7 +258,10 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
 
 // The mic check's result from its recorded blow frames (rise per band,
 // smoothed rise, tone, jitter) and the quiet step's rises.
-export function buildProfile(frames, excesses, tones, jitters, quietExcesses) {
+// tailExcesses / tailFrames: the last third of each blow, so the off
+// thresholds reach down to how quiet (and what shape) the user's exhale gets
+// as it ends, and a real exhale isn't cut off before it's over.
+export function buildProfile(frames, excesses, tones, jitters, quietExcesses, tailExcesses = [], tailFrames = []) {
   const bands = frames[0].length
   const mean = new Float32Array(bands)
   for (const f of frames) for (let b = 0; b < bands; b++) mean[b] += f[b] / frames.length
@@ -274,12 +277,18 @@ export function buildProfile(frames, excesses, tones, jitters, quietExcesses) {
     : 0
   const quietTop = percentile(quietExcesses, 0.95)
   const levelOn = clamp(Math.max(quietTop + 1.5, 0.35 * percentile(excesses, 0.5)), BLOW_ON_DB, 12)
-  const levelOff = Math.max(BLOW_OFF_DB, levelOn * 0.5)
+  let levelOff = levelOn * 0.5
+  if (tailExcesses.length) levelOff = Math.min(levelOff, 0.8 * percentile(tailExcesses, 0.2))
+  levelOff = Math.min(levelOn - 0.5, Math.max(levelOff, BLOW_OFF_DB, quietTop + 0.5))
+  let matchOff = matchOn - 0.15
+  if (hasShape && tailFrames.length) {
+    matchOff = Math.max(0, Math.min(matchOff, percentile(tailFrames.map((f) => shapeMatch(f, template)), 0.2) - 0.1))
+  }
   return {
     bands,
     template: hasShape ? template : null,
     matchOn,
-    matchOff: matchOn - 0.15,
+    matchOff,
     levelOn,
     levelOff,
     range: Math.max(4, percentile(excesses, 0.9) - levelOff),

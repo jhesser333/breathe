@@ -37,17 +37,19 @@ const BLOW_INHALE_RATE_PER_S = 1 / 4  // quiet: full inhale in 4 s
 // breaths: an inhale (CAL_INHALE_S, MicCheck rings the Inhale bell and fills
 // its columns), then an exhale that waits for and records one blow (MicCheck
 // rings the Exhale bell, and cuts it once the blow starts; the columns drain
-// over CAL_EXHALE_S from the bell, suggesting a 6 s exhale).
+// over CAL_EXHALE_S from the bell, suggesting a 5 s exhale, but the player
+// may blow on past it and the whole exhale is recorded, quiet end included).
 // The blows' average shape across the bands becomes the template, and the
 // thresholds (level, match, tone, steadiness, strength range) are set from
-// them (buildProfile).
+// them; the off thresholds also from each blow's last third (buildProfile).
 const CAL_QUIET_S = 2
 const CAL_BLOWS = 3
-const CAL_INHALE_S = 4
-const CAL_EXHALE_S = 6          // the columns drain over this, from the Exhale bell
+const CAL_INHALE_S = 5
+const CAL_EXHALE_S = 5          // the columns drain over this, from the Exhale bell
 const CAL_MIN_BLOW_S = 0.6        // shorter sounds aren't counted as a blow
 const CAL_SKIP_S = 0.15           // each blow's onset isn't recorded
-const CAL_MAX_BLOW_S = 6          // and nothing past this
+const CAL_END_GRACE_S = 0.5       // a blow ends once the loose detector has been off this long
+const CAL_MAX_BLOW_S = 20         // safety cap: nothing past this is recorded
 const CAL_HINT_S = 10             // no blow this long: suggest closer / harder
 const CAL_DONE_MS = 1200          // "Got it" shows this long
 
@@ -298,6 +300,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         cal.excesses = []
         cal.tones = []
         cal.jitters = []
+        cal.tailExcesses = []
+        cal.tailFrames = []
         cal.cur = null
         cal.blows = 0
         cal.noBlowT = 0
@@ -314,30 +318,41 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         if (cal.t >= CAL_INHALE_S) { cal.step = 'exhale'; cal.t = 0; cal.noBlowT = 0 }
       } else if (cal.step === 'exhale') {
         // A blow starts only when it isn't tonal, so the Exhale bell doesn't count.
-        if (blow.raw && (cal.cur || blow.tone < BLOW_MAX_TONE)) {
-          if (!cal.cur) cal.cur = { t: 0, frames: [], excesses: [], tones: [], jitters: [] }
-          cal.cur.t += dt
-          if (cal.cur.t > CAL_SKIP_S && cal.cur.t < CAL_MAX_BLOW_S) {
-            cal.cur.frames.push(Float32Array.from(blow.rise))
-            cal.cur.excesses.push(blow.excess)
-            cal.cur.tones.push(blow.tone)
-            cal.cur.jitters.push(blow.jitter)
+        // It ends only once the loose detector has been off CAL_END_GRACE_S, so
+        // the quiet, flickering end of a long exhale stays part of it; frames
+        // are recorded only while the loose detector hears it.
+        const on = blow.raw && (!!cal.cur || blow.tone < BLOW_MAX_TONE)
+        if (on && !cal.cur) cal.cur = { t: 0, offT: 0, frames: [], excesses: [], tones: [], jitters: [] }
+        if (cal.cur) {
+          const c = cal.cur
+          c.t += dt
+          c.offT = on ? 0 : c.offT + dt
+          if (on && c.t > CAL_SKIP_S && c.t < CAL_MAX_BLOW_S) {
+            c.frames.push(Float32Array.from(blow.rise))
+            c.excesses.push(blow.excess)
+            c.tones.push(blow.tone)
+            c.jitters.push(blow.jitter)
           }
-        } else if (cal.cur) {
-          if (cal.cur.t >= CAL_MIN_BLOW_S && cal.cur.frames.length) {
-            cal.frames.push(...cal.cur.frames)
-            cal.excesses.push(...cal.cur.excesses)
-            cal.tones.push(...cal.cur.tones)
-            cal.jitters.push(...cal.cur.jitters)
-            cal.blows++
-            cal.noBlowT = 0
-            if (cal.blows < CAL_BLOWS) { cal.step = 'inhale'; cal.t = 0 }
+          if (c.offT >= CAL_END_GRACE_S) {
+            if (c.t - c.offT >= CAL_MIN_BLOW_S && c.frames.length) {
+              cal.frames.push(...c.frames)
+              cal.excesses.push(...c.excesses)
+              cal.tones.push(...c.tones)
+              cal.jitters.push(...c.jitters)
+              // The last third: how quiet (and what shape) this user's exhale gets as it ends.
+              const tail = Math.floor((c.frames.length * 2) / 3)
+              cal.tailFrames.push(...c.frames.slice(tail))
+              cal.tailExcesses.push(...c.excesses.slice(tail))
+              cal.blows++
+              cal.noBlowT = 0
+              if (cal.blows < CAL_BLOWS) { cal.step = 'inhale'; cal.t = 0 }
+            }
+            cal.cur = null
           }
-          cal.cur = null
         }
         if (!cal.cur) cal.noBlowT += dt
         if (cal.blows >= CAL_BLOWS) {
-          blowProfile = buildProfile(cal.frames, cal.excesses, cal.tones, cal.jitters, cal.quiet)
+          blowProfile = buildProfile(cal.frames, cal.excesses, cal.tones, cal.jitters, cal.quiet, cal.tailExcesses, cal.tailFrames)
           cal.step = 'done'
           cal.t = 0
         }
@@ -397,7 +412,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           + `sustain ${Math.round(blow.sustain * 100)}%  jitter ${blow.jitter.toFixed(1)}dB  tone ${blow.tone.toFixed(2)}  match ${blow.match === null ? '--' : blow.match.toFixed(2)}\n`
           + `raw ${blow.raw ? 'on' : 'off'}  cand ${blow.candidate ? 'on' : 'off'}  check ${cal.step}\n`
           + (blowProfile
-            ? `profile: level ${blowProfile.levelOn.toFixed(1)}dB  match ${blowProfile.template ? blowProfile.matchOn.toFixed(2) : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
+            ? `profile: level ${blowProfile.levelOn.toFixed(1)}/${blowProfile.levelOff.toFixed(1)}dB  match ${blowProfile.template ? `${blowProfile.matchOn.toFixed(2)}/${blowProfile.matchOff.toFixed(2)}` : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
             : 'profile: none\n')
           + `${status}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}`
       }
