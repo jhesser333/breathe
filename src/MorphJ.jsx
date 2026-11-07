@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { EXIT_TURN_S, WINGSPAN, THICKNESS, LENGTH, ENGINE_R, ENGINE_LEN, ENGINE_X, SIDE_TILT_FULL_DEG, SIDE_RANGE } from './spaceshipJ'
+import { EXIT_TURN_S, WINGSPAN, THICKNESS, LENGTH, ENGINE_R, ENGINE_LEN, ENGINE_X, SIDE_TILT_FULL_DEG } from './spaceshipJ'
 
 // Shape J (Space Ship): the gray-box ship. SpaceshipBayJ runs the pace and
 // writes shipStateRef each frame: { y, z, alpha, rev 0-1, rock 0-1, steer,
@@ -181,7 +181,8 @@ export default function MorphJ({ palette, shipStateRef, planePosRef, livePalette
       s.vx.v = s.exitV
       s.x += s.exitV * dt
     } else {
-      const tx = ship.steer ? THREE.MathUtils.clamp((gammaRef.current ?? 0) / SIDE_TILT_FULL_DEG, -1, 1) * SIDE_RANGE : 0
+      // Full tilt = the screen edge at the ship's depth (ship.sideRange, from the bay), so the reach widens as it flies away.
+      const tx = ship.steer ? THREE.MathUtils.clamp((gammaRef.current ?? 0) / SIDE_TILT_FULL_DEG, -1, 1) * (ship.sideRange ?? 1.3) : 0
       s.x = smoothDamp(s.x, tx, s.vx, SIDE_TIME, dt)
       s.exitV = s.vx.v
     }

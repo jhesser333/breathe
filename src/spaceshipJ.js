@@ -35,15 +35,19 @@ export const COLUMN_MARGIN = 0.15    // column's outer edge inside the screen ed
 export const COLUMN_HEIGHT_FRAC = 0.75   // columns: this much of floor -> past the screen's top
 export const FULL_HEIGHT_FRAC = 0.5     // full-inhale height: this much of floor -> midway up the balloon's range
 
-// Destination spheres, at full height, one per SPHERES_X entry (now just one,
-// straight ahead; [-2.2, 2.2] brings back the left/right pair). Inverted
-// normals (BackSide), so the near half is invisible and you see inside the
-// far half. The mic needs START_LAG_S of blowing to be sure it's a blow
-// (blowDetector's early window), then the ship reaches the front edge after
-// TARGET_EXHALE_S - ARRIVE_S - START_LAG_S of flying and eases to a stop at
-// the center over ARRIVE_S (an ease-out whose starting speed matches
-// SHIP_SPEED), so a ~5 s exhale, counted from its real start, docks it.
-export const SPHERES_X = [0]
+// Destination spheres, at full height, one per SPHERE_SIDES entry (-1 left,
+// 1 right; [0] would put a single one straight ahead), each almost touching
+// its side of the screen: x = side * (half-width of the view at the sphere -
+// SPHERE_R - SPHERE_EDGE_MARGIN), worked out each frame (resolveCourse), so it
+// fits any phone. Inverted normals (BackSide), so the near half is invisible
+// and you see inside the far half. The mic needs START_LAG_S of blowing to be
+// sure it's a blow (blowDetector's early window), then the ship reaches the
+// front edge after TARGET_EXHALE_S - ARRIVE_S - START_LAG_S of flying and
+// eases to a stop at the center over ARRIVE_S (an ease-out whose starting
+// speed matches SHIP_SPEED), so a ~5 s exhale, counted from its real start,
+// docks it.
+export const SPHERE_SIDES = [-1, 1]
+export const SPHERE_EDGE_MARGIN = 0.3
 export const SHIP_SPEED = 5          // flying speed, units/s
 export const TARGET_EXHALE_S = 5
 export const START_LAG_S = 0.15     // blowDetector's BLOW_EARLY_S
@@ -52,32 +56,39 @@ export const ARRIVE_S = (2 * SPHERE_R) / SHIP_SPEED   // 0.6 s: front edge -> ce
 export const SPHERE_Z = -(SHIP_SPEED * (TARGET_EXHALE_S - ARRIVE_S - START_LAG_S)) - SPHERE_R   // -22.75
 export const COURSE_END_Z = SPHERE_Z  // a ship that missed the sphere(s) ends its trip here
 
-// Cube targets, three cube lengths apart (CUBE_SPACING, center to center):
-// a stem straight out of the bay, then a branch easing out to each sphere's
-// x (with one sphere at x = 0, a single straight line).
+// Cube targets, three cube lengths apart (CUBE_SPACING, center to center): one
+// stem cube straight out of the bay at FORK_Z, then a trail to each sphere
+// making an S across the screen. The left sphere's trail runs out to the left
+// edge, sweeps across to the right edge, then back into the left sphere; the
+// right one is its mirror image. A cube's x is an edge fraction f (-1 = its
+// outer face on the left screen edge, 1 = the right) of the view's half-width
+// at its depth, worked out each frame (resolveCourse). Following a trail is
+// optional: docking only needs the ship lined up with a sphere.
 export const TARGET_SIZE = 0.5
 export const CUBE_SPACING = TARGET_SIZE * 4
-export const COURSE_START_Z = -3     // first cube's center
-export const FORK_Z = -8             // the stem ends here; the branches ease out from it
-const BRANCH_END_Z = SPHERE_Z + SPHERE_R + 1   // last branch cube, just before the sphere
+export const CUBE_EDGE_MARGIN = 0.05  // f = ±1 leaves this gap to the screen edge
+export const FORK_Z = -3             // the stem cube; the trails start from it
+const BRANCH_END_Z = SPHERE_Z + SPHERE_R + 1   // the trails end here, just before the spheres
+// The left trail's edge fraction along it (u 0 at FORK_Z -> 1 at BRANCH_END_Z),
+// as [u, f] keypoints, smoothstepped between them; the last f is the sphere's
+// (null = filled in each frame). The right trail negates f.
+const TRAIL_KEYS = [[0, 0], [0.2, -1], [0.55, 1], [1, null]]
 
 // Worlds: each sphere is one breath-cycle palette plus the slider audio group
 // with the same index (BREATH_CYCLE_PALETTES[k] <-> slider group k).
 export const WORLD_COUNT = BREATH_CYCLE_PALETTES.length
 
-// Cube layout (fixed; only the spheres' worlds are random).
-// branch: 0 = stem (or a sphere straight ahead), -1 = left, 1 = right.
+// Cube layout (fixed; only the spheres' worlds are random; x and rotY are
+// filled in by resolveCourse). branch: 0 = stem, else the side of the sphere
+// whose trail it's on. row: cubes at the same z share a row (the ship is
+// judged against the row's nearest cube only, since the trails cross).
 function makeCubes() {
-  const cubes = []
-  let z = COURSE_START_Z
-  for (; z >= FORK_Z - 1e-6; z -= CUBE_SPACING) cubes.push({ x: 0, z, rotY: 0, branch: 0 })
-  const branchStart = z
+  const cubes = [{ z: FORK_Z, u: 0, branch: 0, row: 0, x: 0, rotY: 0 }]
   const span = FORK_Z - BRANCH_END_Z
-  for (const sx of SPHERES_X) {
-    const xAt = (z) => sx * THREE.MathUtils.smoothstep((FORK_Z - z) / span, 0, 1)
-    for (let z = branchStart; z >= BRANCH_END_Z - 1e-6; z -= CUBE_SPACING) {
-      const slope = (xAt(z - 0.05) - xAt(z + 0.05)) / 0.1   // dx per unit down the road
-      cubes.push({ x: xAt(z), z, rotY: Math.atan2(-slope, 1), branch: Math.sign(sx) })
+  for (const side of SPHERE_SIDES) {
+    let row = 1
+    for (let z = FORK_Z - CUBE_SPACING; z >= BRANCH_END_Z - 1e-6; z -= CUBE_SPACING, row++) {
+      cubes.push({ z, u: (FORK_Z - z) / span, branch: side, row, x: 0, rotY: 0 })
     }
   }
   return cubes
@@ -90,17 +101,61 @@ export function makeCourse(currentWorld = 0) {
   const others = []
   for (let k = 1; k < WORLD_COUNT; k++) others.push((currentWorld + k) % WORLD_COUNT)
   if (others.length === 0) others.push(currentWorld)
-  if (SPHERES_X.length > 1) others.sort(() => Math.random() - 0.5)
+  if (SPHERE_SIDES.length > 1) others.sort(() => Math.random() - 0.5)
   return {
     cubes: makeCubes(),
-    spheres: SPHERES_X.map((x, i) => ({ x, z: SPHERE_Z, world: others[i % others.length] })),
+    spheres: SPHERE_SIDES.map((side, i) => ({ side, x: 0, z: SPHERE_Z, world: others[i % others.length] })),
   }
 }
 export const COURSE_SIZE = makeCubes().length
 
-// Side tilt: phone roll that puts the ship at its side limit.
+// Half-width of the view at (y, z), in world units. The camera has no yaw or
+// roll and the lens shift is vertical only, so screen x is linear in world x.
+const _hw = new THREE.Vector3()
+export function halfWidthAt(camera, y, z) {
+  _hw.set(1, y, z).project(camera)
+  return _hw.x > 1e-6 ? 1 / _hw.x : 1
+}
+
+// The trail's edge fraction at u (left trail; the right one negates it).
+function trailF(u, endF) {
+  for (let i = 1; i < TRAIL_KEYS.length; i++) {
+    const [u1, f1] = TRAIL_KEYS[i]
+    if (u <= u1 || i === TRAIL_KEYS.length - 1) {
+      const [u0, f0] = TRAIL_KEYS[i - 1]
+      const a = f0 ?? endF
+      const b = f1 ?? endF
+      return a + (b - a) * THREE.MathUtils.smoothstep((u - u0) / (u1 - u0), 0, 1)
+    }
+  }
+  return 0
+}
+
+// Places the course for this camera and height: each sphere's x, and each
+// cube's x and Y turn (following its trail).
+export function resolveCourse(course, camera, y) {
+  const sphereX = Math.max(0, halfWidthAt(camera, y, SPHERE_Z) - SPHERE_R - SPHERE_EDGE_MARGIN)
+  for (const sp of course.spheres) sp.x = sp.side * sphereX
+  const cubeW = (z) => Math.max(0, halfWidthAt(camera, y, z) - TARGET_SIZE / 2 - CUBE_EDGE_MARGIN)
+  const endW = cubeW(BRANCH_END_Z)
+  const endF = endW > 0 ? sphereX / endW : 0   // the left sphere is at -endF
+  const span = FORK_Z - BRANCH_END_Z
+  // The left trail's x at z; the right trail (branch 1) is its mirror image.
+  const xAt = (z) => trailF((FORK_Z - z) / span, -endF) * cubeW(z)
+  for (const c of course.cubes) {
+    if (c.branch === 0) { c.x = 0; c.rotY = 0; continue }
+    const m = -c.branch
+    c.x = m * xAt(c.z)
+    const slope = m * (xAt(c.z - 0.05) - xAt(c.z + 0.05)) / 0.1   // dx per unit down the road
+    c.rotY = Math.atan2(-slope, 1)
+  }
+}
+
+// Side tilt: phone roll that puts the ship at its side limit, which follows
+// the screen edge at the ship's depth (SpaceshipBayJ writes ship.sideRange):
+// its center SHIP_EDGE_INSET inside the edge, so a little of it clips.
 export const SIDE_TILT_FULL_DEG = 25
-export const SIDE_RANGE = Math.max(...SPHERES_X.map(Math.abs)) + 1.3
+export const SHIP_EDGE_INSET = WINGSPAN * 0.3
 
 // Exit: the down and sideways pulls ramp in over this long (SpaceshipBayJ, MorphJ).
 export const EXIT_TURN_S = 1.5

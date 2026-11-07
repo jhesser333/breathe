@@ -11,7 +11,7 @@ import { BREATH_CYCLE_PALETTES } from './breathCyclePalettes'
 import {
   shipLimits, makeCourse, EXIT_TURN_S, SHIP_SPEED, COURSE_SIZE, COURSE_END_Z, WINGSPAN, THICKNESS,
   PANEL_W, PANEL_H, PANEL_D, DOOR_GAP, FRONT_DOOR_T, FRONT_DOOR_Z, FRONT_DOOR_CLEAR,
-  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R, SPHERE_Z,
+  COLUMN_R, GLOW_COLUMN_SCALE, TARGET_SIZE, SPHERE_R, SPHERE_Z, resolveCourse, halfWidthAt, SHIP_EDGE_INSET,
 } from './spaceshipJ'
 
 // Shape J (Space Ship): the docking bay, columns, front door, cube targets
@@ -97,9 +97,10 @@ const SPHERE_EMISSIVE = 0.4
 const ARRIVE_SIDE_SPEED = 3   // the sideways glide onto the sphere's x takes at least |dx| / this
 const WORLD_COLORS = BREATH_CYCLE_PALETTES.map((p) => ({ base: new THREE.Color(p.tertiaryColor), glow: new THREE.Color(p.primaryColor) }))
 
-// One cube's state on the current course. skipped = on the branch the ship
-// didn't take: never judged, keeps its approach look.
-const makeCube = ({ x, z, rotY, branch }) => ({ x, z, rotY, branch, judged: false, skipped: false, missElapsed: null })
+// One cube's state on the current course. skipped = not the cube in its row
+// nearest the ship as it passed (the trail it didn't follow): never judged,
+// keeps its approach look.
+const makeCube = (c) => ({ ...c, judged: false, skipped: false, missElapsed: null })
 const makeCourseState = (world) => {
   const c = makeCourse(world)
   return { cubes: c.cubes.map(makeCube), spheres: c.spheres }
@@ -193,6 +194,8 @@ export default function SpaceshipBayJ({
     refCam.updateProjectionMatrix()
     refCam.updateMatrixWorld()
     const limits = shipLimits(refCam, state.size)
+    // Spheres at the screen edges and the S trails, for this screen's width.
+    resolveCourse(s.course, refCam, limits.fullY)
     // Lens shift: drop the scene so the floor's front edge sits FLOOR_SCREEN_PX up.
     _v.set(0, limits.floorTop, PANEL_D / 2).project(refCam)
     const shift = (_v.y + 1) / 2 * H - FLOOR_SCREEN_PX
@@ -371,6 +374,9 @@ export default function SpaceshipBayJ({
     } else if (s.phase === 'docking') {
       ship.xOverride = s.dock.fromX + offX
     } else ship.xOverride = null
+    // Steering reach: the screen edge at the ship's depth (MorphJ), its center
+    // SHIP_EDGE_INSET inside, so full tilt clips it a little.
+    const sideRangeAt = (y) => Math.max(0.3, halfWidthAt(refCam, y, s.z) - SHIP_EDGE_INSET)
     if (s.phase === 'idle') {
       Object.assign(ship, { y: belowY, alpha: 0, rev: 0, rock: 0, emit: 0 })
     } else if (s.phase === 'inhale') {
@@ -390,6 +396,8 @@ export default function SpaceshipBayJ({
       const alpha = s.phase === 'exiting' ? 1 - THREE.MathUtils.smoothstep((pe - EXIT_FADE_START_S) / (EXIT_MAX_S - EXIT_FADE_START_S), 0, 1) : 1
       Object.assign(ship, { y: limits.fullY - drop, alpha, rev: 1, rock: 0, emit: s.phase === 'flying' ? 1 : 0.4 })
     }
+
+    ship.sideRange = sideRangeAt(ship.y)
 
     // Floor doors: apart while the ship rises, closed under it after.
     // Docking: open as the pull starts, slide closed under the ship as it arrives.
@@ -458,14 +466,22 @@ export default function SpaceshipBayJ({
     const cubeOffZ = pulling ? offZ : 0
     const px = planePosRef?.current?.x ?? 0
     const judging = FLYING[s.phase] || s.phase === 'arriving'
+    // Passing a row: only its cube nearest the ship is judged (the trails
+    // cross, so the side the ship is on doesn't say which trail it follows).
+    if (judging) {
+      const nearest = new Map()
+      for (const cube of s.course.cubes) {
+        if (cube.judged || cube.skipped || s.z > cube.z) continue
+        const best = nearest.get(cube.row)
+        if (!best || Math.abs(px - cube.x) < Math.abs(px - best.x)) nearest.set(cube.row, cube)
+      }
+      for (const cube of s.course.cubes) {
+        if (!cube.judged && !cube.skipped && s.z <= cube.z && nearest.get(cube.row) !== cube) cube.skipped = true
+      }
+    }
     s.course.cubes.forEach((cube, n) => {
       const mesh = refs.current.cubes[n]
       if (!mesh) return
-      if (!cube.judged && !cube.skipped && judging && s.z <= cube.z) {
-        const hit = Math.abs(px - cube.x) < WINGSPAN / 2 + TARGET_SIZE / 2
-        // The branch the ship didn't take isn't judged.
-        if (!hit && cube.branch !== 0 && Math.sign(px) !== cube.branch) cube.skipped = true
-      }
       if (!cube.judged && !cube.skipped && judging && s.z <= cube.z) {
         cube.judged = true
         if (Math.abs(px - cube.x) < WINGSPAN / 2 + TARGET_SIZE / 2) {
