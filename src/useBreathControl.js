@@ -152,7 +152,7 @@ const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('but
 // Mic check: a new non-zero calibrateKey starts one (0 = none); calStatusRef
 // gets { step, blows, needed, hint, level } each frame for the overlay, and
 // onCalibrated() is called when it's done.
-export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef, blowDetailRef, allSensors = false, readoutRef, calibrateKey = 0, calStatusRef, onCalibrated }) {
+export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef, blowDetailRef, allSensors = false, readoutRef, calibrateKey = 0, calStatusRef, onCalibrated, blowNeedsTouch = false }) {
   const [shown, setShown] = useState(null)
   const onValueRef = useRef(onValue)
   onValueRef.current = onValue
@@ -166,6 +166,9 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
   onCalibratedRef.current = onCalibrated
   const calibrateKeyRef = useRef(calibrateKey)
   calibrateKeyRef.current = calibrateKey
+  // Space Ship: the mic's blow only counts while a finger holds the screen.
+  const blowNeedsTouchRef = useRef(blowNeedsTouch)
+  blowNeedsTouchRef.current = blowNeedsTouch
   const vRef = useRef(0)
 
   useEffect(() => { vRef.current = 0 }, [resetKey])
@@ -393,13 +396,20 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           level: clamp(blow.excess / 15, 0, 1),
         }
       }
-      if (blowRef) blowRef.current = control === 'blow' && blow.on ? 1 : 0
+      // blowNeedsTouch (Space Ship): the blow only counts while a finger holds
+      // the screen (not a button), so noises at other times can't fly the ship.
+      // The detector itself keeps running, so the floor stays current and a
+      // blow already going is heard the moment the finger lands.
+      const listening = !blowNeedsTouchRef.current || down.size > 0
+      const blowOn = blow.on && listening
+      if (blowRef) blowRef.current = control === 'blow' && blowOn ? 1 : 0
       if (blowDetailRef && blowDetailRef.current) {
         const d = blowDetailRef.current
         const isBlow = control === 'blow'
-        d.candidate = isBlow && blow.candidate
-        d.early = isBlow && blow.early
-        d.strict = isBlow && blow.on
+        d.listening = isBlow && listening
+        d.candidate = isBlow && listening && blow.candidate
+        d.early = isBlow && listening && blow.early
+        d.strict = isBlow && blowOn
         d.tone = isBlow ? blow.tone : 0
         d.why = isBlow ? blow.why : ''
         d.rise = isBlow ? blow.excess : 0
@@ -432,7 +442,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           + (blowProfile
             ? `profile: level ${blowProfile.levelOn.toFixed(1)}/${blowProfile.levelOff.toFixed(1)}dB  match ${blowProfile.template ? `${blowProfile.matchOn.toFixed(2)}/${blowProfile.matchOff.toFixed(2)}` : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
             : 'profile: none\n')
-          + `${status}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}\n`
+          + `${status}${blowNeedsTouchRef.current ? `  touch ${listening ? 'held' : 'not held'}` : ''}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}\n`
           + `last block: ${lastBlock ? `${lastBlock.why} (rise ${lastBlock.rise.toFixed(1)}dB) ${ago(lastBlock.clock)}` : '--'}\n`
           + `last stop: ${blow.offWhy ? `${blow.offWhy} (rise ${blow.offRise.toFixed(1)}dB${levelOffNow === null ? '' : `, stop level ${levelOffNow.toFixed(1)}`}) ${ago(blow.offClock)}` : '--'}`
       }
@@ -454,7 +464,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         v += (tiltTarget - v) * (1 - Math.exp(-dt / TILT_SMOOTH_S))
         if (Math.abs(tiltTarget - v) < 0.0005) v = tiltTarget
       } else if (control === 'blow') {
-        if (blow.on) {
+        if (blowOn) {
           lastOnT = now
           const rate = BLOW_MIN_RATE_PER_S + (BLOW_MAX_RATE_PER_S - BLOW_MIN_RATE_PER_S) * blow.strength
           v = Math.max(0, v - rate * dt)
@@ -484,7 +494,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('deviceorientation', onTilt)
       if (useMic) releaseMic()
       if (blowRef) blowRef.current = 0
-      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { candidate: false, early: false, strict: false, tone: 0, why: '', rise: 0, offWhy: '', offRise: 0 })
+      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { listening: false, candidate: false, early: false, strict: false, tone: 0, why: '', rise: 0, offWhy: '', offRise: 0 })
       if (readoutRef) readoutRef.current = null
       if (calStatusRef) calStatusRef.current = null
       debugEl?.remove()

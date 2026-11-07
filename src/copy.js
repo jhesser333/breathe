@@ -76,5 +76,5 @@ export const TEXTS = {
   shipInhaleA: 'Slowly fill your lungs up.',
   shipInhaleB: 'Exhale for about six seconds to reach a sphere.',
   shipChoose: 'Tilt your phone to choose a sphere.',
-  shipBlow: 'Blow on the mic.',
+  shipBlow: 'Hold the screen and blow on the mic.',
 }

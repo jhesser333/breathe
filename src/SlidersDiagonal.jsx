@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTouchSlider } from './useTouchSlider'
 import { UI_EDGE, UI_INTERIOR, UI_FILL, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
+import { HOLD_CIRCLE_SIZE, HOLD_CIRCLE_BOTTOM } from './HoldCircle'
 import {
   CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE,
   P0_FRAC, P2_FRAC, sampleCurve, getPathD, pointAtArcFrac,
@@ -16,6 +17,12 @@ const HOLD_LABEL_GAP = 4    // Box Breathing's "hold" labels: gap to their inhal
 // at this y in the track box, where the gap between the tracks clears the
 // label (~52 px wide) by about 8 px on each side.
 const HOLD_OUT_TOP_Y = 94
+// labelsOnly (Space Ship on the mic): one "inhale" over "exhale", stacked
+// above the hold circle between Home and Restart (measured from the screen's
+// bottom, so the layer's shiftUp is taken back out).
+const STACK_CIRCLE_GAP = 8
+const STACK_EXHALE_BOTTOM = HOLD_CIRCLE_BOTTOM + HOLD_CIRCLE_SIZE + STACK_CIRCLE_GAP
+const STACK_INHALE_BOTTOM = STACK_EXHALE_BOTTOM + LABEL_SIZE + HOLD_LABEL_GAP
 
 const labelStyle = {
   position: 'absolute',
@@ -28,6 +35,20 @@ const labelStyle = {
   letterSpacing: '0.06em',
   userSelect: 'none',
   pointerEvents: 'none',
+}
+
+// The inhale/exhale labels: tertiary, lit for the phase to breathe now (App's PaletteLerpDriver).
+const inhaleLabelLook = {
+  ...labelStyle,
+  color: 'var(--inhale-label-color, var(--live-tertiary-color, #276d8c))',
+  opacity: 'var(--inhale-label-opacity, 0.5)',
+  textShadow: 'var(--inhale-label-glow, none)',
+}
+const exhaleLabelLook = {
+  ...labelStyle,
+  color: 'var(--exhale-label-color, var(--live-tertiary-color, #276d8c))',
+  opacity: 'var(--exhale-label-opacity, 0.5)',
+  textShadow: 'var(--exhale-label-glow, none)',
 }
 
 // Box Breathing's "hold" labels: the lit label look, opacity from App's PaletteLerpDriver.
@@ -62,10 +83,8 @@ function DiagonalTrack({ sliderRef, value, side, labelsOnly }) {
       ...edgeStyle,
     }}>
       <span style={{
-        ...labelStyle,
-        color: 'var(--inhale-label-color, var(--live-tertiary-color, #276d8c))',
-        opacity: 'var(--inhale-label-opacity, 0.5)',
-        textShadow: 'var(--inhale-label-glow, none)',
+        ...inhaleLabelLook,
+        display: labelsOnly ? 'none' : undefined,
         left: (isLeft ? P2_FRAC.x : 1 - P2_FRAC.x) * w,
         top: P2_FRAC.y * h - THUMB_SIZE / 2 - INHALE_LABEL_GAP,
         transform: 'translate(-50%, -100%)',
@@ -122,7 +141,8 @@ function DiagonalTrack({ sliderRef, value, side, labelsOnly }) {
 
 // drivenValue (0 exhale -> 1 inhale, or null): another Control Option is
 // driving the breath, so the thumbs show it and the tracks ignore touches.
-// labelsOnly: hide the tracks and thumbs, keep the inhale/exhale/hold labels.
+// labelsOnly (Space Ship on the mic): hide the tracks and thumbs; one
+// "inhale" over "exhale" stacked above the hold circle (HoldCircle).
 export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null, drivenValue = null, labelsOnly = false }) {
   const driven = drivenValue !== null
   const drivenRef = useRef(driven)
@@ -144,9 +164,20 @@ export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawR
     <div style={{ position: 'absolute', inset: 0, transform: `translateY(-${shiftUp}px)` }}>
       <DiagonalTrack sliderRef={leftRef} value={leftVal} side="left" labelsOnly={labelsOnly} />
       <DiagonalTrack sliderRef={rightRef} value={rightVal} side="right" labelsOnly={labelsOnly} />
-      <span style={{ ...labelStyle, color: 'var(--exhale-label-color, var(--live-tertiary-color, #276d8c))', opacity: 'var(--exhale-label-opacity, 0.5)', textShadow: 'var(--exhale-label-glow, none)', bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
-        exhale
-      </span>
+      {labelsOnly ? (
+        <>
+          <span style={{ ...inhaleLabelLook, bottom: STACK_INHALE_BOTTOM - shiftUp, left: '50%', transform: 'translateX(-50%)' }}>
+            inhale
+          </span>
+          <span style={{ ...exhaleLabelLook, bottom: STACK_EXHALE_BOTTOM - shiftUp, left: '50%', transform: 'translateX(-50%)' }}>
+            exhale
+          </span>
+        </>
+      ) : (
+        <span style={{ ...exhaleLabelLook, bottom: exhaleLabelBottom, left: '50%', transform: 'translate(-50%, 100%)' }}>
+          exhale
+        </span>
+      )}
       <span style={{ ...holdStyle('out'), bottom: BOTTOM_INSET + CURVE_BOX_H - HOLD_OUT_TOP_Y - LABEL_SIZE, left: '50%', transform: 'translateX(-50%)' }}>
         hold
       </span>

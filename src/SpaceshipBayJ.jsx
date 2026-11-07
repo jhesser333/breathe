@@ -50,7 +50,8 @@ import {
 // Screen placement: the layout is worked out on an unshifted copy of the
 // camera, then the real camera gets a lens shift (setViewOffset, no zoom)
 // that puts the floor's front edge FLOOR_SCREEN_PX above the screen's bottom,
-// just above Home/Restart.
+// just above Home/Restart (on the mic: FLOOR_SCREEN_PX_MIC, above the hold
+// circle and its inhale/exhale labels).
 
 const DOOR_SLIDE_S = 0.6        // floor doors open/close
 const RISE_DELAY_S = 0.3        // the ship starts rising this long after the Inhale bell
@@ -70,6 +71,7 @@ const EXIT_TILT_DEADZONE_DEG = 3 // phone roll under this = level: random exit s
 const EXIT_OFFSCREEN_NDC = 1.15  // pops out once past this far off the screen
 const EXIT_MAX_S = 2.8           // ...or after this long
 const FLOOR_SCREEN_PX = 80       // floor front edge above the screen's bottom
+const FLOOR_SCREEN_PX_MIC = 160  // ...on the mic, clearing the hold circle + labels (~144 px)
 const CUBE_FADE_S = 1
 const COLUMN_SINK_S = 0.6
 // Coaching text (onShipText; App fades each in/out over TEXT_FADE_S):
@@ -198,7 +200,7 @@ export default function SpaceshipBayJ({
     resolveCourse(s.course, refCam, limits.fullY)
     // Lens shift: drop the scene so the floor's front edge sits FLOOR_SCREEN_PX up.
     _v.set(0, limits.floorTop, PANEL_D / 2).project(refCam)
-    const shift = (_v.y + 1) / 2 * H - FLOOR_SCREEN_PX
+    const shift = (_v.y + 1) / 2 * H - (micFailed ? FLOOR_SCREEN_PX : FLOOR_SCREEN_PX_MIC)
     if (shiftRef.current === null || Math.abs(shift - shiftRef.current) > 0.5) {
       shiftRef.current = shift
       cam.setViewOffset(W, H, 0, -shift, W, H)
@@ -567,7 +569,7 @@ export default function SpaceshipBayJ({
         `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
         `x ${px.toFixed(2)} ${inside ? 'lined up' : 'off to the side'}`,
         `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
-        `strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  early ${detail && detail.early ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
+        `touch ${detail && detail.listening ? 'held' : 'not held'}  strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  early ${detail && detail.early ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
         `last trip: ${s.lastEnd}`,
         `blow lost: ${s.lostBlow || '--'}`,
       ].join('\n')
