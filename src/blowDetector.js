@@ -28,6 +28,7 @@ const TONE_SMOOTH_S = 0.15
 export const BLOW_MAX_TONE = 0.75        // no mic check: above this the rise is pitched (0 smooth -> ~1+ tones)
 const BLOW_START_S = 0.3                 // a blow must hold over this window to start...
 const BLOW_SUSTAIN_FRAC = 0.8            // ...with this share of its frames above the start level
+export const BLOW_EARLY_S = 0.15         // the early detector's window (above the stop level)
 const BLOW_MAX_JITTER_DB = 5             // no mic check: mean frame-to-frame level change allowed in the window
 const BLOW_RELEASE_S = 0.15              // a blow must be gone this long to end
 const BLOW_MATCHED_COVERAGE = 0.2        // with a mic check, the shape match replaces most of the coverage rule
@@ -60,15 +61,16 @@ export const percentile = (arr, p) => {
 }
 
 // Pearson correlation of the rise (dB per band) with a centred, unit-length
-// template: the shape only, whatever the loudness.
-export function shapeMatch(rise, template) {
+// template: the shape only, whatever the loudness. A rise too flat to have a
+// shape returns `shapeless`.
+export function shapeMatch(rise, template, shapeless = 0) {
   const n = rise.length
   let mean = 0
   for (let b = 0; b < n; b++) mean += rise[b]
   mean /= n
   let dot = 0, nn = 0
   for (let b = 0; b < n; b++) { const d = rise[b] - mean; dot += d * template[b]; nn += d * d }
-  if (Math.sqrt(nn / n) < SHAPE_MIN_SPREAD_DB) return 0
+  if (Math.sqrt(nn / n) < SHAPE_MIN_SPREAD_DB) return shapeless
   return dot / Math.sqrt(nn)
 }
 
@@ -79,7 +81,7 @@ export function createBlowState() {
     rise: null, extra: null,
     histT: new Float64Array(HIST_LEN), histX: new Float32Array(HIST_LEN), histI: 0, histN: 0, histStart: 0,
     clock: 0, lastOnClock: -Infinity, calS: 0, onS: 0, releaseS: 0,
-    on: false, raw: false, candidate: false, why: 'calibrating', offWhy: '', offRise: 0, offClock: -Infinity,
+    on: false, raw: false, candidate: false, early: false, why: 'calibrating', offWhy: '', offRise: 0, offClock: -Infinity,
     strength: 0, excess: 0, frameExcess: 0, coverage: 0, tone: 0, match: null, sustain: 0, jitter: 0,
   }
 }
@@ -107,7 +109,7 @@ export function resetBlowState(blow, lo, n, hz) {
     extra: new Float32Array(n),
     histI: 0, histN: 0, histStart: 0,
     clock: 0, lastOnClock: -Infinity, calS: 0, onS: 0, releaseS: 0,
-    on: false, raw: false, candidate: false, why: 'calibrating', offWhy: '', offRise: 0, offClock: -Infinity,
+    on: false, raw: false, candidate: false, early: false, why: 'calibrating', offWhy: '', offRise: 0, offClock: -Infinity,
     strength: 0, excess: 0, frameExcess: 0, coverage: 0, tone: 0, match: null, sustain: 0, jitter: 0,
   })
 }
@@ -162,7 +164,7 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
   }
   if (calibrating) {
     blow.calS += dt
-    blow.on = blow.raw = blow.candidate = false
+    blow.on = blow.raw = blow.candidate = blow.early = false
     blow.why = 'calibrating'
     blow.histStart = blow.clock
     return
@@ -213,7 +215,10 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
   blow.histX[blow.histI] = blow.frameExcess
   blow.histI = (blow.histI + 1) % HIST_LEN
   blow.histN = Math.min(HIST_LEN, blow.histN + 1)
+  // The early window (the last BLOW_EARLY_S) is judged against the early level.
+  const earlyLevel = prof ? prof.levelOff : BLOW_ON_DB
   let count = 0, above = 0, jSum = 0, prev = 0
+  let eCount = 0, eAbove = 0, eJSum = 0
   for (let k = 0; k < blow.histN; k++) {
     const idx = (blow.histI - 1 - k + HIST_LEN) % HIST_LEN
     if (blow.histT[idx] <= blow.clock - BLOW_START_S) break
@@ -221,11 +226,19 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
     count++
     if (x > levelOn) above++
     if (k > 0) jSum += Math.abs(prev - x)
+    if (blow.histT[idx] > blow.clock - BLOW_EARLY_S) {
+      eCount++
+      if (x > earlyLevel) eAbove++
+      if (k > 0) eJSum += Math.abs(prev - x)
+    }
     prev = x
   }
   const full = blow.clock - blow.histStart >= BLOW_START_S
   blow.sustain = count ? above / count : 0
   blow.jitter = count > 1 ? jSum / (count - 1) : 0
+  const earlyFull = blow.clock - blow.histStart >= BLOW_EARLY_S
+  const earlySustain = eCount ? eAbove / eCount : 0
+  const earlyJitter = eCount > 1 ? eJSum / (eCount - 1) : 0
 
   // Candidate and strict detectors.
   const shape = !!(prof && prof.template)
@@ -242,6 +255,15 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
   else if (blow.tone >= Math.max(toneMax, BLOW_MAX_TONE)) why = 'tone'
   blow.candidate = !why
   if (!why && blow.tone >= toneMax) why = 'tone'
+  // Early: the gentle start of an exhale the app is waiting for. The stop
+  // level and shape (the strict detector's keep rules) held over a short
+  // window, so a soft exhale counts within ~0.15 s; taps and bumps are too
+  // short, voices too tonal, other noises the wrong shape.
+  blow.early = earlyFull && earlySustain >= BLOW_SUSTAIN_FRAC
+    && blow.excess > earlyLevel
+    && earlyJitter <= jitterMax
+    && (shape ? blow.match > prof.matchOff : blow.coverage > (prof ? BLOW_OFF_COVERAGE : BLOW_ON_COVERAGE))
+    && blow.tone < BLOW_MAX_TONE
   const wantOff = blow.excess < levelOff
     || blow.tone > toneMax * 1.2
     || (shape ? blow.match < prof.matchOff : blow.coverage < BLOW_OFF_COVERAGE)
@@ -262,12 +284,9 @@ export function analyzeBlowFrame(blow, bins, lo, n, hz, dt, { prof = null, calEx
   blow.strength = clamp((blow.excess - levelOff) / (prof ? prof.range : BLOW_RANGE_DB), 0, 1)
 }
 
-// The mic check's result from its recorded blow frames (rise per band,
-// smoothed rise, tone, jitter) and the quiet step's rises.
-// tailExcesses / tailFrames: the last third of each blow, so the off
-// thresholds reach down to how quiet (and what shape) the user's exhale gets
-// as it ends, and a real exhale isn't cut off before it's over.
-export function buildProfile(frames, excesses, tones, jitters, quietExcesses, tailExcesses = [], tailFrames = []) {
+// The frames' mean rise per band, mean-centred and unit length (null if it's
+// too flat to have a shape): a template for shapeMatch.
+export function makeTemplate(frames) {
   const bands = frames[0].length
   const mean = new Float32Array(bands)
   for (const f of frames) for (let b = 0; b < bands; b++) mean[b] += f[b] / frames.length
@@ -276,8 +295,22 @@ export function buildProfile(frames, excesses, tones, jitters, quietExcesses, ta
   const template = new Float32Array(bands)
   let norm = 0
   for (let b = 0; b < bands; b++) { template[b] = mean[b] - avg; norm += template[b] * template[b] }
-  const hasShape = Math.sqrt(norm / bands) >= TEMPLATE_MIN_SPREAD_DB
-  if (hasShape) { norm = Math.sqrt(norm); for (let b = 0; b < bands; b++) template[b] /= norm }
+  if (Math.sqrt(norm / bands) < TEMPLATE_MIN_SPREAD_DB) return null
+  norm = Math.sqrt(norm)
+  for (let b = 0; b < bands; b++) template[b] /= norm
+  return template
+}
+
+// The mic check's result from its recorded blow frames (rise per band,
+// smoothed rise, tone, jitter) and the quiet step's rises.
+// tailExcesses / tailFrames: the last third of each blow, so the off
+// thresholds reach down to how quiet (and what shape) the user's exhale gets
+// as it ends, and a real exhale isn't cut off before it's over.
+export function buildProfile(frames, excesses, tones, jitters, quietExcesses, tailExcesses = [], tailFrames = []) {
+  if (!frames.length) return null
+  const bands = frames[0].length
+  const template = makeTemplate(frames)
+  const hasShape = !!template
   const matchOn = hasShape
     ? clamp(percentile(frames.map((f) => shapeMatch(f, template)), 0.2) - 0.1, 0.2, 0.75)
     : 0

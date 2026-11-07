@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   FFT_SIZE, BLOW_LOW_HZ, BLOW_HIGH_HZ, BLOW_MAX_TONE, BLOW_CALIBRATE_S,
-  createBlowState, resetBlowState, analyzeBlowFrame, buildProfile,
+  createBlowState, resetBlowState, analyzeBlowFrame, buildProfile, shapeMatch, makeTemplate,
 } from './blowDetector'
 
 // Control Options other than the sliders: each one drives the breath value
@@ -49,6 +49,8 @@ const CAL_EXHALE_S = 5          // the columns drain over this, from the Exhale 
 const CAL_MIN_BLOW_S = 0.6        // shorter sounds aren't counted as a blow
 const CAL_SKIP_S = 0.15           // each blow's onset isn't recorded
 const CAL_END_GRACE_S = 0.5       // a blow ends once the loose detector has been off this long
+const CAL_REF_S = 1               // the blow's first this-long (after CAL_SKIP_S) sets its shape...
+const CAL_SAME_BLOW_MATCH = 0.3   // ...and a sound matching it less than this isn't the blow
 const CAL_MAX_BLOW_S = 20         // safety cap: nothing past this is recorded
 const CAL_HINT_S = 10             // no blow this long: suggest closer / harder
 const CAL_DONE_MS = 1200          // "Got it" shows this long
@@ -258,7 +260,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       tiltTimer = setTimeout(() => { if (!gotTilt) onTiltFailRef.current?.() }, TILT_NO_READING_MS)
     }
 
-    const blowOff = () => { blow.on = blow.raw = blow.candidate = false }
+    const blowOff = () => { blow.on = blow.raw = blow.candidate = blow.early = false }
     // Reads the mic into blow.on / blow.candidate / blow.strength (0-1).
     const readBlow = (dt) => {
       if (!micLive()) { blowOff(); silentMs = 0; return }
@@ -321,12 +323,19 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         // A blow starts only when it isn't tonal, so the Exhale bell doesn't count.
         // It ends only once the loose detector has been off CAL_END_GRACE_S, so
         // the quiet, flickering end of a long exhale stays part of it; frames
-        // are recorded only while the loose detector hears it.
-        const on = blow.raw && (!!cal.cur || blow.tone < BLOW_MAX_TONE)
-        if (on && !cal.cur) cal.cur = { t: 0, offT: 0, frames: [], excesses: [], tones: [], jitters: [] }
+        // are recorded only while the loose detector hears it. Once the blow's
+        // first CAL_REF_S has set its shape (c.ref), a sound of another shape
+        // (the in-breath that follows, a voice) counts as off too, so it ends
+        // the blow instead of being learned as part of it; a quiet end too flat
+        // to have a shape still counts as the blow.
+        const c0 = cal.cur
+        const same = !c0 || !c0.ref || shapeMatch(blow.rise, c0.ref, 1) >= CAL_SAME_BLOW_MATCH
+        const on = blow.raw && same && (!!c0 || blow.tone < BLOW_MAX_TONE)
+        if (on && !cal.cur) cal.cur = { t: 0, offT: 0, ref: null, frames: [], excesses: [], tones: [], jitters: [] }
         if (cal.cur) {
           const c = cal.cur
           c.t += dt
+          if (!c.ref && c.t >= CAL_SKIP_S + CAL_REF_S && c.frames.length) c.ref = makeTemplate(c.frames) || false
           c.offT = on ? 0 : c.offT + dt
           if (on && c.t > CAL_SKIP_S && c.t < CAL_MAX_BLOW_S) {
             c.frames.push(Float32Array.from(blow.rise))
@@ -352,7 +361,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           }
         }
         if (!cal.cur) cal.noBlowT += dt
-        if (cal.blows >= CAL_BLOWS) {
+        if (cal.blows >= CAL_BLOWS && cal.frames.length) {
           blowProfile = buildProfile(cal.frames, cal.excesses, cal.tones, cal.jitters, cal.quiet, cal.tailExcesses, cal.tailFrames)
           cal.step = 'done'
           cal.t = 0
@@ -389,6 +398,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         const d = blowDetailRef.current
         const isBlow = control === 'blow'
         d.candidate = isBlow && blow.candidate
+        d.early = isBlow && blow.early
         d.strict = isBlow && blow.on
         d.tone = isBlow ? blow.tone : 0
         d.why = isBlow ? blow.why : ''
@@ -418,7 +428,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
         debugEl.textContent =`mic ${micLive() ? 'live' : 'off'}  ctx ${micCtx ? micCtx.state : '--'}  silent ${Math.round(silentMs)}ms\n`
           + `rise ${blow.excess.toFixed(1)}dB (frame ${blow.frameExcess.toFixed(1)})  bands ${Math.round(blow.coverage * 100)}%\n`
           + `sustain ${Math.round(blow.sustain * 100)}%  jitter ${blow.jitter.toFixed(1)}dB  tone ${blow.tone.toFixed(2)}  match ${blow.match === null ? '--' : blow.match.toFixed(2)}\n`
-          + `raw ${blow.raw ? 'on' : 'off'}  cand ${blow.candidate ? 'on' : 'off'}  check ${cal.step}\n`
+          + `raw ${blow.raw ? 'on' : 'off'}  early ${blow.early ? 'on' : 'off'}  cand ${blow.candidate ? 'on' : 'off'}  check ${cal.step}\n`
           + (blowProfile
             ? `profile: level ${blowProfile.levelOn.toFixed(1)}/${blowProfile.levelOff.toFixed(1)}dB  match ${blowProfile.template ? `${blowProfile.matchOn.toFixed(2)}/${blowProfile.matchOff.toFixed(2)}` : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
             : 'profile: none\n')
@@ -474,7 +484,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       window.removeEventListener('deviceorientation', onTilt)
       if (useMic) releaseMic()
       if (blowRef) blowRef.current = 0
-      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { candidate: false, strict: false, tone: 0, why: '', rise: 0, offWhy: '', offRise: 0 })
+      if (blowDetailRef && blowDetailRef.current) Object.assign(blowDetailRef.current, { candidate: false, early: false, strict: false, tone: 0, why: '', rise: 0, offWhy: '', offRise: 0 })
       if (readoutRef) readoutRef.current = null
       if (calStatusRef) calStatusRef.current = null
       debugEl?.remove()

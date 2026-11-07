@@ -209,13 +209,14 @@ export default function SpaceshipBayJ({
     const v = THREE.MathUtils.clamp(leftVal.current, 0, 1)
     if (s.prevV !== null && dt > 0) s.fallRate += ((s.prevV - v) / dt - s.fallRate) * (1 - Math.exp(-dt / 0.15))
     s.prevV = v
-    // On the mic: the strict detector, or the candidate (a blow that lasts, is
+    // On the mic: the strict detector, the candidate (a blow that lasts, is
     // steady and has the user's shape, with a looser tone limit so the ringing
-    // Exhale bell or a swell in the music can't hold it back). Taps, bumps
-    // and voices pass neither.
+    // Exhale bell or a swell in the music can't hold it back), or early (the
+    // user's stop level and shape held 0.15 s, so a gentle exhale starts the
+    // ship at once and keeps it going). Taps, bumps and voices pass none.
     const strict = !!(blowRef && blowRef.current > 0.5)
     const detail = blowDetailRef && blowDetailRef.current
-    const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && detail.candidate)
+    const blowing = micFailed ? s.fallRate > SLIDER_BLOW_RATE : strict || !!(detail && (detail.candidate || detail.early))
     if (blowing) s.lastBlow = now
     // ?shipdebug: why the mic stopped hearing the blow mid-flight (it only flashes by live).
     if (!blowing && s.wasBlowing && (s.phase === 'flying' || s.phase === 'slowing') && detail) {
@@ -543,7 +544,7 @@ export default function SpaceshipBayJ({
         `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
         `x ${px.toFixed(2)} ${inside ? 'lined up' : 'off to the side'}`,
         `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
-        `strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
+        `strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  early ${detail && detail.early ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
         `last trip: ${s.lastEnd}`,
         `blow lost: ${s.lostBlow || '--'}`,
       ].join('\n')
