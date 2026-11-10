@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTouchSlider } from './useTouchSlider'
 import { UI_EDGE, UI_INTERIOR, UI_FILL, UI_THUMB, UI_THUMB_GLOW } from './uiColors'
-import { HOLD_CIRCLE_SIZE, HOLD_CIRCLE_BOTTOM } from './HoldCircle'
 import {
   CURVE_BOX_W, CURVE_BOX_H, TRACK_THICKNESS, THUMB_SIZE,
   P0_FRAC, P2_FRAC, sampleCurve, getPathD, pointAtArcFrac,
@@ -18,10 +17,9 @@ const HOLD_LABEL_GAP = 4    // Box Breathing's "hold" labels: gap to their inhal
 // label (~52 px wide) by about 8 px on each side.
 const HOLD_OUT_TOP_Y = 94
 // labelsOnly (Space Ship on the mic): one "inhale" over "exhale", stacked
-// above the hold circle between Home and Restart (measured from the screen's
+// between Home and Restart on their bottom line (measured from the screen's
 // bottom, so the layer's shiftUp is taken back out).
-const STACK_CIRCLE_GAP = 8
-const STACK_EXHALE_BOTTOM = HOLD_CIRCLE_BOTTOM + HOLD_CIRCLE_SIZE + STACK_CIRCLE_GAP
+const STACK_EXHALE_BOTTOM = 16
 const STACK_INHALE_BOTTOM = STACK_EXHALE_BOTTOM + LABEL_SIZE + HOLD_LABEL_GAP
 
 const labelStyle = {
@@ -142,7 +140,7 @@ function DiagonalTrack({ sliderRef, value, side, labelsOnly }) {
 // drivenValue (0 exhale -> 1 inhale, or null): another Control Option is
 // driving the breath, so the thumbs show it and the tracks ignore touches.
 // labelsOnly (Space Ship on the mic): hide the tracks and thumbs; one
-// "inhale" over "exhale" stacked above the hold circle (HoldCircle).
+// "inhale" over "exhale" stacked between Home and Restart.
 export default function SlidersDiagonal({ onLeft, onRight, leftRawRef, rightRawRef, shiftUp = 0, disabledRef = null, drivenValue = null, labelsOnly = false }) {
   const driven = drivenValue !== null
   const drivenRef = useRef(driven)

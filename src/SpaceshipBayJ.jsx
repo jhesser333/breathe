@@ -71,7 +71,7 @@ const EXIT_TILT_DEADZONE_DEG = 3 // phone roll under this = level: random exit s
 const EXIT_OFFSCREEN_NDC = 1.15  // pops out once past this far off the screen
 const EXIT_MAX_S = 2.8           // ...or after this long
 const FLOOR_SCREEN_PX = 80       // floor front edge above the screen's bottom
-const FLOOR_SCREEN_PX_MIC = 160  // ...on the mic, clearing the hold circle + labels (~144 px)
+const FLOOR_SCREEN_PX_MIC = 96   // ...on the mic, clearing the stacked labels (~64 px)
 const CUBE_FADE_S = 1
 const COLUMN_SINK_S = 0.6
 // Coaching text (onShipText; App fades each in/out over TEXT_FADE_S):
@@ -569,7 +569,7 @@ export default function SpaceshipBayJ({
         `z ${s.z.toFixed(1)} (spheres at ${(SPHERE_Z + SPHERE_R).toFixed(1)})`,
         `x ${px.toFixed(2)} ${inside ? 'lined up' : 'off to the side'}`,
         `blow ${s.blowS.toFixed(1)} s  ${blowing ? 'BLOWING' : 'quiet'}`,
-        `touch ${detail && detail.listening ? 'held' : 'not held'}  strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  early ${detail && detail.early ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
+        `flat ${detail && detail.listening ? 'yes' : 'no'}  strict ${strict ? 'on' : 'off'}  cand ${detail && detail.candidate ? 'on' : 'off'}  early ${detail && detail.early ? 'on' : 'off'}  tone ${detail ? detail.tone.toFixed(2) : '--'}  why ${detail && detail.why ? detail.why : '--'}`,
         `last trip: ${s.lastEnd}`,
         `blow lost: ${s.lostBlow || '--'}`,
       ].join('\n')

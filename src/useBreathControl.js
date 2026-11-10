@@ -25,6 +25,11 @@ const TILT_EXHALE_DEG = 25
 const TILT_INHALE_DEG = 65        // 25 degrees back from vertical
 const TILT_SMOOTH_S = 0.15
 const TILT_NO_READING_MS = 1000   // no reading this long after starting = no sensor
+// Space Ship (blowNeedsFlat): the mic's blow counts only while the phone is
+// tilted flat. Within FLAT_ON_DEG of flat opens the gate; tilting back up past
+// FLAT_OFF_DEG closes it (hysteresis, so it doesn't flicker at the edge).
+const FLAT_ON_DEG = 35
+const FLAT_OFF_DEG = 45
 // Blow on the Mic: the detection itself (what counts as a blow, the noise
 // floor, the mic check's profile) is in blowDetector.js.
 const BLOW_NO_DATA_DB = -110      // below this the analyser has no audio
@@ -152,7 +157,7 @@ const onButton = (e) => !!(e.target && e.target.closest && e.target.closest('but
 // Mic check: a new non-zero calibrateKey starts one (0 = none); calStatusRef
 // gets { step, blows, needed, hint, level } each frame for the overlay, and
 // onCalibrated() is called when it's done.
-export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef, blowDetailRef, allSensors = false, readoutRef, calibrateKey = 0, calStatusRef, onCalibrated, blowNeedsTouch = false }) {
+export function useBreathControl({ control, disabledRef, resetKey, onValue, onTiltFail, onMicFail, getQuietRate, blowRef, blowDetailRef, allSensors = false, readoutRef, calibrateKey = 0, calStatusRef, onCalibrated, blowNeedsFlat = false }) {
   const [shown, setShown] = useState(null)
   const onValueRef = useRef(onValue)
   onValueRef.current = onValue
@@ -166,9 +171,9 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
   onCalibratedRef.current = onCalibrated
   const calibrateKeyRef = useRef(calibrateKey)
   calibrateKeyRef.current = calibrateKey
-  // Space Ship: the mic's blow only counts while a finger holds the screen.
-  const blowNeedsTouchRef = useRef(blowNeedsTouch)
-  blowNeedsTouchRef.current = blowNeedsTouch
+  // Space Ship: the mic's blow only counts while the phone is tilted flat.
+  const blowNeedsFlatRef = useRef(blowNeedsFlat)
+  blowNeedsFlatRef.current = blowNeedsFlat
   const vRef = useRef(0)
 
   useEffect(() => { vRef.current = 0 }, [resetKey])
@@ -179,7 +184,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     let lastSent = -1
     const disabled = () => !!disabledRef?.current
     const useMic = control === 'blow' || allSensors
-    const useTilt = control === 'tilt' || allSensors
+    const useTilt = control === 'tilt' || allSensors || blowNeedsFlat
 
     // Pointers held down (not on buttons).
     const down = new Map()   // pointerId -> { y, t, lastMoveT }
@@ -187,6 +192,8 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     let speed = 0            // Single Slider: smoothed finger speed in v units/s (+ = up)
     let glideDir = 0         // +1 / -1 while gliding to an end
     let tiltTarget = null
+    let tiltBeta = null      // raw beta in degrees (0 flat, 90 upright)
+    let flatOpen = false     // blowNeedsFlat: the phone is flat (with hysteresis)
     let gotTilt = false
     // Blow on the Mic: the detector's state (blowDetector.js). raw = the
     // loose detector (loud and broad, nothing else), used by the mic check to
@@ -249,7 +256,11 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
     const onTilt = (e) => {
       if (e.beta === null || e.beta === undefined) return
       gotTilt = true
-      tiltTarget = Math.min(1, Math.max(0, (e.beta - TILT_EXHALE_DEG) / (TILT_INHALE_DEG - TILT_EXHALE_DEG)))
+      tiltBeta = e.beta
+      const fromFlat = Math.abs(e.beta)
+      if (fromFlat <= FLAT_ON_DEG) flatOpen = true
+      else if (fromFlat >= FLAT_OFF_DEG) flatOpen = false
+      tiltTarget =Math.min(1, Math.max(0, (e.beta - TILT_EXHALE_DEG) / (TILT_INHALE_DEG - TILT_EXHALE_DEG)))
     }
 
     const opts = { passive: true }
@@ -396,11 +407,12 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           level: clamp(blow.excess / 15, 0, 1),
         }
       }
-      // blowNeedsTouch (Space Ship): the blow only counts while a finger holds
-      // the screen (not a button), so noises at other times can't fly the ship.
+      // blowNeedsFlat (Space Ship): the blow only counts while the phone is
+      // tilted flat (upright = inhale), so noises at other times can't fly the
+      // ship. No tilt reading (no sensor / permission) leaves the gate open.
       // The detector itself keeps running, so the floor stays current and a
-      // blow already going is heard the moment the finger lands.
-      const listening = !blowNeedsTouchRef.current || down.size > 0
+      // blow already going is heard the moment the phone tips flat.
+      const listening = !blowNeedsFlatRef.current || tiltBeta === null || flatOpen
       const blowOn = blow.on && listening
       if (blowRef) blowRef.current = control === 'blow' && blowOn ? 1 : 0
       if (blowDetailRef && blowDetailRef.current) {
@@ -442,7 +454,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
           + (blowProfile
             ? `profile: level ${blowProfile.levelOn.toFixed(1)}/${blowProfile.levelOff.toFixed(1)}dB  match ${blowProfile.template ? `${blowProfile.matchOn.toFixed(2)}/${blowProfile.matchOff.toFixed(2)}` : 'off'}  tone ${blowProfile.toneMax.toFixed(2)}  jitter ${blowProfile.jitterMax.toFixed(1)}\n`
             : 'profile: none\n')
-          + `${status}${blowNeedsTouchRef.current ? `  touch ${listening ? 'held' : 'not held'}` : ''}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}\n`
+          + `${status}${blowNeedsFlatRef.current ? `  flat ${listening ? 'yes' : 'no'} (beta ${tiltBeta === null ? '--' : `${Math.round(tiltBeta)}°`})` : ''}  tilt ${tiltTarget === null ? '--' : tiltTarget.toFixed(2)}  v ${v.toFixed(2)}\n`
           + `last block: ${lastBlock ? `${lastBlock.why} (rise ${lastBlock.rise.toFixed(1)}dB) ${ago(lastBlock.clock)}` : '--'}\n`
           + `last stop: ${blow.offWhy ? `${blow.offWhy} (rise ${blow.offRise.toFixed(1)}dB${levelOffNow === null ? '' : `, stop level ${levelOffNow.toFixed(1)}`}) ${ago(blow.offClock)}` : '--'}`
       }
@@ -499,7 +511,7 @@ export function useBreathControl({ control, disabledRef, resetKey, onValue, onTi
       if (calStatusRef) calStatusRef.current = null
       debugEl?.remove()
     }
-  }, [control, disabledRef, allSensors])
+  }, [control, disabledRef, allSensors, blowNeedsFlat])
 
   return shown
 }

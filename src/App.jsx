@@ -30,7 +30,6 @@ import GatesBoxBreathingD from './GatesBoxBreathingD'
 import GatesBoxBreathingHeadlessE from './GatesBoxBreathingHeadlessE'
 import Sliders from './Sliders'
 import SlidersDiagonal from './SlidersDiagonal'
-import HoldCircle from './HoldCircle'
 import SelectModeScreen from './SelectModeScreen'
 import SliderLayoutsScreen from './SliderLayoutsScreen'
 import PersonalizeScreen from './PersonalizeScreen'
@@ -1791,7 +1790,7 @@ export default function App() {
     calibrateKey: micCheckKey,
     calStatusRef: micCheckStatusRef,
     onCalibrated: () => finishMicCheck(),
-    blowNeedsTouch: shapeOption === 'j',
+    blowNeedsFlat: shapeOption === 'j',
   })
 
   // Mic check done or skipped: unmute and run the mode's opening.
@@ -2382,7 +2381,6 @@ export default function App() {
             <button onClick={handleRestart} style={{ ...navPillStyle, position: 'absolute', bottom: 16, right: 16 }}>
               Restart
             </button>
-            {shapeOption === 'j' && breathControl === 'blow' && <HoldCircle />}
           </>
         ) : (
           <div ref={navButtonsRef} style={{

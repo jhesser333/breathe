@@ -73,8 +73,8 @@ export const TEXTS = {
   // Balloon (Shape H): the door closed because no exhale came after the bell.
   balloonRetry: 'Try inhale again and exhale when the bell rings.',
   // Space Ship (j): alternating inhale coaching, and the exhale prompt.
-  shipInhaleA: 'Slowly fill your lungs up.',
+  shipInhaleA: 'Hold your phone upright and slowly fill your lungs.',
   shipInhaleB: 'Exhale for about six seconds to reach a sphere.',
   shipChoose: 'Tilt your phone to choose a sphere.',
-  shipBlow: 'Hold the screen and blow on the mic.',
+  shipBlow: 'Tilt your phone flat and blow on the mic.',
 }
